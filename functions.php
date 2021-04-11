@@ -360,24 +360,24 @@ function validate_n_wrap_form($src_data,$fields_,&$errors_)
    return $res_data;
 }
 
-function daf_feedback_check_trap($val_)
+function feedback_check_trap($val_)
 {
-   return ($val_=="" ? "ok" : ""); //Trap must be empty to pass the test. //NOTE: The daf_feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
+   return ($val_=="" ? "ok" : ""); //Trap must be empty to pass the test. //NOTE: The feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
 }
 
-function daf_feedback_wrap_string($val_)
+function feedback_wrap_string($val_)
 {
-   return htmlspecialchars(trim(substr(strip_tags($val_),0,255)));   //NOTE: The daf_feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
+   return htmlspecialchars(trim(substr(strip_tags($val_),0,255)));   //NOTE: The feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
 }
 
-function daf_feedback_wrap_text($val_)
+function feedback_wrap_text($val_)
 {
-   return htmlspecialchars(trim(substr(strip_tags($val_),0,20480))); //NOTE: The daf_feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
+   return htmlspecialchars(trim(substr(strip_tags($val_),0,20480))); //NOTE: The feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
 }
 
-function daf_feedback_wrap_int($val_)
+function feedback_wrap_int($val_)
 {
-   return (is_numeric($val_) ? intval($val_) : ""); //NOTE: The daf_feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
+   return (is_numeric($val_) ? intval($val_) : ""); //NOTE: The feedback_validate_n_wrap_form() requires exact "" to teat $val_ as inacceptable.
 }
 
 ?>
