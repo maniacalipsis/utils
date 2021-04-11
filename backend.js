@@ -14,7 +14,8 @@ class MediaList
       this._MediaSelectorClass=params_.MediaSelector??this._MediaSelectorClass;
       this._mediaSelectorParams=params_.MediaSelectorParams??this._mediaSelectorParams;
       
-      this._limit=params_.limit??is._limit;
+      this._limit=params_.limit??this._limit;
+      this._immediate=params_.immediate??this._immediate;
       
       if (wp.media&&this._input&&this._container)
       {
@@ -24,20 +25,21 @@ class MediaList
          {
             if (this._input.value)
                mediaList=JSON.parse(this._input.value);
-         }
-         catch (ex)
-         {
-            console.error('LogoList.constructor suffers JSON error:',ex);
-         }
-         finally
-         {
+            
             mediaList??(mediaList=[]);
             for (let media of mediaList)
                this.add(new this._MediaSelectorClass(media,this,this._mediaSelectorParams));
+         }
+         catch (ex)
+         {
+            console.error('MediaList.constructor suffers JSON error:',ex,' Input value is ',this._input.value);
+         }
+         finally
+         {
             
             this.add(); //+ one empty selector.
             
-            if (this._input.form)
+            if (!this._immediate&&this._input.form)
                this._input.form.addEventListener('submit',()=>{this._input.value=JSON.stringify(this.list);});
          }
       }
@@ -60,6 +62,7 @@ class MediaList
    _MediaSelectorClass=MediaSelector;  //MediaSelector class.
    _mediaSelectorParams=null;          //Params for MediaSelector's constructor.
    _limit=0;         //Maximal amount of media files selected.
+   _immediate=false;
    
    //public methods
    add(mediaSelector_)
@@ -108,6 +111,9 @@ class MediaList
          
          if (this._selectors.length==0)
             this.add(new this._MediaSelectorClass(null,this,this._mediaSelectorParams));
+         
+         if (this._immediate)
+            this._input.value=JSON.stringify(this.list);
       }
    }
    
@@ -124,6 +130,8 @@ class MediaList
       if (allHasMedia)
          this.add(new this._MediaSelectorClass(null,this,this._mediaSelectorParams));
       
+      if (this._immediate)
+         this._input.value=JSON.stringify(this.list);
    }
    
    //private methods
