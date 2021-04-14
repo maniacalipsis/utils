@@ -133,6 +133,8 @@ class ThemeSetup
       foreach ($this->admin_scripts as $asset_key=>$asset_url)
          wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
       
+      wp_enqueue_media();
+      
       //Add settings pages:
       foreach ($this->settings_pages as $setting_page)
          $setting_page->setup();
@@ -198,9 +200,10 @@ class ThemeSettingsPage
       ?>
          <FORM NAME="<?=$this->key?>" ACTION="options.php" METHOD="post">
       <?php
+      submit_button();                   //Additional submit button at the top.
       settings_fields($this->key);       //Output hidden inputs ?for the settings registered?.
       do_settings_sections($this->key);  //Output setting sections.
-      submit_button();                    //Output submit button.
+      submit_button();                   //Output submit button.
       ?>
          </FORM>
       <?php
