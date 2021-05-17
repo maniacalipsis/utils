@@ -15,6 +15,14 @@ class ThemeSetup
    public $page_supports=[];
    public $post_supports=[];
    
+   public $allowed_mimes=["svg"=>"image/svg+xml"];
+   public $disallowed_mimes=[];
+   
+   public $unwanted_public_styles=[];
+   public $unwanted_public_scripts=[];
+   public $unwanted_admin_styles=[];
+   public $unwanted_admin_scripts=[];
+   
    public $public_styles=[];
    public $public_scripts=[];
    public $admin_styles=[];
@@ -51,6 +59,31 @@ class ThemeSetup
       ];
    }
    
+   public function remove_action($tag_,$callback_,$priority_=null,$argc_=null)
+   {
+      $was_found=false;
+      //Try to find this action into the adding list:
+      foreach ($this->actions_to_add as $i=>$action)
+         if (($action["tag"]==$tag_)&&($action["callback"]==$callback_)&&(arr_val($action,"priority")==$priority_)&&(arr_val($action,"argc")==$argc_))
+         {
+            unset($this->actions_to_add[$i]);
+            $was_found=true;
+            break;
+         }
+      
+      //If the action is builtin or thirdparty's then add it to removal list:
+      if (!$was_found)
+      {
+         $act=["tag"=>$tag_,"callback"=>$callback_];
+         if ($priority_!==null)
+            $act["priority"]=$priority_;
+         if ($argc_!==null)
+            $act["argc"]=$argc_;
+      }
+      
+      $this->actions_to_remove[]=$act;
+   }
+   
    public function add_action($tag_,$callback_,$priority_=null,$argc_=null)
    {
       $act=["tag"=>$tag_,"callback"=>$callback_];
@@ -78,6 +111,9 @@ class ThemeSetup
       //Performs the admin page setup.
       //Call this after set all properties needed.
       
+      //Allow mimes
+      add_filter("upload_mimes",[$this,"filter_allowed_mimes_callback"]);
+      
       //Remove actions:
       foreach ($this->actions_to_remove as $action)
          remove_action($action["tag"],$action["callback"],arr_val($action,"priority",10)); //WP's default action priority is 10,
@@ -91,8 +127,27 @@ class ThemeSetup
    }
    
    //Callbacks
+   public function filter_allowed_mimes_callback($mimes_)
+   {
+      foreach ($this->allowed_mimes as $key=>$mime)
+         $mimes_[$key]=$mime;
+      
+      foreach ($this->disallowed_mimes as $key=>$mime)
+         if (key_exists($key,$mimes_))
+            unset($mimes_[$key]);
+      
+      return $mimes_;
+   }
+   
    public function enqueue_public_assets_callback()
    {
+      //Remove unwanted styles and scripts:
+      foreach ($this->unwanted_public_styles as $asset_key)
+         wp_dequeue_style($asset_key);
+      
+      foreach ($this->unwanted_public_scripts as $asset_key)
+         wp_dequeue_script($asset_key);
+      
       //Add public styles and scripts:
       $theme_url=get_stylesheet_directory_uri();
       
@@ -124,6 +179,13 @@ class ThemeSetup
    
    public function init_admin_menu_callback()
    {
+      //Remove unwanted styles and scripts:
+      foreach ($this->unwanted_admin_styles as $asset_key)
+         wp_dequeue_style($asset_key);
+      
+      foreach ($this->unwanted_admin_scripts as $asset_key)
+         wp_dequeue_script($asset_key);
+      
       //Add admin styles and scripts:
       $theme_url=get_stylesheet_directory_uri();
       

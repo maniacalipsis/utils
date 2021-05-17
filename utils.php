@@ -11,6 +11,7 @@ Plugin URI:
 define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_PARTIAL_OUTPUT_ON_ERROR);
 
 require_once(__DIR__."/functions.php");   //Utilities.
+require_once(__DIR__."/post_meta.php");   //Custom posts metaboxes.
 require_once(__DIR__."/theme_setup.php"); //Theme setup clases.
 require_once(__DIR__."/shortcodes.php");  //Set of the most commonly used shortcodes.
 
@@ -22,8 +23,8 @@ function utilities_init()
    //Backend-specific utils:
    if (is_admin())
    {
-      wp_enqueue_script("backend_utils",plugins_url("/backend.js",__FILE__));
-      wp_enqueue_style("backend_utils",plugins_url("/backend.css",__FILE__));
+      wp_enqueue_script("admin_utils",plugins_url("/admin.js",__FILE__));
+      wp_enqueue_style("admin_utils",plugins_url("/admin.css",__FILE__));
    }      
 }
 add_action("init","utilities_init");

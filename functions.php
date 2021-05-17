@@ -5,7 +5,7 @@
 /* Contact: imroot@maniacalipsis.ru */
 /* License: GNU GPL v3              */
 /*----------------------------------*/
-/* Utiliti functions                */
+/* Utility functions                */
 /* (partially migrated from         */
 /*  ThePatternEngine v3.3)          */
 /*==================================*/
@@ -19,6 +19,32 @@ function similar($a_,$b_)
    //As the == is more equal for the task, the same() uses it after excluding of that cases when the == "misses".
    
    return (($a_===0||$a_===false)&&(is_null($b_)||$b_===""||$b_===[]))||(($b_===0||$b_===false)&&(is_null($a_)||$a_===""||$a_===[])) ? false : (($a_===""&&$b_===[])||($b_===""&&$a_===[]) ? true : $a_==$b_);
+}
+
+function wp_bs_escape($val_)
+{
+   //As WP applies the wp_unslash() to the data before putting to DB, the JSON 
+   return str_replace("\\","[[_bs]]",$val_);
+}
+
+function wp_bs_unescape($val_)
+{
+   //As WP applies the wp_unslash() to the data before putting to DB, the JSON 
+   return str_replace("[[_bs]]","\\",$val_);
+}
+
+function decode_request($raw_req_)
+{
+   if (is_array($raw_req_))
+   {
+      $res=[];
+      foreach ($raw_req_ as $key=>$val)
+         $res[$key]=decode_request($val);
+   }
+   else
+      $res=stripcslashes($raw_req_);
+   
+   return $res;
 }
 
 /* --------------------------------------- string utilities --------------------------------------- */
@@ -49,6 +75,18 @@ function mb_icmp($str1_,$str2_)
    //Multibyte case insensitive compare
    
    return strcmp(mb_convert_case($str1_,MB_CASE_LOWER),mb_convert_case($str2_,MB_CASE_LOWER));
+}
+
+
+
+function translate_date($date_str_,$is_genitive_=false)
+{
+   $months_l_en=["January","February","March","April","May","June","July","August","September","October","November","December"];
+   $months_l_ru=[
+                   ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"],
+                   ["Января","Февраля","Марта","Апреля","Мая","Июня","Июля","Августа","Сентября","Октября","Ноября","Декабря"],
+                ];
+   return str_replace($months_l_en,$months_l_ru[$is_genitive_],$date_str_);
 }
 
 /* --------------------------------------- array utilities --------------------------------------- */
