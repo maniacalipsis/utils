@@ -28,6 +28,8 @@ class ThemeSetup
    public $admin_styles=[];
    public $admin_scripts=[];
    
+   public $remove_category_base=true;
+   
    protected $required_plugins=["Utlilties"=>"FSG a.k.a ManiaC"];
    
    protected $actions_to_remove=null;
@@ -111,8 +113,10 @@ class ThemeSetup
       //Performs the admin page setup.
       //Call this after set all properties needed.
       
-      //Allow mimes
-      add_filter("upload_mimes",[$this,"filter_allowed_mimes_callback"]);
+      //Add filters:
+      add_filter("upload_mimes",[$this,"filter_allowed_mimes_callback"]);  //Allow/disallow specified mimes.
+      if ($this->remove_category_base)
+         add_filter("category_link",[$this,"filter_category_link"],99);
       
       //Remove actions:
       foreach ($this->actions_to_remove as $action)
@@ -137,6 +141,11 @@ class ThemeSetup
             unset($mimes_[$key]);
       
       return $mimes_;
+   }
+   
+   public function filter_category_link($link_str_)
+   {
+      return str_replace("/category/","/",$link_str_);
    }
    
    public function enqueue_public_assets_callback()
