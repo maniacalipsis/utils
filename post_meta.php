@@ -8,6 +8,8 @@
 /* Custom posts metaboxes           */
 /*==================================*/
 
+namespace Utilities;
+
 class CustomMeta
 {
    //Allows to add a metabox[es], attaching a custom meta data to the posts, pages etc.

@@ -8,6 +8,8 @@
 /* WP Theme setup&settings classes  */
 /*==================================*/
 
+namespace Utilities;
+
 class ThemeSetup
 {
    public $noindex=false;

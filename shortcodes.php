@@ -8,9 +8,9 @@
 /* Most common shortcodes           */
 /*==================================*/
 
-namespace UtilityShortcodes;
+namespace Utilities;
 
-add_shortcode("date","UtilityShortcodes\date_shortcode");
+add_shortcode("date",__NAMESPACE__."\Shortcodes\date_shortcode");
 function date_shortcode($params_="",$content_="")
 {
    //Posts (basic post_type "post")
@@ -22,24 +22,75 @@ function date_shortcode($params_="",$content_="")
    return date(arr_val($params_,"format","Y-m-d H:i:s"));
 }
 
-class DataListShortcode
+abstract class Shortcode
 {
-   //A basic class for creating a parametrized multi-template shortcodes intended to output the lists of some data.
+   //A bare base for the parametrized multi-templated shortcodes.
+   
+   protected $name="";   //A unique name of the shortcode.
+   protected $tpl_pipe=[/*"tpl"=>"default_tpl"*/];  //Templates pipe. This allow to use a nested templates for e.g. output of the some elements lists. NOTE: This array must be initialized with complete default templates pipe. Otherwise the shortcode rendering will be broken.
+   protected $data=null;
+   //Rendering params, that can be defined only at the backend:
+   public $identity_class=null;  //CSS-class which identifies the certain shortcode's main node. If undefined, it's automatically set equal to shortcode's name.
+   
+   public function __construct($name_="")
+   {
+      if ($name_!="")         //NOTE: For the single
+         $this->name=$name_;
+      
+      if ($this->identity_class===null)
+         $this->identity_class=$this->name;
+      
+      //Register shortcode.
+      add_shortcode($this->name,[$this,"do"]);
+   }
+   
+   public function do($params_="",$content_="")
+   {
+      //This method does this shortcode.
+      
+      //WARNING: If shortcode has no params then an empty string will be passed to $params_, not [], thus attempitng to access $params_ elements will cause warning "Illegal string offset".
+      if (!is_array($params_))
+         $params_=[];
+      
+      //Process params and get the data:
+      $this->get_rendering_params($params_,$content_);
+      $this->get_data($params_);
+      
+      //Render shortcode:
+      return $this->{reset($this->tpl_pipe)}();  //Run the top-level template.
+   }
+   
+   protected function get_rendering_params($params_,$content_)
+   {
+      //Process the rendering params.
+      
+      //Select the templates:
+      foreach ($this->tpl_pipe as $key=>$tpl_name)
+      {
+         $tpl_method_name=arr_val($params_,$key,$tpl_name)."_".$key;
+         if (method_exists($this,$tpl_method_name))
+            $this->tpl_pipe[$key]=$tpl_method_name;
+      }
+   }
+   
+   abstract protected function get_data($params_); //Get and preformat the data. Set results to $this->data.
+   
+   //abstract protected function default_tpl();   //Return rendered shortcode. NOTE: this method isn't declared bacause the descendant classes may has a different template keys.
+}
+
+abstract class DataListShortcode extends Shortcode
+{
+   //A base for the shortcodes intended to output the lists of an items.
    // It supports a set of the most necessary parameters for output customization and has a flexible and extensible pipeline.
    // Also it provides a set of the most common list templates.
    //TODO: describe the usage.
    
-   public $name="list";   //Unique name of the shortcode.
-   protected $tpl_layers=["wrap_tpl","list_tpl","item_tpl"];
-   protected $wrap_tpl="default_wrap_tpl";
-   protected $list_tpl="default_list_tpl";
-   protected $item_tpl="default_item_tpl";
+   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","list_tpl"=>"default_list_tpl","item_tpl"=>"default_item_tpl"];
    //Data-related properties:
-   protected $filter=[];
    protected $data=[];
-   //Rendering params, that can be redefined just at the backend:
-   public $basic_list_class="list";
-   public $basic_item_class="item";
+   //Rendering params, that can be defined only at the backend:
+   public $list_class="grid";    //CSS-class for the simple list node.
+   public $item_class="";        //CSS-class for the items' nodes.
    //Rendering params, obtained only from shortcode and having no defaults:
    protected $custom_class="";   //Custon css-class. Where it will appear - is a matter of the templates.
    protected $attr_id="";        //ID attribute to be attached  e.g. to the main shortcode layout element.
@@ -47,44 +98,10 @@ class DataListShortcode
    //Rendering params, that has defaults and can be redefined into shortcode:
    public $empties_count=0;   //Number of the empty blocks for orphans alignment.
    
-   public function __construct($name_="")
-   {
-      if ($name_)
-         $this->name=$name_;
-      
-      add_shortcode($this->name,[$this,"render"]);
-   }
-   
-   public function render($params_="",$content_="")
-   {
-      //WARNING: If shortcode has no params then an empty string will be passed to $params_, not [], thus attempitng to access $params_ elements will cause warning "Illegal string offset".
-      if (!is_array($params_))
-         $params_=[];
-      
-      //Process params:
-      $this->get_filtering_params($params_);
-      $this->get_rendering_params($params_,$content_);
-      
-      //Get and render the data:
-      $this->get_data();
-      return $this->{$this->wrap_tpl}();  //Run the top-layer template.
-   }
-   
-   protected function get_filtering_params($params_)
-   {
-      //Process data filtering params.
-      //Abstract.
-   }
-   
    protected function get_rendering_params($params_,$content_)
    {
-      //Get templates:
-      foreach ($this->tpl_layers as $layer)
-      {
-         $tpl=arr_val($params_,$layer,"default")."_".$layer;
-         if (method_exists($this,$tpl))
-            $this->{$layer}=$tpl;
-      }
+      //Process the rendering params.
+      parent::get_rendering_params($params_,$content_);
       
       //Get list customizations params:
       $this->custom_class=arr_val($params_,"class",$this->custom_class);
@@ -101,17 +118,11 @@ class DataListShortcode
             $this->attr_data.=" ".strtoupper(str_replace("_","-",$key))."=\"".htmlspecialchars($val)."\"";
    }
    
-   protected function get_data()
-   {
-      //Get and preformat the data.
-      //Abstract.
-   }
-   
    protected function default_wrap_tpl()
    {
-      //By default there is no wrapping, so just pass.
+      //The default template makes no wrapping.
       
-      return $this->{$this->list_tpl}();
+      return $this->{$this->tpl_pipe["list_tpl"]}();  //Just pass and run the next template in the pipe.
    }
    
    protected function default_list_tpl()
@@ -120,10 +131,10 @@ class DataListShortcode
       
       ob_start();
       ?>
-      <DIV <?=$this->attr_id?> CLASS="<?=$this->basic_list_class?> grid <?=$this->custom_class?>">
+      <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->list_class?> <?=$this->custom_class?>">
          <?php
             foreach ($this->data as $item)
-               echo $this->{$this->item_tpl}($item);
+               echo $this->{$this->tpl_pipe["item_tpl"]}($item);
             
             echo $this->empties_tpl(); //Pad the items with empty blocks to align the orphans in the flex grid.
          ?>
@@ -138,10 +149,10 @@ class DataListShortcode
       
       ob_start();
       ?>
-      <DIV <?=$this->attr_id?> CLASS="<?=$this->basic_list_class?> slideshow <?=$this->custom_class?>" <?=$this->attr_data?>>
+      <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> slideshow <?=$this->custom_class?>" <?=$this->attr_data?>>
          <?php
             foreach ($this->data as $item)
-               echo $this->{$this->item_tpl}($item);
+               echo $this->{$this->tpl_pipe["item_tpl"]}($item);
          ?>
          <DIV CLASS="button prev"></DIV>
          <DIV CLASS="button next"></DIV>
@@ -156,12 +167,12 @@ class DataListShortcode
       
       ob_start();
       ?>
-      <DIV <?=$this->attr_id?> CLASS="<?=$this->basic_list_class?> scroller <?=$this->custom_class?>" <?=$this->attr_data?>>
+      <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> scroller <?=$this->custom_class?>" <?=$this->attr_data?>>
          <DIV CLASS="area">
             <DIV CLASS="content">
                <?php
                   foreach ($this->data as $item)
-                     echo $this->{$this->item_tpl}($item);
+                     echo $this->{$this->tpl_pipe["item_tpl"]}($item);
                ?>
             </DIV>
          </DIV>
@@ -184,60 +195,47 @@ class DataListShortcode
       
       //Output the list items:
       foreach ($this->data as $item)
-          $res.=$this->{$this->item_tpl}($item);
+          $res.=$this->{$this->tpl_pipe["item_tpl"]}($item);
       
       return $res;
    }
    
-   protected function default_item_tpl($item_data_)
-   {
-      //An example template for the data item.
-      //Abstract.
-      
-      ob_start();
-      ?>
-         <DIV CLASS="<?=$this->basic_item_class?>">
-            <?php
-            var_dump($item_data_)
-            ?>
-         </DIV>
-      <?php
-      return ob_get_clean();
-   }
+   abstract protected function default_item_tpl($item_data_);
    
    protected function empties_tpl()
    {
       //Returns a number of empty blocks to align the orphans in the flex grid.
+      //NOTE: It's an auxiliary template, and is not intended to be used in the pipe.
       
-      return str_repeat("\n         <DIV CLASS=\"".$this->basic_item_class." empty\"></DIV>",$this->empties_count);
+      return str_repeat("\n         <DIV CLASS=\"".$this->item_class." empty\"></DIV>",$this->empties_count);
    }
 }
 
-class PostsPrefabShortcode extends DataListShortcode
+abstract class PostsPrefabShortcode extends DataListShortcode
 {
    //A basic class for creating a parametrized multi-template shortcodes intended to output the posts.
    
-   public $name="posts";   //Shortcode name.
-   public $filter_defaults=["post_type"=>"post","category"=>1,"post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1];
-   //Data-related properties:
-   protected $filter=[];
+   public $filter_defaults=["post_type"=>"post","category"=>1,"post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[]];
    //Rendering params, that can be redefined just at the backend:
-   public $basic_list_class="posts_list";
-   public $basic_item_class="post";
+   public $item_class="post";
    //Rendering params, that has defaults and can be redefined into shortcode:
    
-   protected function get_filtering_params($params_)
+   protected function get_data($params_)
    {
-      //Get the posts filtering params.
+      //Get posts data.
       
+      //Get the posts filtering params:
       $params_["numberposts"]=arr_val($params_,"limit",arr_val($params_,"numberposts",$this->filter_defaults["numberposts"]));  //Translate "limit" to "numberposts" as the last one isn't intuitive.
-      $this->filter=array_replace($this->filter_defaults,array_intersect_key($params_,$this->filter_defaults));   //Filter params of the filter.
-   }
-   
-   protected function get_data()
-   {
-      //Get the posts.
-      $this->data=get_posts($this->filter);
+      $filter=array_replace($this->filter_defaults,array_intersect_key($params_,$this->filter_defaults));   //Filter params of the filter.
+      
+      //Convert comma-separated values to arrays:
+      $arr_param_keys=["include","exclude"];
+      foreach ($arr_param_keys as $key)
+         if (key_exists($key,$filter)&&(!is_array($filter[$key])))
+            $filter[$key]=explode(",",$filter[$key]);
+      
+      //Get the posts:
+      $this->data=get_posts($filter);
    }
    
    protected function get_link($post_)
@@ -255,6 +253,66 @@ class PostsPrefabShortcode extends DataListShortcode
       
       return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_));
    }
+}
+
+class MapShortcode
+{
+   public $name="map";
+   public $default_lat_long=[55.755819,37.617644];
+   public $map_id="ymap";
+   public $default_params=[
+                             "zoom"=>10,
+                             "controls"=>['typeSelector','fullscreenControl','geolocationControl','trafficControl','zoomControl','routeEditor','rulerControl'],
+                             
+                          ];
+   
+   //Data-related properties:
+   protected $data=[];
+   protected $params=[];
+   
+   protected $wrap_tpl="default_wrap_tpl";
+   protected $map_tpl="default_map_tpl";
+   protected $baloon_tpl="default_baloon_tpl";
+   
+   //Rendering params, obtained only from shortcode and having no defaults:
+   protected $custom_class="";   //Custon css-class. Where it will appear - is a matter of the templates.
+   protected $attr_id="";        //ID attribute to be attached  e.g. to the main shortcode layout element.
+   protected $attr_data="";      //DATA-... attributes for some kinds of JS-controlled lists like a scrollers or slideshows.
+   
+   public function __construct($name_="")
+   {
+      add_shortcode($name_,[$this,"render"]);
+   }
+   
+   protected function default_wrap_tpl()
+   {
+      //By default there is no wrapping, so just pass.
+      
+      return $this->{$this->list_tpl}();
+   }
+   
+   protected function default_map_tpl()
+   {
+      //Render the simple list.
+      
+      ob_start();
+      ?>
+      <DIV <?=$this->attr_id?> CLASS="map <?=$this->custom_class?>" <?=$attr_data?>><DIV CLASS="inner" ID="<?=$map_id?>"></DIV></DIV>
+      <SCRIPT>
+        function map_init_callback()
+        {
+           var yPlacemark=new ymaps.Placemark(<?=$lat_long?>,{iconContent:'<?=$ico_str?>',hintContent:'<?=$hint?>',balloonContent:'<?=$baloon?>'},{preset:'<?=$ico_preset?>'});
+           var yMap=new ymaps.Map('<?=$map_id?>',{center:<?=$lat_long?>,zoom:<?=$zoom?>,controls:<?=json_encode($this)?>},{yandexMapDisablePoiInteractivity:true});
+           yMap.geoObjects.add(yPlacemark);
+           if (yMap.getZoom()>16)
+              yMap.setZoom(16);  //In case of only one placemark on map the hyper-zooming may occurs.
+        }
+        ymaps.ready(map_init_callback);
+      </SCRIPT>
+      <?php
+      return ob_get_clean();
+   }
+   
 }
 
 ?>
