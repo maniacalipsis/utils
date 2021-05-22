@@ -67,7 +67,7 @@ abstract class Shortcode
       //Select the templates:
       foreach ($this->tpl_pipe as $key=>$tpl_name)
       {
-         $tpl_method_name=arr_val($params_,$key,$tpl_name)."_".$key;
+         $tpl_method_name=arr_val($params_,$key,"default")."_".$key;
          if (method_exists($this,$tpl_method_name))
             $this->tpl_pipe[$key]=$tpl_method_name;
       }
@@ -89,14 +89,14 @@ abstract class DataListShortcode extends Shortcode
    //Data-related properties:
    protected $data=[];
    //Rendering params, that can be defined only at the backend:
-   public $list_class="grid";    //CSS-class for the simple list node.
-   public $item_class="";        //CSS-class for the items' nodes.
+   public $list_class="grid";       //CSS-class for the simple list node.
+   public $item_class="";           //CSS-class for the items' nodes.
+   public $default_empties_count=0; //Default values of the $empties_count.
    //Rendering params, obtained only from shortcode and having no defaults:
-   protected $custom_class="";   //Custon css-class. Where it will appear - is a matter of the templates.
-   protected $attr_id="";        //ID attribute to be attached  e.g. to the main shortcode layout element.
-   protected $attr_data="";      //DATA-... attributes for some kinds of JS-controlled lists like a scrollers or slideshows.
-   //Rendering params, that has defaults and can be redefined into shortcode:
-   public $empties_count=0;   //Number of the empty blocks for orphans alignment.
+   protected $custom_class="";      //Custon css-class. Where it will appear - is a matter of the templates.
+   protected $attr_id="";           //ID attribute to be attached  e.g. to the main shortcode layout element.
+   protected $attr_data="";         //DATA-... attributes for some kinds of JS-controlled lists like a scrollers or slideshows.
+   protected $empties_count=0;      //Number of the empty blocks for orphans alignment.
    
    protected function get_rendering_params($params_,$content_)
    {
@@ -104,8 +104,8 @@ abstract class DataListShortcode extends Shortcode
       parent::get_rendering_params($params_,$content_);
       
       //Get list customizations params:
-      $this->custom_class=arr_val($params_,"class",$this->custom_class);
-      $this->empties_count=(int)arr_val($params_,"empties",$this->empties_count);
+      $this->custom_class=arr_val($params_,"class","");
+      $this->empties_count=(int)arr_val($params_,"empties",$this->default_empties_count);
       
       //Get ID attribute:
       $id=arr_val($params_,"id","");
@@ -218,7 +218,6 @@ abstract class PostsPrefabShortcode extends DataListShortcode
    public $filter_defaults=["post_type"=>"post","category"=>1,"post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[]];
    //Rendering params, that can be redefined just at the backend:
    public $item_class="post";
-   //Rendering params, that has defaults and can be redefined into shortcode:
    
    protected function get_data($params_)
    {
@@ -255,40 +254,34 @@ abstract class PostsPrefabShortcode extends DataListShortcode
    }
 }
 
-class MapShortcode
+class MapShortcode extends Shortcode
 {
    public $name="map";
-   public $default_lat_long=[55.755819,37.617644];
-   public $map_id="ymap";
-   public $default_params=[
-                             "zoom"=>10,
-                             "controls"=>['typeSelector','fullscreenControl','geolocationControl','trafficControl','zoomControl','routeEditor','rulerControl'],
-                             
-                          ];
+   public $key="map";
+   protected $data="";  //JSON encoded data.
+   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","map_tpl"=>"default_map_tpl","baloon_tpl"=>"default_baloon_tpl"];  //Templates pipe.
+   //Map parameters' defaults:
+   public $default_map_id="ymap";
+   public $default_map_zoom=16;
+   public $default_map_state=["controls"=>["typeSelector","fullscreenControl","geolocationControl","trafficControl","zoomControl","routeEditor","rulerControl"]];
+   public $default_map_options=["yandexMapDisablePoiInteractivity"=>true];
+   public $default_place_options=["preset"=>"islands#blueStretchyIcon"];
+   //Map parameters set by shortcode params:
+   protected $map_id=null;
+   protected $map_zoom=null;
    
-   //Data-related properties:
-   protected $data=[];
-   protected $params=[];
-   
-   protected $wrap_tpl="default_wrap_tpl";
-   protected $map_tpl="default_map_tpl";
-   protected $baloon_tpl="default_baloon_tpl";
-   
-   //Rendering params, obtained only from shortcode and having no defaults:
-   protected $custom_class="";   //Custon css-class. Where it will appear - is a matter of the templates.
-   protected $attr_id="";        //ID attribute to be attached  e.g. to the main shortcode layout element.
-   protected $attr_data="";      //DATA-... attributes for some kinds of JS-controlled lists like a scrollers or slideshows.
-   
-   public function __construct($name_="")
+   protected function get_rendering_params($params_,$content_)
    {
-      add_shortcode($name_,[$this,"render"]);
+      //Process the rendering params.
+      parent::get_rendering_params($params_,$content_);
+      
+      $this->map_id=arr_val($params_,"",$this->default_map_id);
+      $this->map_zoom=(int)arr_val($params_,"",$this->default_zoom);
    }
    
-   protected function default_wrap_tpl()
+   protected function get_data($params_)
    {
-      //By default there is no wrapping, so just pass.
-      
-      return $this->{$this->list_tpl}();
+      $this->data=get_option($this->key,"[]");
    }
    
    protected function default_map_tpl()
@@ -299,15 +292,33 @@ class MapShortcode
       ?>
       <DIV <?=$this->attr_id?> CLASS="map <?=$this->custom_class?>" <?=$attr_data?>><DIV CLASS="inner" ID="<?=$map_id?>"></DIV></DIV>
       <SCRIPT>
-        function map_init_callback()
+        function mapInitCallback()
         {
-           var yPlacemark=new ymaps.Placemark(<?=$lat_long?>,{iconContent:'<?=$ico_str?>',hintContent:'<?=$hint?>',balloonContent:'<?=$baloon?>'},{preset:'<?=$ico_preset?>'});
-           var yMap=new ymaps.Map('<?=$map_id?>',{center:<?=$lat_long?>,zoom:<?=$zoom?>,controls:<?=json_encode($this)?>},{yandexMapDisablePoiInteractivity:true});
-           yMap.geoObjects.add(yPlacemark);
-           if (yMap.getZoom()>16)
-              yMap.setZoom(16);  //In case of only one placemark on map the hyper-zooming may occurs.
+           //Source data:
+           let places=<?=$this->data?>;
+           
+           let mapId='<?=$this->map_id?>';
+           let zoom=<?=$this->map_zoom?>;
+           let mapState=<?=json_encode($this->default_map_state,JSON_ENCODE_OPTIONS)?>;
+           let mapOptions=<?=json_encode($this->default_map_options,JSON_ENCODE_OPTIONS)?>;
+           let placeOptions=<?=json_encode($this->default_place_options)?>;
+           
+           //Create places:
+           let yClusterer=new ymaps.Clusterer();
+           for (let place of places)
+              yClusterer.add(new ymaps.Placemark(place.lat_long,{iconContent:place.text,hintContent:place.hint,balloonContent:place.baloon},{...placeOptions,preset:place.preset}));
+           
+           //Adjust view area:
+           if (places.length>1)
+              mapState.bounds=yClusterer.getBounds();
+           else
+              mapState={...mapState,center:places[0]?.lat_long??[55.755819,37.617644],zoom:zoom};
+           
+           //Create map and add the places on it:
+           let yMap=new ymaps.Map(mapId,mapState,mapOptions);
+           yMap.geoObjects.add(yClusterer);
         }
-        ymaps.ready(map_init_callback);
+        ymaps.ready(mapInitCallback);
       </SCRIPT>
       <?php
       return ob_get_clean();

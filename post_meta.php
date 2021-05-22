@@ -10,6 +10,45 @@
 
 namespace Utilities;
 
+function custom_post_labels($plural_,$nominative_,$accusative_,$genitive_,$menu_="")
+{
+   $menu_=($menu_ ? $menu_ : $plural_);
+   return [
+            "name"              =>$plural_,
+            "singular_name"     =>$nominative_,
+            "add_new"           =>"Добавить $accusative_",
+            "add_new_item"      =>"Добавить $accusative_",
+            "edit_item"         =>"Редактировать $accusative_",
+            "new_item"          =>"Новая запись",
+            "view_item"         =>"Посмотреть $accusative_",
+            "search_items"      =>"Найти $accusative_",
+            "not_found"         =>mb_ucfirst("$genitive_ не найдено"),
+            "not_found_in_trash"=>"Нет $genitive_ в корзине",
+            "parent_item_colon" =>"",
+            "menu_name"         =>$menu_
+          ];
+}
+
+function register_custom_post($post_type_,$labels_,$params_=[])
+{
+   $defaults=[
+                "public"            =>true,
+                "show_in_rest"      =>true,  //IMPORTANT! Guttenberg and some sidebar panels (featured image in particular) will not work properly if "show_in_rest" isn't set true.
+                "rewrite"           =>true,
+                "capability_type"   =>"post",
+                "hierarchical"      =>false,
+                "menu_position"     =>5,
+                "menu_icon"         =>"dashicons-format-aside",
+                "supports"          =>["title","editor","excerpt","page-attributes","thumbnail"],
+                "taxonomies"        =>["category"],
+                //"query_var"=>true by WP default, that means it's equal to the $post_type_.
+             ];
+   $params_=array_replace_recursive($defaults,$params_);
+   $params_["labels"]=$labels_;
+   
+   register_post_type($post_type_,$params_);
+}
+
 class CustomMeta
 {
    //Allows to add a metabox[es], attaching a custom meta data to the posts, pages etc.
