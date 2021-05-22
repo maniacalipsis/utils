@@ -12,10 +12,10 @@ namespace Utilities\Init;
 
 define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_PARTIAL_OUTPUT_ON_ERROR);
 
-require_once(__DIR__."/functions.php");   //Utilities.
-require_once(__DIR__."/post_meta.php");   //Custom posts metaboxes.
-require_once(__DIR__."/theme_setup.php"); //Theme setup clases.
-require_once(__DIR__."/shortcodes.php");  //Set of the most commonly used shortcodes.
+require_once(__DIR__."/functions.php");            //Utilities.
+require_once(__DIR__."/post_customizations.php");  //Custom posts metaboxes.
+require_once(__DIR__."/theme_setup.php");          //Theme setup clases.
+require_once(__DIR__."/shortcodes.php");           //Set of the most commonly used shortcodes.
 
 function plugin_init()
 {
