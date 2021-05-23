@@ -351,40 +351,37 @@ class ThemeSettingsField extends AbstractThemeSettingsField
 {
    public function render_callback()
    {
-      $main_attrs=[
-                     "type"=>$this->type,
-                     "name"=>$this->key,
-                  ];
       $value=get_option($this->key,$this->default);
       
       switch ($this->type)
       {
          case "richtext":
          {
-            echo wp_editor($value,$this->key,["textarea_name"=>$this->key]+$this->misc_attrs);
+            $wp_editor_params=["textarea_name"=>$this->key]+$this->misc_attrs;
+            echo wp_editor($value,$this->key,$wp_editor_params);
             break;
          }
          case "textarea":
          {
+            $attrs=["name"=>$this->key]+$this->misc_attrs;
             ?>
-            <TEXTAREA<?=serialize_element_attrs($main_attrs+$this->misc_attrs)?>><?=htmlspecialchars($value)?></TEXTAREA>
+            <TEXTAREA<?=serialize_element_attrs($attrs)?>><?=htmlspecialchars($value)?></TEXTAREA>
             <?php
             break;
          }
          case "checkbox":
-         case "radio":     //NOTE: radio is accounted, but just as far as it has the same format as the checkbox. However it's task for the separate class to render an option sets.
          {
-            $main_attrs["checked"]=to_bool($value);
+            $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($value)]+$this->misc_attrs;
             ?>
-            <INPUT<?=serialize_element_attrs($main_attrs+$this->misc_attrs)?>>
+            <INPUT<?=serialize_element_attrs($attrs)?>>
             <?php
             break;
          }
          default:
          {
-            $main_attrs["value"]=$value;
+            $attrs=["type"=>$this->type,"name"=>$this->key,"value"=>$value]+$this->misc_attrs;
             ?>
-            <INPUT<?=serialize_element_attrs($main_attrs+$this->misc_attrs)?>>
+            <INPUT<?=serialize_element_attrs($attrs)?>>
             <?php
          }
       }
