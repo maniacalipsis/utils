@@ -8,24 +8,24 @@
 /* Feedback basic utils             */
 /*==================================*/
 
-class Feedback
+namespace Utilities;
+
+class Feedback extends Shortcode
 {
-   public $id="feedback"; //This string identifier is used as the shortcode tag, the form name and the "action" parameter value in the ajax request.
-   public $fields=[
-                     "name"   =>["title"=>"Имя"      ,"type"=>"text"    ,"required"=>true,"alt"=>[]       ,"params"=>["maxlength"=>64,"err_msg"=>"Пожалуйста, укажите имя."]],
-                     "phone"  =>["title"=>"Телефон"  ,"type"=>"text"    ,"required"=>true,"alt"=>["email"],"params"=>["maxlength"=>32,"err_msg"=>"Пожалуйста, укажите телефон или e-mail."]],
-                     "email"  =>["title"=>"E-mail"   ,"type"=>"text"    ,"required"=>true,"alt"=>["phone"],"params"=>["maxlength"=>32,"err_msg"=>"Пожалуйста, укажите телефон или e-mail."]],
-                     "message"=>["title"=>"Сообщение","type"=>"textarea","required"=>true,"alt"=>[]       ,"params"=>["err_msg"=>"Пожалуйста, заполните поле &laquo;сообщение&raquo;."]],
-                  ];
-
-   public $public_styles=[];
-   public $public_scripts=[];
-   protected $shortcodes=[,"form_shortcode"];
+   //Rendering
+   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","form_tpl"=>"default_form_tpl"];
+   //Data-related properties:
+   protected $data=[];     //Form data.
+   protected $fields=[];   //Form input fields,
+   //Rendering params, that can be defined only at the backend:
+   public $form_class="feedback_form"; //CSS-class for the form's outermost block.
    
-   public function __construct($shortcode_)
+   public function __construct($name_="")
    {
-      add_action("init",[$this,"init"]);
-
+      parent::__construct($name_);
+      
+      add_action("init",[$this,"on_init"]);
+      
       if (wp_doing_ajax())
       {
          add_action("wp_ajax_nopriv_".$this->id,[$this,"handle_request"]);
@@ -33,7 +33,7 @@ class Feedback
       }
    }
    
-   public function init()
+   public function on_init()
    {
       //Process the redirection request (some WP feature):
       if (preg_match("/^\\/goto\\//",$_SERVER["REQUEST_URI"])&&$_REQUEST["r"])
@@ -41,85 +41,54 @@ class Feedback
          header("Location: ".$_REQUEST["r"]);
          die();
       }
-      
-      //Continue normal operation:
-      if (!is_admin())
-      {
-         //Enqueue JS and CSS, required by the form:
-         foreach ($this->public_styles as $asset_key=>$asset_url)
-            wp_enqueue_style($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : plugins_url($asset_url,__FILE__)));
-         
-         foreach ($this->public_scripts as $asset_key=>$asset_url)
-            wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : plugins_url($asset_url,__FILE__)));
-         
-         //Register form shortcode:
-         add_shortcode($this->id,[$this,"form_shortcode"]);
-      }
    }
    
-   public function form_shortcode($params_="",$content_="")
+   public function add_field(FeedbackField $field_)
    {
-      //Returns a feedback form.
-      //Overrideable.
-      //NOTE: this is a simple example form which may be used as template for the descendant clases.
+      $this->fields[$field_->key]=$field_;
+   }
+   
+   protected function get_data($params_)
+   {
+      //Get the default form data before the rendering.
       
-      //WARNING: If shortcode has no params then an empty string will be passed to $params_, not [], thus attempitng to access $params_ elements will cause warning "Illegal string offset".
-      if (!is_array($params_))
-         $params_=[];
+      $this->data=[];
+      foreach ($this->fields as $field)
+         $this->data[$field->key]="";//$field->default;
+   }
+   
+   protected function default_wrap_tpl()
+   {
+      //The default template makes no wrapping.
       
-      $custom_class=arr_val($params_,"custom_class","");
-      $title=arr_val($params_,"title","Свяжитесь с нами");
-      $notice=arr_val($params_,"notice","");
-         
+      return $this->{$this->tpl_pipe["form_tpl"]}();  //Just pass and run the next template in the pipe.
+   }
+   
+   protected function default_form_tpl()
+   {
+      //Render the simple list.
+      $title="Wasd!";
       ob_start();
       ?>
-      <DIV CLASS="feedback_form <?=$custom_class?>">
+      <DIV <?=$this->attr_id?> CLASS="<?=$this->form_class?> <?=$this->list_class?> <?=$this->custom_class?>">
          <H2 CLASS="title"><?=$title?></H2>
-         <?=$this->form_open()?>
-            <LABEL CLASS="name flex x-center">Имя <INPUT TYPE="text" NAME="name" VALUE="" MAXLENGTH="64"></LABEL>
-            <LABEL CLASS="phone flex x-center">Телефон <INPUT TYPE="text" NAME="phone" VALUE="" MAXLENGTH="32"></LABEL>
-            <LABEL CLASS="email flex x-center">E-mail <INPUT TYPE="text" NAME="email" VALUE="" MAXLENGTH="32"></LABEL>
-            <LABEL CLASS="message flex x-center">Сообщение <TEXTAREA NAME="message"></TEXTAREA></LABEL>
-            <DIV CLASS="submission flex end x-end">
-               <SPAN CLASS="notice"><?=$notice?></SPAN>
-               <INPUT TYPE="submit" VALUE="Отправить">
-            </DIV>
-            <DIV CLASS="result"></DIV>
-         <?=$this->form_close()?>
+         <?php
+            echo $this->form_open_tpl();
+            foreach ($this->fields as $field)
+               echo $field->render();
+            echo $this->form_submit_tpl();
+            echo $this->form_close_tpl();
+         ?>
       </DIV>
       <?php
       return ob_get_clean();
    }
    
-   
-   public function handle_request()
+   protected function form_open_tpl()
    {
-      //Handle AJAX request from the feedback form.
-   }
-   
-   protected function message_to_manager()
-   {
-      //Returns a formatted message for the manager.
-      //Overrideable.
-      $email_text="";
-      
-      return $email_text;
-   }
-   
-   protected function message_to_user()
-   {
-      //Returns a formatted confirmation message for the user.
-      //Overrideable.
-      $email_text="";
-      
-      return $email_text;
-   }
-   
-   protected form_open()
-   {
-      //Returns and form open tag and some utility fields.
-      //Helper for the form_shortcode().
-      ob_start
+      //Returns form open tag and some utility fields.
+      //Helper for the *_form_tpl().
+      ob_start();
       ?>
          <FORM ACTION="<?=admin_url("admin-ajax.php")?>" CLASS="flex">
             <INPUT TYPE="hidden" NAME="action" VALUE="<?=$this->id?>">
@@ -129,11 +98,11 @@ class Feedback
       return ob_get_clean();
    }
    
-   protected form_close($title_="Field",$key_="trap")
+   protected function form_close_tpl()
    {
-      //Returns and form open tag and some utility fields.
-      //Helper for the form_shortcode().
-      ob_start
+      //Returns form open tag and some utility fields.
+      //Helper for the *_form_tpl().
+      ob_start();
       ?>
       </FORM>
 
@@ -141,69 +110,160 @@ class Feedback
       return ob_get_clean();
    }
    
-   protected function validate_n_wrap_form()
+   protected function form_submit_tpl()
    {
-      $res_data=[];
+      //Returns form open tag and some utility fields.
+      //Helper for the *_form_tpl().
+      $notice="yo";
+      ob_start();
+      ?>
+            <DIV CLASS="submission flex end x-end">
+               <SPAN CLASS="notice"><?=$notice?></SPAN>
+               <INPUT TYPE="submit" VALUE="Отправить">
+            </DIV>
+            <DIV CLASS="result"></DIV>
+         
+      <?php
+      return ob_get_clean();
+   }
+   
+   public function validate()
+   {
       $this->errors=[]; //Reset errors list.
       
-      //1st pass - wrap src data:
-      foreach ($this->fields as $key=>$field)
-      {
-         $wrp=arr_val($field,"wrp","wrap_".arr_val($field,"type","text")); //Get the wrapping method name.
-         $res_data[$key]=$wrp(arr_val($_REQUEST,$key),$key,$field);        //Wrap the value from the request.
-      }
+      //1st pass - wrap request:
+      foreach ($this->fields as $field)
+         $field->set_value(arr_val($_REQUEST,$field->key)); //Get and wrap values from the request.
       
       //2nd pass - check if all required fields are filled:
-      $check_list=$this->fields; //NOTE: The copy-on-write will not duplicate sub arrays 
+      $check_list=$this->fields; //Duplicate fields array (not the fields themselves).
       foreach ($check_list as $key=>$field)
-         if (!in_array($key,$checked_alts))                                         //Skip the fields already checked.
-            if (($res_data[$key]===null)&&arr_val($this->fields[$key],"required"))  //Check if the field is required but wasn't filled.
+         if (!$field->validate())
+         {
+            if ($field->alt_fields_keys)
             {
-               $alt_keys=arr_val($field,"alt",[]);
-               if ($alt_keys)
-               {
-                  $alt_titles=[];
+               $invalid_alts_titles=[];   //Precollect titles for the error message.
                   
-                  //Find at least one filled alternative field:
-                  $is_alt_filled=false;
-                  foreach ($alt_keys as $alt_key)
-                     if (($res_data[$alt_key]!==null))
+               //Find at least one filled alternative field:
+               $is_alt_filled=false;
+               foreach ($field->alt_fields_keys as $alt_key)
+                  if (key_exists($alt_key,$this->fields))
+                  {
+                     if (!$this->fields[$alt_key]->validate())
+                     {
+                        $invalid_alts_titles[]=$this->fields[$alt_key]->get_title();  //By the way collect titles of the alt fields.
+                        //$this->errors[]="Заполните ".$field->get_title;                      //Individual error.
+                     }
+                     else
                      {
                         $is_alt_filled=true;
                         break;
                      }
-                     else
-                        $titles[]=$this->fields[$alt_key]["title"];  //By the way collect titles of the alt fields.
+                     unset($check_list[$alt_key]);
+                  }
+                  else
+                     $titles[]=$alt_key; //Expose the alt field key instead of the title if the form was made inconsistently.
                   
-                  if (!$is_alt_filled)                                                                            //If all alternatives aren't filled
-                     $this->errors[]="Заполните хотя бы одно из обязательных полей: ".implode(", ",$alt_titles);  // then set a collective error
-                  $checked_alts=array_merge($checked_alts,$field["alt"]);                                         // and 
-               }
-               else
-                  $this->errors[]="Заполните";
+               if (!$is_alt_filled)                                                                                     //If all alternatives aren't filled
+                  $this->errors[]="Заполните хотя бы одно из обязательных полей: ".implode(", ",$invalid_alts_titles);  // then set a collective error.
             }
+            else
+               $this->errors[]="Заполните ".$field->get_title();
+         }
       
-      return $res_data;
+      return count($this->errors)==0;
    }
    
-   protected field_text($str_)
+   public function handle_request()
    {
+      //Handle AJAX request from the feedback form.
+      // An example.
       
+      $response=["res"=>false];
+      if ($this->validate())
+      {
+         //Some payload.
+      }
+      else
+         $response["errors"]=$this->errors;
+      
+      echo json_encode($response,JSON_ENCODE_OPTIONS);
+      die();
    }
    
-   protected wrap_text($str_)
+}
+
+
+abstract class FeedbackField
+{
+   public const SINGLE=true;
+   protected $input_class=""; //Mixin class. NOTE: parent constructor sees a perent's consts, even if descendant overrides'em.
+   protected $input=null;     //Mixin.
+   
+   public $alt_fields_keys=[];   //Reserved for usage in feedback.
+   public $error_msg="";
+   
+   public function __construct(array $params_=[])
    {
-      
+      $this->input=new (__NAMESPACE__."\\".$this->input_class)($params_);
    }
    
-   protected field_texterea($text_)
+   //Proxy the mixin's properties:
+   public function __call($name_,$args_)
    {
-      
+      return $this->input->{$name_}($args_);
    }
-   
-   protected wrap_texterea($text_)
+   public function __get (string $name_)
    {
-      
+      return $this->input->{$name_};
+   }
+   public function __set (string $name_,$val_)
+   {
+      $this->input->{$name_}=$val_;
    }
 }
+
+class FeedbackString extends FeedbackField
+{
+   protected $input_class="InputString";
+}
+
+class FeedbackPwd extends FeedbackField
+{
+   protected $input_class="InputPwd";
+}
+
+class FeedbackText extends FeedbackField
+{
+   protected $input_class="InputText";
+}
+
+class FeedbackRichText extends FeedbackField
+{
+   protected $input_class="InputRichText";
+}
+
+class FeedbackInt extends FeedbackField
+{
+   protected const DATA_TYPE="integer";
+   protected $input_class="InputInt";
+}
+
+class FeedbackFloat extends FeedbackField
+{
+   protected const DATA_TYPE="number";
+   protected $input_class="InputFloat";
+}
+
+class FeedbackBool extends FeedbackField
+{
+   protected const DATA_TYPE="boolean";
+   protected $input_class="InputBool";
+}
+
+class FeedbackMedia extends FeedbackField
+{
+   protected $input_class="InputMedia";
+}
+
 ?>

@@ -139,7 +139,7 @@ class Metabox
       if ($field_)
       {
          if (!$field_->key)
-            $field_->key=$this->id;         //If metabox created with only one field, them its key and title may be omitted in the $field_ argument. However this shorthand doesn't denies to add more fields with different explicit keys and titles later.
+            $field_->key=$this->id;  //If metabox created with only one field, them its key and title may be omitted in the $field_ argument. However this shorthand doesn't denies to add more fields with different explicit keys and titles later.
          $this->add_field($field_);
       }
    }
@@ -160,8 +160,8 @@ class Metabox
       foreach ($this->fields as $field)
       {
          //dump("???",$post_->ID,$field->key,$value);
-         $value=get_post_meta($post_->ID,$field->key,$field::SINGLE);
-         $field->render($value);
+         $field->set_value(get_post_meta($post_->ID,$field->key,$field::SINGLE));
+         $field->render();
       }
    }
    
@@ -179,10 +179,10 @@ class Metabox
       
       foreach ($this->fields as $field)
       {
-         $value=arr_val($_POST,$field->key);
+         $field->set_value(arr_val($_POST,$field->key));
          //dump("^^^",$field->key,$value);
          if ($value!==null)
-            update_post_meta($post_id_,$field->key,$field->on_save($value));  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
+            update_post_meta($post_id_,$field->key,$field->get_value());  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
          else
             delete_post_meta($post_id_,$field->key);
       }
@@ -191,148 +191,72 @@ class Metabox
 
 abstract class MetaboxField
 {
-   public $key="";
-   public $title="";
-   public $default="";
-   public $params=[];
    protected const DATA_TYPE="string";
    public const SINGLE=true;
+   protected $input_class=""; //Mixin class. NOTE: parent constructor sees a perent's consts, even if descendant overrides'em.
+   protected $input=null;     //Mixin.
    
    public function __construct(array $params_=[])
    {
-      //Read properties from constructor params:
-      foreach ($params_ as $key=>$val)
-         if (property_exists($this,$key))
-            $this->{$key}=$val;
+      $this->input=new (__NAMESPACE__."\\".$this->input_class)($params_);
    }
+   
    public function register($post_type_)
    {
-      register_meta("post",$this->key,["object_subtype"=>$post_type_,"type"=>self::DATA_TYPE,"description"=>$this->title,"default"=>$this->default,"single"=>self::SINGLE/*,"show_in_rest"=>true*/]);   //TODO: "sanitize_callback" and "show_in_rest" might be subjects of update.
+      register_meta("post",$this->input->key,["object_subtype"=>$post_type_,"type"=>self::DATA_TYPE,"description"=>$this->input->title,"default"=>$this->input->default,"single"=>self::SINGLE]);   //TODO: "sanitize_callback" and "show_in_rest" might be subjects of update.
    }
-   abstract public function render($val_);
-   abstract public function on_save($val_);  //Returns [modified] $val_.
+   
+   //Proxy the mixin's properties:
+   public function __call($name_,$args_)
+   {
+      return $this->input->{$name_}($args_);
+   }
+   public function __get (string $name_)
+   {
+      return $this->input->{$name_};
+   }
+   public function __set (string $name_,$val_)
+   {
+      $this->input->{$name_}=$val_;
+   }
 }
 
 class MetaboxString extends MetaboxField
 {
-   public function render($val_)
-   {
-      $attrs=["type"=>"text","name"=>$this->key,"value"=>$val_]+$this->params;
-      ?>
-      <LABEL><SPAN><?=$this->title?></SPAN><INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
-      <?php
-   }
-   
-   public function on_save($val_)
-   {
-      return $val_;
-   }
+   protected $input_class="InputString";
 }
 
-class MetaboxText extends MetaboxString
+class MetaboxText extends MetaboxField
 {
-   public function render($val_)
-   {
-      $attrs=["name"=>$this->key]+$this->params;
-      ?>
-      <LABEL><SPAN><?=$this->title?></SPAN><TEXTAREA <?=serialize_element_attrs($main_attrs+$this->misc_attrs)?>><?=htmlspecialchars($val_)?></TEXTAREA></LABEL>
-      <?php
-   }
+   protected $input_class="InputText";
 }
 
-class MetaboxRichText extends MetaboxText
+class MetaboxRichText extends MetaboxField
 {
-   public function render($val_)
-   {
-      $wp_editor_params=["textarea_name"=>$this->key]+$this->params;
-      ?>
-      <LABEL><SPAN><?=$this->title?></SPAN><?=wp_editor($val_,$this->key,$wp_editor_params)?></LABEL>
-      <?php
-   }
+   protected $input_class="InputRichText";
 }
 
 class MetaboxInt extends MetaboxField
 {
    protected const DATA_TYPE="integer";
-   public function render($val_)
-   {
-      $attrs=["type"=>"number","name"=>$this->key,"value"=>$val_]+$this->params;
-      ?>
-      <LABEL><SPAN><?=$this->title?></SPAN><INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
-      <?php
-   }
-   public function on_save($val_)
-   {
-      return (int)$val_;
-   }
+   protected $input_class="InputInt";
 }
 
-class MetaboxFloat extends MetaboxInt
+class MetaboxFloat extends MetaboxField
 {
    protected const DATA_TYPE="number";
-   public function on_save($val_)
-   {
-      return (float)$val_;
-   }
+   protected $input_class="InputFloat";
 }
 
 class MetaboxBool extends MetaboxField
 {
    protected const DATA_TYPE="boolean";
-   public function render($val_)
-   {
-      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($val_)]+$this->params
-      ?>
-      <LABEL><SPAN><?=$this->title?></SPAN><INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
-      <?php
-   }
-   public function on_save($val_)
-   {
-      return to_bool($val_);
-   }
+   protected $input_class="InputBool";
 }
 
-class MetaboxJsonField extends MetaboxField
+class MetaboxMedia extends MetaboxField
 {
-   public function on_save($val_)
-   {
-      return json_encode($val_,JSON_ENCODE_OPTIONS);
-   }
-   
-   public function render($val_)
-   {
-      //This renderer may be called from the descendant classes to render the input.
-      
-      $attrs=["type"=>"hidden","name"=>$this->key,"value"=>$val_]+$this->params;
-      ?>
-      <INPUT<?=serialize_element_attrs($attrs)?>>
-      <?php
-   }
-}
-
-class MetaboxMedia extends MetaboxJsonField
-{
-   public function render($val_)
-   {
-      $container_id="extra_media_".$this->key;
-      $list_params=[
-                      "inputSelector"=>"#$container_id>input[type=hidden]",
-                      "containerSelector"=>"#$container_id>.media_list",
-                      "limit"=>arr_val($this->params,"limit",0),
-                      "immediate"=>true,
-                      "MediaSelectorParams"=>arr_val($this->params,"selector_params",["options"=>[]]),
-                   ];
-      $list_params_json=json_encode($list_params,JSON_ENCODE_OPTIONS);
-      ?>
-      <DIV ID="<?=$container_id?>">
-         <INPUT TYPE="hidden" NAME="<?=$this->key?>" VALUE="<?=$val_?>">
-         <DIV CLASS="media_list"></DIV>
-         <SCRIPT>
-            document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>);});
-         </SCRIPT>
-      </DIV>
-      <?php
-   }
+   protected $input_class="InputMedia";
 }
 
 ?>

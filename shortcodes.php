@@ -31,6 +31,10 @@ abstract class Shortcode
    protected $data=null;
    //Rendering params, that can be defined only at the backend:
    public $identity_class=null;  //CSS-class which identifies the certain shortcode's main node. If undefined, it's automatically set equal to shortcode's name.
+   //Rendering params, obtained only from shortcode and having no defaults:
+   protected $custom_class="";      //Custon css-class. Where it will appear - is a matter of the templates.
+   protected $attr_id="";           //ID attribute to be attached  e.g. to the main shortcode layout element.
+   protected $attr_data="";         //DATA-... attributes for some kinds of JS-controlled lists like a scrollers or slideshows.
    
    public function __construct($name_="")
    {
@@ -71,6 +75,18 @@ abstract class Shortcode
          if (method_exists($this,$tpl_method_name))
             $this->tpl_pipe[$key]=$tpl_method_name;
       }
+      
+      //Get customizations params:
+      $this->custom_class=arr_val($params_,"class","");
+      
+      $id=arr_val($params_,"id","");
+      if ($id!="")
+         $this->attr_id="ID=\"".htmlspecialchars($id)."\"";
+      
+      //Get params with data for JS:
+      foreach ($params_ as $key=>$val)
+         if (str_starts_with($key,"data_"))
+            $this->attr_data.=" ".strtoupper(str_replace("_","-",$key))."=\"".htmlspecialchars($val)."\"";      
    }
    
    abstract protected function get_data($params_); //Get and preformat the data. Set results to $this->data.
@@ -93,9 +109,6 @@ abstract class DataListShortcode extends Shortcode
    public $item_class="";           //CSS-class for the items' nodes.
    public $default_empties_count=0; //Default values of the $empties_count.
    //Rendering params, obtained only from shortcode and having no defaults:
-   protected $custom_class="";      //Custon css-class. Where it will appear - is a matter of the templates.
-   protected $attr_id="";           //ID attribute to be attached  e.g. to the main shortcode layout element.
-   protected $attr_data="";         //DATA-... attributes for some kinds of JS-controlled lists like a scrollers or slideshows.
    protected $empties_count=0;      //Number of the empty blocks for orphans alignment.
    
    protected function get_rendering_params($params_,$content_)
@@ -104,18 +117,7 @@ abstract class DataListShortcode extends Shortcode
       parent::get_rendering_params($params_,$content_);
       
       //Get list customizations params:
-      $this->custom_class=arr_val($params_,"class","");
       $this->empties_count=(int)arr_val($params_,"empties",$this->default_empties_count);
-      
-      //Get ID attribute:
-      $id=arr_val($params_,"id","");
-      if ($id!="")
-         $this->attr_id="ID=\"".htmlspecialchars($id)."\"";
-      
-      //Get params for JS:
-      foreach ($params_ as $key=>$val)
-         if (str_starts_with($key,"data_"))
-            $this->attr_data.=" ".strtoupper(str_replace("_","-",$key))."=\"".htmlspecialchars($val)."\"";
    }
    
    protected function default_wrap_tpl()
