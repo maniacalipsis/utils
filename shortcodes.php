@@ -10,7 +10,7 @@
 
 namespace Utilities;
 
-add_shortcode("date",__NAMESPACE__."\Shortcodes\date_shortcode");
+add_shortcode("date",__NAMESPACE__."\\date_shortcode");
 function date_shortcode($params_="",$content_="")
 {
    //Posts (basic post_type "post")
