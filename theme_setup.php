@@ -297,9 +297,8 @@ class ThemeSettingsSection
       $this->title=$title_;
    }
    
-   public function add_field(/*AbstractThemeSettingsField*/ $field_)
+   public function add_field(InputField $field_)
    {
-      $field_->section=$this;
       $this->fields[]=$field_;
    }
    
@@ -311,80 +310,17 @@ class ThemeSettingsSection
       add_settings_section($this->key,$this->title,[$this,"render_callback"],$this->page->key);
       
       foreach ($this->fields as $field)
-         $field->setup();
-   }
-   
-   public function render_callback()
-   {
-      ?><HR><?php
-   }
-}
-
-abstract class AbstractThemeSettingsField
-{
-   public $key="";         //Field ID.
-   public $title="";       //Field title.
-   public $section=null;   //Parent ThemeSettingsSection.
-   public $type="text";    //Input type.
-   public $default="";     //Default value.
-   public $misc_attrs=[];  //Other input attributes.
-   
-   public function __construct($key_,$title_,$type_=null,$default_=null,$misc_attrs_=null)
-   {
-      $this->key=$key_;
-      $this->title=$title_;
-      if ($type_) $this->type=$type_;
-      if ($default_) $this->default=$default_;
-      if ($misc_attrs_) $this->misc_attrs=$misc_attrs_;
-   }
-   
-   public function setup()
-   {
-      add_settings_field($this->key,$this->title,[$this,"render_callback"],$this->section->page->key,$this->section->key);
-      register_setting($this->section->page->key,$this->key);
-   }
-   
-   abstract public function render_callback();
-}
-
-class ThemeSettingsField extends AbstractThemeSettingsField
-{
-   public function render_callback()
-   {
-      $value=get_option($this->key,$this->default);
-      
-      switch ($this->type)
       {
-         case "richtext":
-         {
-            $wp_editor_params=["textarea_name"=>$this->key]+$this->misc_attrs;
-            echo wp_editor($value,$this->key,$wp_editor_params);
-            break;
-         }
-         case "textarea":
-         {
-            $attrs=["name"=>$this->key]+$this->misc_attrs;
-            ?>
-            <TEXTAREA<?=serialize_element_attrs($attrs)?>><?=htmlspecialchars($value)?></TEXTAREA>
-            <?php
-            break;
-         }
-         case "checkbox":
-         {
-            $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($value)]+$this->misc_attrs;
-            ?>
-            <INPUT<?=serialize_element_attrs($attrs)?>>
-            <?php
-            break;
-         }
-         default:
-         {
-            $attrs=["type"=>$this->type,"name"=>$this->key,"value"=>$value]+$this->misc_attrs;
-            ?>
-            <INPUT<?=serialize_element_attrs($attrs)?>>
-            <?php
-         }
+         add_settings_field($field->key,$field->title,[$field,"render"],$this->page->key,$this->key);
+         register_setting($this->page->key,$field->key);
       }
+   }
+   
+   public function render_callback()
+   {
+      foreach ($this->fields as $field)
+         $field->value=get_option($field->key,$field->default);
+      ?><HR><?php
    }
 }
 ?>

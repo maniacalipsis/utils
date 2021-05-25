@@ -14,9 +14,11 @@ abstract class InputField
 {
    public $key="";
    public $title="";
+   public $value=null;
    public $default="";
    public $attrs=[];
-   protected $value=null;
+   public $is_required=false; //If this field required. Flag for the form validation. NOTE: Its because the REQUIRED attribute can't be used to make an alternative requirements.
+   public $alt_required=[];   //Alternatively required fields.
    
    public function __construct(array $params_=[])
    {
@@ -26,32 +28,45 @@ abstract class InputField
             $this->{$key}=$val;
    }
    
-   public function get_is_required()
+   public function get_data_type()
    {
-      //returns if the field id required.
-      return to_bool(arr_val($this->attrs,"required"));
+      //Returns compatible data type (in particular for the function register_meta()).
+      return "string";  //This is class-specific readonly value.
    }
    
    public function validate()
    {
       //Basic value validation.
       
-      return !($this->get_is_required()&&($this->value==""));
+      return !($this->is_required&&($this->value==""));
    }
    
-   public function set_value($val_)
+   public function get_safe_value()
    {
-      //Usually, directly assigns $val_ to the value.
-      $this->value=$val_;
-   }
-   
-   public function get_value()
-   {
-      //Returns [properly modified] $value.
-      return $this->value;
+      //Returns [properly modified] $value, safe for storing to DB or something else.
+      return $this->value; //TODO: write the basic sanitizing.
    }
    
    abstract public function render();  //Returns an input's html.
+   
+   public function print()
+   {
+      //Outputs the value to any kind of document. 
+      echo $this->get_safe_value();
+   }
+}
+
+class InputHidden extends InputField
+{
+   public function render()
+   {
+      //This renderer may be called from the descendant classes to render the input.
+      
+      $attrs=["type"=>"hidden","name"=>$this->key,"value"=>$this->value]+$this->attrs;
+      ?>
+      <INPUT<?=serialize_element_attrs($attrs)?>>
+      <?php
+   }
 }
 
 class InputString extends InputField
@@ -98,8 +113,19 @@ class InputRichText extends InputText
    }
 }
 
-class InputInt extends InputField
+class InputFloat extends InputField
 {
+   public function get_data_type()
+   {
+      //Returns compatible data type (in particular for the function register_meta()).
+      return "number";  //This is class-specific readonly value.
+   }
+   
+   public function get_safe_value()
+   {
+      return (float)$this->value;
+   }
+   
    public function render()
    {
       $attrs=["type"=>"number","name"=>$this->key,"value"=>$this->value]+$this->attrs;
@@ -109,16 +135,33 @@ class InputInt extends InputField
    }
 }
 
-class InputFloat extends InputInt
+class InputInt extends InputFloat   //NOTE: THe int is more tight than the float.
 {
-   public function get_value()
+   public function get_data_type()
    {
-      return (float)$this->value;
+      //Returns compatible data type (in particular for the function register_meta()).
+      return "integer";  //This is class-specific readonly value.
+   }
+   
+   public function get_safe_value()
+   {
+      return (int)$this->value;
    }
 }
 
 class InputBool extends InputField
 {
+   public function get_data_type()
+   {
+      //Returns compatible data type (in particular for the function register_meta()).
+      return "boolean";  //This is class-specific readonly value.
+   }
+   
+   public function get_safe_value()
+   {
+      return to_bool($this->value);
+   }
+   
    public function render()
    {
       $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value)]+$this->attrs
@@ -126,31 +169,23 @@ class InputBool extends InputField
       <LABEL> CLASS="<?=$this->key?>"<SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
    }
-   public function get_value()
-   {
-      return to_bool($this->value);
-   }
 }
 
-class InputJsonField extends InputField
+class InputJson extends InputHidden
 {
-   public function get_value()
+   public function get_safe_value()
    {
-      return json_encode($this->value,JSON_ENCODE_OPTIONS);
+      return $this->value; //TODO: Later, try to use something like try{ $res=json_encode(json_decode($this->value),JSON_ENCODE_OPTIONS); }....
    }
    
-   public function render()
+   public function print()
    {
-      //This renderer may be called from the descendant classes to render the input.
-      
-      $attrs=["type"=>"hidden","name"=>$this->key,"value"=>$this->value]+$this->attrs;
-      ?>
-      <INPUT<?=serialize_element_attrs($attrs)?>>
-      <?php
+      //Outputs the value to any kind of document. 
+      echo json_encode(json_decode($this->value),JSON_ENCODE_OPTIONS|JSON_PRETTY_PRINT);
    }
 }
 
-class InputMedia extends InputJsonField
+class InputMedia extends InputJson
 {
    public $limit=0;
    public $selector_params=["options"=>[]];
@@ -166,6 +201,7 @@ class InputMedia extends InputJsonField
                       "MediaSelectorParams"=>$this->selector_params,
                    ];
       $list_params_json=json_encode($list_params,JSON_ENCODE_OPTIONS);
+      parent::render();
       ?>
       <DIV ID="<?=$container_id?>" CLASS="media">
          <INPUT TYPE="hidden" NAME="<?=$this->key?>" VALUE="<?=$this->value?>">
@@ -174,6 +210,31 @@ class InputMedia extends InputJsonField
             document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>);});
          </SCRIPT>
       </DIV>
+      <?php
+   }
+}
+
+class InputSelect extends InputField
+{
+   //TODO: This class actually can't support mulitple selection.
+   public $variants=[];
+   
+   public function validate()
+   {
+      //Valid value must match the selection variants and, if required, must not be empty.
+      return !($this->is_required&&($this->value!=""))&&key_exists($this->value,$this->variants);
+   }
+   
+   public function get_safe_value()
+   {
+      return (key_exists($this->value,$this->variants) ? $this->value : $this->default);
+   }
+   
+   public function render()
+   {
+      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value)]+$this->attrs
+      ?>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <SPAN CLASS="select"><?=html_select($this->key,$this->variants,$this->value,$attrs)?></SPAN></LABEL>
       <?php
    }
 }

@@ -121,7 +121,7 @@ class Metabox
    public $priority="default";      //Metabox position priority: "default", "high", "low"or "core".
    protected $fields=[];
    
-   public function __construct($id_=null,$title_=null,MetaboxField $field_=null,$post_types_=null)
+   public function __construct($id_=null,$title_=null,InputField $field_=null,$post_types_=null)
    {
       ////Register metaboxes factory:
       //add_action("add_meta_boxes",[$this,"add_meta_boxes"],10,2);
@@ -147,7 +147,7 @@ class Metabox
    public function add_field($field_)
    {
       foreach ($this->post_types as $post_type) //Register meta for the own post types.
-         $field_->register($post_type);
+         register_meta("post",$field_->key,["object_subtype"=>$post_type,"type"=>$field_->get_data_type(),"description"=>$field_->title,"default"=>$field_->default,"single"=>true]);   //TODO: "sanitize_callback" and "show_in_rest" might be subjects of update.
       
       $this->fields[]=$field_;
    }
@@ -160,7 +160,7 @@ class Metabox
       foreach ($this->fields as $field)
       {
          //dump("???",$post_->ID,$field->key,$value);
-         $field->set_value(get_post_meta($post_->ID,$field->key,$field::SINGLE));
+         $field->value=get_post_meta($post_->ID,$field->key,/*single=*/true);
          $field->render();
       }
    }
@@ -179,84 +179,14 @@ class Metabox
       
       foreach ($this->fields as $field)
       {
-         $field->set_value(arr_val($_POST,$field->key));
+         $field->value=arr_val($_POST,$field->key);
          //dump("^^^",$field->key,$value);
-         if ($value!==null)
-            update_post_meta($post_id_,$field->key,$field->get_value());  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
+         if ($field->value!==null)
+            update_post_meta($post_id_,$field->key,$field->value);  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
          else
             delete_post_meta($post_id_,$field->key);
       }
    }
-}
-
-abstract class MetaboxField
-{
-   protected const DATA_TYPE="string";
-   public const SINGLE=true;
-   protected $input_class=""; //Mixin class. NOTE: parent constructor sees a perent's consts, even if descendant overrides'em.
-   protected $input=null;     //Mixin.
-   
-   public function __construct(array $params_=[])
-   {
-      $this->input=new (__NAMESPACE__."\\".$this->input_class)($params_);
-   }
-   
-   public function register($post_type_)
-   {
-      register_meta("post",$this->input->key,["object_subtype"=>$post_type_,"type"=>self::DATA_TYPE,"description"=>$this->input->title,"default"=>$this->input->default,"single"=>self::SINGLE]);   //TODO: "sanitize_callback" and "show_in_rest" might be subjects of update.
-   }
-   
-   //Proxy the mixin's properties:
-   public function __call($name_,$args_)
-   {
-      return $this->input->{$name_}($args_);
-   }
-   public function __get (string $name_)
-   {
-      return $this->input->{$name_};
-   }
-   public function __set (string $name_,$val_)
-   {
-      $this->input->{$name_}=$val_;
-   }
-}
-
-class MetaboxString extends MetaboxField
-{
-   protected $input_class="InputString";
-}
-
-class MetaboxText extends MetaboxField
-{
-   protected $input_class="InputText";
-}
-
-class MetaboxRichText extends MetaboxField
-{
-   protected $input_class="InputRichText";
-}
-
-class MetaboxInt extends MetaboxField
-{
-   protected const DATA_TYPE="integer";
-   protected $input_class="InputInt";
-}
-
-class MetaboxFloat extends MetaboxField
-{
-   protected const DATA_TYPE="number";
-   protected $input_class="InputFloat";
-}
-
-class MetaboxBool extends MetaboxField
-{
-   protected const DATA_TYPE="boolean";
-   protected $input_class="InputBool";
-}
-
-class MetaboxMedia extends MetaboxField
-{
-   protected $input_class="InputMedia";
 }
 
 ?>

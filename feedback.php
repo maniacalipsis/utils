@@ -18,7 +18,8 @@ class Feedback extends Shortcode
    protected $data=[];     //Form data.
    protected $fields=[];   //Form input fields,
    //Rendering params, that can be defined only at the backend:
-   public $form_class="feedback_form"; //CSS-class for the form's outermost block.
+   public $identity_class="feedback_form"; //CSS-class for the form's outermost block.
+   public $custom_form_class="";
    
    public function __construct($name_="")
    {
@@ -28,8 +29,8 @@ class Feedback extends Shortcode
       
       if (wp_doing_ajax())
       {
-         add_action("wp_ajax_nopriv_".$this->id,[$this,"handle_request"]);
-         add_action("wp_ajax_".$this->id       ,[$this,"handle_request"]);
+         add_action("wp_ajax_nopriv_".$this->name,[$this,"handle_request"]);
+         add_action("wp_ajax_".$this->name       ,[$this,"handle_request"]);
       }
    }
    
@@ -45,6 +46,8 @@ class Feedback extends Shortcode
    
    public function add_field(FeedbackField $field_)
    {
+      //Add an input field to the form.
+      
       $this->fields[$field_->key]=$field_;
    }
    
@@ -67,11 +70,9 @@ class Feedback extends Shortcode
    protected function default_form_tpl()
    {
       //Render the simple list.
-      $title="Wasd!";
       ob_start();
       ?>
-      <DIV <?=$this->attr_id?> CLASS="<?=$this->form_class?> <?=$this->list_class?> <?=$this->custom_class?>">
-         <H2 CLASS="title"><?=$title?></H2>
+      <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->custom_class?>">
          <?php
             echo $this->form_open_tpl();
             foreach ($this->fields as $field)
@@ -90,9 +91,8 @@ class Feedback extends Shortcode
       //Helper for the *_form_tpl().
       ob_start();
       ?>
-         <FORM ACTION="<?=admin_url("admin-ajax.php")?>" CLASS="flex">
-            <INPUT TYPE="hidden" NAME="action" VALUE="<?=$this->id?>">
-            <LABEL CLASS="hidden">Field <INPUT TYPE="text" NAME="trap" VALUE=""></LABEL>
+         <FORM ACTION="<?=admin_url("admin-ajax.php")?>" CLASS="<?=$this->custom_form_class?>">
+            <INPUT TYPE="hidden" NAME="action" VALUE="<?=$this->name?>">
 
       <?php
       return ob_get_clean();
@@ -114,11 +114,9 @@ class Feedback extends Shortcode
    {
       //Returns form open tag and some utility fields.
       //Helper for the *_form_tpl().
-      $notice="yo";
       ob_start();
       ?>
             <DIV CLASS="submission flex end x-end">
-               <SPAN CLASS="notice"><?=$notice?></SPAN>
                <INPUT TYPE="submit" VALUE="Отправить">
             </DIV>
             <DIV CLASS="result"></DIV>
@@ -133,7 +131,7 @@ class Feedback extends Shortcode
       
       //1st pass - wrap request:
       foreach ($this->fields as $field)
-         $field->set_value(arr_val($_REQUEST,$field->key)); //Get and wrap values from the request.
+         $field->value=arr_val($_REQUEST,$field->key); //Get and wrap values from the request.
       
       //2nd pass - check if all required fields are filled:
       $check_list=$this->fields; //Duplicate fields array (not the fields themselves).
@@ -177,30 +175,34 @@ class Feedback extends Shortcode
    public function handle_request()
    {
       //Handle AJAX request from the feedback form.
-      // An example.
       
       $response=["res"=>false];
+      
       if ($this->validate())
-      {
-         //Some payload.
-      }
-      else
+         $this->handle_request_payload();
+      
+      if ($this->errors)
          $response["errors"]=$this->errors;
       
       echo json_encode($response,JSON_ENCODE_OPTIONS);
       die();
    }
    
+   public function handle_request_payload()
+   {
+      //This method is called at the handle_request() when the form is validated.
+      //Do something useful here.
+   }
 }
 
-
+//Input fields' classes for the feedback forms:
 abstract class FeedbackField
 {
-   public const SINGLE=true;
    protected $input_class=""; //Mixin class. NOTE: parent constructor sees a perent's consts, even if descendant overrides'em.
    protected $input=null;     //Mixin.
-   
-   public $alt_fields_keys=[];   //Reserved for usage in feedback.
+
+   public $required=false;
+   public $alt_fields_keys=[]; //List of alternatively required fields.
    public $error_msg="";
    
    public function __construct(array $params_=[])
@@ -261,9 +263,14 @@ class FeedbackBool extends FeedbackField
    protected $input_class="InputBool";
 }
 
-class FeedbackMedia extends FeedbackField
+// class FeedbackMedia extends FeedbackField
+// {
+//    protected $input_class="InputMedia";
+// }
+
+class FeedbackSelect extends FeedbackField
 {
-   protected $input_class="InputMedia";
+   protected $input_class="InputSelect";
 }
 
 ?>
