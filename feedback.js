@@ -1,3 +1,9 @@
+function initFeedbackForms(selector_)
+{
+   for (let form of document.forms)
+      form.addEventListener('submit',ajaxFormOnSubmit);   
+}
+
 function printAjaxResponse(form_,ans_)
 {
    console.log(form_,ans_);
@@ -6,11 +12,11 @@ function printAjaxResponse(form_,ans_)
    {
       resBox.classList.toggle('error',!ans_.res);
       resBox.classList.toggle('success',ans_.res);
-      resBox.innerHTML=(ans_.errors?.length ? '<P>'+ans_.errors.join('</P>\n<P>')+'</P>\n'+'<P>' : '')+
-                       (ans_.success?.length ? '<P>'+ans_.success.join('</P>\n<P>')+'</P>\n'+'<P>' : '');
+      resBox.innerHTML=(ans_.errors?.length ? '<P>'+ans_.errors?.join('</P>\n<P>')??(!ans_.res ? 'Похоже, что-то пошло не так.' : '')+'</P>\n'+'<P>' : '')+
+                       (ans_.success?.length ? '<P>'+ans_.success?.join('</P>\n<P>')??(ans_.res ? 'Запрос выполнен успешно' : '')+'</P>\n'+'<P>' : '');
    }
    else
-      alert(ans_.errors?.join('\n'));
+      alert(ans_.errors?.join('\n')+'\n\n'+ans_.success?.join('\n'));
 }
 
 function ajaxFormOnSubmit(e_)
@@ -31,10 +37,4 @@ function ajaxFormOnSubmit(e_)
                 );
    
    return cancelEvent(e_);
-}
-
-function initFeedbackForms(selector_)
-{
-   for (let form of document.forms)
-      form.addEventListener('submit',ajaxFormOnSubmit);   
 }

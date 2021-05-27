@@ -33,7 +33,7 @@ function plugin_init()
    }
    else
    {
-      wp_enqueue_script("admin_utils",plugins_url("/feedback.js",__FILE__));
+      wp_enqueue_script("feedback",plugins_url("/feedback.js",__FILE__));
    }
 }
 add_action("init",__NAMESPACE__."\\plugin_init");
