@@ -11,6 +11,7 @@ Plugin URI:
 namespace Utilities\Init;
 
 define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_PARTIAL_OUTPUT_ON_ERROR);
+define("DB_CONSTANTS",["NULL","TRUE","FALSE","CURRENT_TIMESTAMP","CURRENT_DATE","CURRENT_TIME","LOCALTIME","LOCALTIMESTAMP","UTC_DATE","UTC_TIME","UTC_TIMESTAMP"]);
 
 require_once(__DIR__."/functions.php");            //Utilities.
 require_once(__DIR__."/inputs.php");               //Input fields handling.
@@ -29,7 +30,11 @@ function plugin_init()
    {
       wp_enqueue_script("admin_utils",plugins_url("/admin.js",__FILE__));
       wp_enqueue_style("admin_utils",plugins_url("/admin.css",__FILE__));
-   }      
+   }
+   else
+   {
+      wp_enqueue_script("admin_utils",plugins_url("/feedback.js",__FILE__));
+   }
 }
 add_action("init",__NAMESPACE__."\\plugin_init");
 ?>

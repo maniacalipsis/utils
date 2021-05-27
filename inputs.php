@@ -17,8 +17,10 @@ abstract class InputField
    public $value=null;
    public $default="";
    public $attrs=[];
-   public $is_required=false; //If this field required. Flag for the form validation. NOTE: Its because the REQUIRED attribute can't be used to make an alternative requirements.
-   public $alt_required=[];   //Alternatively required fields.
+   public $required=false; //If this field required. Flag for the form validation. NOTE: Its because the REQUIRED attribute can't be used to make an alternative requirements.
+   public $group="";          //Name of the group of the alternatively required fields. If "", then the field is required without alternatives. NOTE: there is no sense to set this property for the optional fields.
+   public $errors=[];         //The field's validate() puts error messages here, while the form's validate() method gets them from here.
+   //TODO: change $required and $group to private and define getters/setters.
    
    public function __construct(array $params_=[])
    {
@@ -37,14 +39,31 @@ abstract class InputField
    public function validate()
    {
       //Basic value validation.
+      //Return boolean true if the value is valid. If not, return boolean false and put error messages into $this->errors.
+      //Rules of validation:
+      // - The required field must be filled correctly. The optional field must be filled correctly or not filled at all.
+      // - If the field has alternatives, don't add "This field isn't filled" message individually, because such a thing should be generated for the whole group by the form's method validate(). However other specific errors should be reported.
       
-      return !($this->is_required&&($this->value==""));
+      $this->errors=[];
+      
+      if ($this->required)
+      {
+         if (($this->value=="")&&(!$this->group))          
+            $this->errors[]="Заполните поле «".$this->title."»";
+      }
+      
+      return count($this->errors)==0;
    }
    
    public function get_safe_value()
    {
       //Returns [properly modified] $value, safe for storing to DB or something else.
-      return $this->value; //TODO: write the basic sanitizing.
+      $res=htmlspecialchars(strip_tags($this->value));
+      $maxlen=arr_val($this->attrs,"maxlength");
+      if ($maxlen)
+         $res=mb_substr($res,0,$maxlen);
+      
+      return $res;
    }
    
    abstract public function render();  //Returns an input's html.
@@ -222,7 +241,7 @@ class InputSelect extends InputField
    public function validate()
    {
       //Valid value must match the selection variants and, if required, must not be empty.
-      return !($this->is_required&&($this->value!=""))&&key_exists($this->value,$this->variants);
+      return !($this->required&&($this->value!=""))&&key_exists($this->value,$this->variants);
    }
    
    public function get_safe_value()

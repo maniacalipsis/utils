@@ -15,8 +15,9 @@ class Feedback extends Shortcode
    //Rendering
    protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","form_tpl"=>"default_form_tpl"];
    //Data-related properties:
-   protected $data=[];     //Form data.
    protected $fields=[];   //Form input fields,
+   protected $response=[]; //
+   protected $errors=[];   //List of messages about any kind of errors interrupted normal form processing.
    //Rendering params, that can be defined only at the backend:
    public $identity_class="feedback_form"; //CSS-class for the form's outermost block.
    public $custom_form_class="";
@@ -119,7 +120,7 @@ class Feedback extends Shortcode
             <DIV CLASS="submission flex end x-end">
                <INPUT TYPE="submit" VALUE="Отправить">
             </DIV>
-            <DIV CLASS="result"></DIV>
+            <DIV CLASS="result message"></DIV>
          
       <?php
       return ob_get_clean();
@@ -127,64 +128,62 @@ class Feedback extends Shortcode
    
    public function validate()
    {
-      $this->errors=[]; //Reset errors list.
+      //Valide .
+      // Overriding, return boolean true if all fields are valid or false if not. Put error messages into the array $this->errors.
       
-      //1st pass - wrap request:
+      $valid_cnt=0;
+      $valid_groups=[];
+      $grouped_titles=[];
+      
+      //1st stage - validate all fields, counting grouped ones seperately:
       foreach ($this->fields as $field)
-         $field->value=arr_val($_REQUEST,$field->key); //Get and wrap values from the request.
-      
-      //2nd pass - check if all required fields are filled:
-      $check_list=$this->fields; //Duplicate fields array (not the fields themselves).
-      foreach ($check_list as $key=>$field)
-         if (!$field->validate())
-         {
-            if ($field->alt_fields_keys)
-            {
-               $invalid_alts_titles=[];   //Precollect titles for the error message.
-                  
-               //Find at least one filled alternative field:
-               $is_alt_filled=false;
-               foreach ($field->alt_fields_keys as $alt_key)
-                  if (key_exists($alt_key,$this->fields))
-                  {
-                     if (!$this->fields[$alt_key]->validate())
-                     {
-                        $invalid_alts_titles[]=$this->fields[$alt_key]->get_title();  //By the way collect titles of the alt fields.
-                        //$this->errors[]="Заполните ".$field->get_title;                      //Individual error.
-                     }
-                     else
-                     {
-                        $is_alt_filled=true;
-                        break;
-                     }
-                     unset($check_list[$alt_key]);
-                  }
-                  else
-                     $titles[]=$alt_key; //Expose the alt field key instead of the title if the form was made inconsistently.
-                  
-               if (!$is_alt_filled)                                                                                     //If all alternatives aren't filled
-                  $this->errors[]="Заполните хотя бы одно из обязательных полей: ".implode(", ",$invalid_alts_titles);  // then set a collective error.
-            }
-            else
-               $this->errors[]="Заполните ".$field->get_title();
+      {
+         if ($field->group)
+            $grouped_titles[$field->group][]=$field->title; //This will serve two purposes: count fields in the group and collect their titles for the case if all of them invalid.
+         
+         if ($field->validate())                //If the field is valid,
+         {                                      //
+            if ($field->group)                  //
+               $valid_groups[]=$field->group;   // set its group valid.
+            else                                //
+               $valid_cnt++;                    // If it has no group, increase the common counter.
          }
+         else
+            $this->errors=array_merge($this->errors,$field->errors); //The keys will help JS to address errors next to the corresponding inputs.
+      }
       
-      return count($this->errors)==0;
+      //2nd stage - count fields in the valid groups:
+      foreach ($grouped_titles as $group=>$titles)
+         if (in_array($group,$valid_groups)) //If at least one valid field was detected in the group,
+            $valid_cnt+=count($titles);      // count like all fields in it are valid.
+         else
+            $this->errors[]="Заполните хотя бы одно из обязательных полей: ".implode(", ",$titles);
+      
+      //Finally, check if the sum of the ungrouped valid fields and fields in the valid groups equals to the total amount of fields:
+      return ($valid_cnt==count($this->fields));
    }
    
    public function handle_request()
    {
       //Handle AJAX request from the feedback form.
       
-      $response=["res"=>false];
+      $this->errors=[]; //Reset errors list.
+      $this->response=["res"=>false];
       
+      //Get the from data from the request:
+      foreach ($this->fields as $field)
+         $field->value=arr_val($_REQUEST,$field->key);
+      
+      //Validate form data and do something useful: 
       if ($this->validate())
-         $this->handle_request_payload();
+         $this->handle_request_payload(); //Payload is expected to set $this->response["res"] true on success and append some necessary data, if needed. On fail it shall only append a report to $this->errors[]. Howener it may report non critical issues even on success.
       
+      //Report all errors to the client:
       if ($this->errors)
-         $response["errors"]=$this->errors;
+         $this->response["errors"]=$this->errors;
       
-      echo json_encode($response,JSON_ENCODE_OPTIONS);
+      //Finally, send a response:
+      echo json_encode($this->response,JSON_ENCODE_OPTIONS);
       die();
    }
    
@@ -202,7 +201,7 @@ abstract class FeedbackField
    protected $input=null;     //Mixin.
 
    public $required=false;
-   public $alt_fields_keys=[]; //List of alternatively required fields.
+   public $alt_required=[]; //List of alternatively required fields.
    public $error_msg="";
    
    public function __construct(array $params_=[])

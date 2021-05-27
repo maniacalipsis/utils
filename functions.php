@@ -251,6 +251,32 @@ function send_email($recipients_,$subject_,$text_,$attachments_=null,$sender_="n
    return mail($recipients_,$subject_,$content,$headers);
 }
 
+// ------------------------ Database functions ------------------------ //
+function name_to_query($name_)
+{
+   //Permanently replaces characters depreciated in the names of databases, tables, columns.
+   //This function don't needs complementary decoding one, cause the correct names needs not any encoding.
+   return "`".strtr($name_,"\0\"\n\\ `'[](){}<>.,/?!@#$%^&*-+=:;|","_________________________________")."`";
+}
+
+function data_to_query($val_)
+{
+   //General purpose function that protects queries from breaking or injections by means of special characters in data.
+   //Usage: "UPDATE `table` SET `col_a`=".data_to_query($value).";";
+   //NOTE: performance tests shows that str_replace() noticeably slows code only when it called for huge strings.
+   //      But when it applied on a short values, the fact of calling of a function has more effect on execution time, so differentiation of, e.g., numbers will not make it faster because of caling of a type-checking functions.
+   //NOTE: In MySQL the TRUE and the FALSE are aliases of '1' and '0', so raw boolean values in the data will be correctly type-casted.
+   
+   return is_null($val_) ? "NULL" : (array_search($val_,DB_CONSTANTS)!==false ? $val_ : "'".str_replace(["\0","`","'","\\"],["[[_0]]","[[_bq]]","[[_q]]","[[_bs]]"],$val_)."'");
+}
+
+function data_from_query($val_)
+{
+   //General purpose function that decodes special characters in data, encoded by data_to_query() and the same.
+   
+   return is_null($val_) ? NULL : str_replace(["[[_0]]","[[_bq]]","[[_q]]","[[_bs]]"],["\0","`","'","\\"],$val_);
+}
+
 // ------------------------ Debug functions ------------------------//
 function dump(...$args_)
 {
