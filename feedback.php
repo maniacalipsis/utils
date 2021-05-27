@@ -56,9 +56,6 @@ class Feedback extends Shortcode
    {
       //Get the default form data before the rendering.
       
-      $this->data=[];
-      foreach ($this->fields as $field)
-         $this->data[$field->key]="";//$field->default;
    }
    
    protected function default_wrap_tpl()
@@ -192,84 +189,6 @@ class Feedback extends Shortcode
       //This method is called at the handle_request() when the form is validated.
       //Do something useful here.
    }
-}
-
-//Input fields' classes for the feedback forms:
-abstract class FeedbackField
-{
-   protected $input_class=""; //Mixin class. NOTE: parent constructor sees a perent's consts, even if descendant overrides'em.
-   protected $input=null;     //Mixin.
-
-   public $required=false;
-   public $alt_required=[]; //List of alternatively required fields.
-   public $error_msg="";
-   
-   public function __construct(array $params_=[])
-   {
-      $this->input=new (__NAMESPACE__."\\".$this->input_class)($params_);
-   }
-   
-   //Proxy the mixin's properties:
-   public function __call($name_,$args_)
-   {
-      return $this->input->{$name_}($args_);
-   }
-   public function __get (string $name_)
-   {
-      return $this->input->{$name_};
-   }
-   public function __set (string $name_,$val_)
-   {
-      $this->input->{$name_}=$val_;
-   }
-}
-
-class FeedbackString extends FeedbackField
-{
-   protected $input_class="InputString";
-}
-
-class FeedbackPwd extends FeedbackField
-{
-   protected $input_class="InputPwd";
-}
-
-class FeedbackText extends FeedbackField
-{
-   protected $input_class="InputText";
-}
-
-class FeedbackRichText extends FeedbackField
-{
-   protected $input_class="InputRichText";
-}
-
-class FeedbackInt extends FeedbackField
-{
-   protected const DATA_TYPE="integer";
-   protected $input_class="InputInt";
-}
-
-class FeedbackFloat extends FeedbackField
-{
-   protected const DATA_TYPE="number";
-   protected $input_class="InputFloat";
-}
-
-class FeedbackBool extends FeedbackField
-{
-   protected const DATA_TYPE="boolean";
-   protected $input_class="InputBool";
-}
-
-// class FeedbackMedia extends FeedbackField
-// {
-//    protected $input_class="InputMedia";
-// }
-
-class FeedbackSelect extends FeedbackField
-{
-   protected $input_class="InputSelect";
 }
 
 ?>
