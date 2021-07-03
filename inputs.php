@@ -10,17 +10,14 @@
 
 namespace Utilities;
 
-abstract class InputField
+class DataField
 {
+   //Minimal class for making data compatible with the inputs classes.
+   //NOTE: The DataField doesn't retrieves or stores its value by itself because this mechanism is usage-dependent and needs to be external.
+   //      So it just lets its owner to retrieve/store the data in a right way,  using its property 'key' and setting/getting its property 'value'.
+   
    public $key="";
-   public $title="";
    public $value=null;
-   public $default="";
-   public $attrs=[];
-   public $required=false; //If this field required. Flag for the form validation. NOTE: Its because the REQUIRED attribute can't be used to make an alternative requirements.
-   public $group="";          //Name of the group of the alternatively required fields. If "", then the field is required without alternatives. NOTE: there is no sense to set this property for the optional fields.
-   public $errors=[];         //The field's validate() puts error messages here, while the form's validate() method gets them from here.
-   //TODO: change $required and $group to private and define getters/setters.
    
    public function __construct(array $params_=[])
    {
@@ -29,6 +26,26 @@ abstract class InputField
          if (property_exists($this,$key))
             $this->{$key}=$val;
    }
+   
+   public function get_safe_value()
+   {
+      //Returns [properly modified] $value, safe for storing to DB or something else.
+      return htmlspecialchars($this->value);
+   }
+}
+
+abstract class InputField extends DataField
+{
+   //Base class for various input fields.
+   
+   public $title="";
+   public $default="";
+   public $attrs=[];
+   public $required=false; //If this field required. Flag for the form validation. NOTE: Its because the REQUIRED attribute can't be used to make an alternative requirements.
+   public $group="";          //Name of the group of the alternatively required fields. If "", then the field is required without alternatives. NOTE: there is no sense to set this property for the optional fields.
+   public $errors=[];         //The field's validate() puts error messages here, while the form's validate() method gets them from here.
+   //TODO: change $required and $group to private and define getters/setters.
+   
    
    public function get_data_type()
    {
@@ -55,17 +72,6 @@ abstract class InputField
       return count($this->errors)==0;
    }
    
-   public function get_safe_value()
-   {
-      //Returns [properly modified] $value, safe for storing to DB or something else.
-      $res=htmlspecialchars(strip_tags($this->value));
-      $maxlen=arr_val($this->attrs,"maxlength");
-      if ($maxlen)
-         $res=mb_substr($res,0,$maxlen);
-      
-      return $res;
-   }
-   
    abstract public function render();  //Returns an input's html.
    
    public function print()
@@ -81,29 +87,40 @@ class InputHidden extends InputField
    {
       //This renderer may be called from the descendant classes to render the input.
       
-      $attrs=["type"=>"hidden","name"=>$this->key,"value"=>$this->value]+$this->attrs;
+      $attrs=["type"=>"hidden","name"=>$this->key,"value"=>(string)$this->value]+$this->attrs;
       ?>
       <INPUT<?=serialize_element_attrs($attrs)?>>
       <?php
    }
 }
 
-class InputString extends InputField
+class InputPwd extends InputField
 {
    public function render()
    {
-      $attrs=["type"=>"text","name"=>$this->key,"value"=>$this->value]+$this->attrs;
+      $attrs=["type"=>"password","name"=>$this->key,"value"=>$this->value]+$this->attrs;
       ?>
       <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
 
-class InputPwd extends InputString
+class InputString extends InputField
 {
+   public function get_safe_value()
+   {
+      //Returns [properly modified] $value, safe for storing to DB or something else.
+      $res=htmlspecialchars(strip_tags($this->value));
+      $maxlen=arr_val($this->attrs,"maxlength");
+      if ($maxlen)
+         $res=mb_substr($res,0,$maxlen);
+      
+      return $res;
+   }
+   
    public function render()
    {
-      $attrs=["type"=>"password","name"=>$this->key,"value"=>$this->value]+$this->attrs;
+      $attrs=["type"=>"text","name"=>$this->key,"value"=>$this->value]+$this->attrs;
       ?>
       <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
@@ -116,7 +133,7 @@ class InputText extends InputString
    {
       $attrs=["name"=>$this->key]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <TEXTAREA <?=serialize_element_attrs($main_attrs+$this->misc_attrs)?>><?=htmlspecialchars($this->value)?></TEXTAREA></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <TEXTAREA <?=serialize_element_attrs($attrs)?>><?=htmlspecialchars($this->value)?></TEXTAREA></LABEL>
       <?php
    }
 }
@@ -213,10 +230,9 @@ class InputMedia extends InputJson
    {
       $container_id="extra_media_".$this->key;
       $list_params=[
-                      "inputSelector"=>"#$container_id>input[type=hidden]",
-                      "containerSelector"=>"#$container_id>.media_list",
+                      "inputSelector"=>"#$container_id input[type=hidden][name=".$this->key."]",
+                      "containerSelector"=>"#$container_id .media_list",
                       "limit"=>$this->limit,
-                      "immediate"=>true,
                       "MediaSelectorParams"=>$this->selector_params,
                    ];
       $list_params_json=json_encode($list_params,JSON_ENCODE_OPTIONS);
@@ -224,9 +240,9 @@ class InputMedia extends InputJson
       ?>
       <DIV ID="<?=$container_id?>" CLASS="media">
          <INPUT TYPE="hidden" NAME="<?=$this->key?>" VALUE="<?=$this->value?>">
-         <DIV CLASS="list"></DIV>
+         <DIV CLASS="media_list"></DIV>
          <SCRIPT>
-            document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>);});
+            document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});
          </SCRIPT>
       </DIV>
       <?php
@@ -241,7 +257,24 @@ class InputSelect extends InputField
    public function validate()
    {
       //Valid value must match the selection variants and, if required, must not be empty.
-      return !($this->required&&($this->value!=""))&&key_exists($this->value,$this->variants);
+      $this->errors=[];
+      
+      $checks_cnt=2;
+      $checks_passed=0;
+      if (!$this->required||($this->value!=""))
+         $checks_passed++;
+      else
+      {
+         if (!$this->group)
+            $this->errors[]="Заполните поле «".$this->title."»";
+      }
+      
+      if (key_exists($this->value,$this->variants))
+         $checks_passed++;
+      else
+         $this->errors[]="Переданное значение не соответствует списку";
+      
+      return ($checks_passed==$checks_cnt);
    }
    
    public function get_safe_value()

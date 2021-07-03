@@ -79,7 +79,8 @@
 
 
 #wpbody-content .media_selector,
-#wpbody-content .media_selector>label
+#wpbody-content .media_selector>label,
+#wpbody-content .media_selector>label.media /*Fix overrde by the #wpbody-content .postbox label.*/
 {
    display:flex;
    flex-flow:row;

@@ -15,19 +15,20 @@ class MediaList
       this._mediaSelectorParams=params_.MediaSelectorParams??this._mediaSelectorParams;
       
       this._limit=params_.limit??this._limit;
-      this._immediate=params_.immediate??this._immediate;
+      this.onChange=params_.onChange??params_.onchange??null;  //Allow to pass onchange handler via params.
       
       if (wp.media&&this._input&&this._container)
       {
          //Get the media:
-         let mediaList=null;
+         let mediaData=null;
          try
          {
+            //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
             if (this._input.value)
-               mediaList=JSON.parse(this._input.value);
+               mediaData=JSON.parse(this._input.value);
             
-            mediaList??(mediaList=[]);
-            for (let media of mediaList)
+            mediaData??(mediaData=[]);
+            for (let media of mediaData)
                this.add(new this._MediaSelectorClass(media,this,this._mediaSelectorParams));
          }
          catch (ex)
@@ -36,11 +37,9 @@ class MediaList
          }
          finally
          {
-            
             this.add(); //+ one empty selector.
             
-            if (!this._immediate&&this._input.form)
-               this._input.form.addEventListener('submit',()=>{this._input.value=JSON.stringify(this.list);});
+            this._input.form?.addEventListener('submit',()=>{this.updateSourceInput();});
          }
       }
    }
@@ -62,7 +61,6 @@ class MediaList
    _MediaSelectorClass=MediaSelector;  //MediaSelector class.
    _mediaSelectorParams=null;          //Params for MediaSelector's constructor.
    _limit=0;         //Maximal amount of media files selected.
-   _immediate=false;
    
    //public methods
    add(mediaSelector_)
@@ -112,8 +110,7 @@ class MediaList
          if (this._selectors.length==0)
             this.add(new this._MediaSelectorClass(null,this,this._mediaSelectorParams));
          
-         if (this._immediate)
-            this._input.value=JSON.stringify(this.list);
+         this.onChange?.(this);
       }
    }
    
@@ -130,12 +127,14 @@ class MediaList
       if (allHasMedia)
          this.add(new this._MediaSelectorClass(null,this,this._mediaSelectorParams));
       
-      if (this._immediate)
-         this._input.value=JSON.stringify(this.list);
+      this.onChange?.(this);
    }
    
-   //private methods
-   
+   updateSourceInput()
+   {
+      this._input.value=JSON.stringify(this.list);
+      this._input.dispatchEvent(new Event('change',{cancelable:true}));
+   }
 }
 
 class MediaSelector
@@ -332,4 +331,113 @@ class MediaSelector
       
       this._render();
    }
-} 
+}
+
+class wpJSONForm
+{
+   //This class handles a [part] of a static form that represents JSON data from the hidden inupt.
+   constructor(params_)
+   {
+      //Init:
+      let container=params_.container??document.querySelector(params_.containerSelector);
+      console.log(container);
+      this._sourceInput=params_.sourceInput??container?.querySelector(params_.sourceInputSelector??'input[type=hidden]');  //By default, a first hidden input will be the data source.
+      this._defaultsInput=params_.sourceInput??container?.querySelector(params_.sourceInputSelector??'input.defaults[type=hidden]');
+      this._inputs=this._filterInputs(params_.inputs??container?.querySelectorAll(params_.inputsSelector??'input,select,textarea'));   //Select all inputs and then filter-off unwanted ones (e.g.buttons).
+      
+      try
+      {
+         this._loadData();
+      }
+      catch (exc)
+      {
+         console.error('wpJSONForm failed to get JSON data from the source or defaults input.',exc,this);
+      }
+      finally
+      {
+         this._initInputs();
+         console.log(this);
+      }
+   }
+   
+   assignValue(keysSeq_,value_)
+   {
+      console.log(keysSeq_,value_);
+      this._data=setElementRecursively(this._data,keysSeq_,value_);
+      this._sourceInput.value=JSON.stringify(this._data);   //TODO: hook to post save event.
+   }
+   
+   //private props
+   _sourceInput=null;
+   _defaultsInput=null;
+   _inputs=[];
+   _data=null;
+   
+   //private methods
+   _loadData()
+   {
+      //Get data and apply defaults (if given):
+      
+      this._data=JSON.parse(this._sourceInput.value);
+      if (this._defaultsInput)
+         this._data=cloneOverriden(JSON.parse(this._defaultsInput.value),this._data);
+   }
+   
+   _initInputs()
+   {
+      this._keysCache=[];
+      for (var input of this._inputs)
+      {
+         switch (input.type)
+         {
+            case 'hidden':
+            {
+               input.value=getElementRecursively(this._data,this._getKeysSequence(input));
+               input.addEventListener('change',(e_)=>{console.log('Hidden changed:',e_.target); this.assignValue(this._getKeysSequence(e_.target),e_.target.value);});
+            }
+            case 'image':
+            case 'radio':
+            {
+               console.warn('wpJSONForm didn\'t learned how to treat inputs of types image and radio yet.');
+               break;
+            }
+            case 'checkbox':
+            {
+               input.checked=toBool(getElementRecursively(this._data,this._getKeysSequence(input)));
+               input.addEventListener('click',(e_)=>{this.assignValue(this._getKeysSequence(e_.target),toBool(e_.target.checked));});
+               break;
+            }
+            default:
+            {
+               input.value=getElementRecursively(this._data,this._getKeysSequence(input));
+               input.addEventListener('input',(e_)=>{this.assignValue(this._getKeysSequence(e_.target),e_.target.value);});
+            }
+         }
+      }
+   }
+   
+   _getKeysSequence(input_)
+   {
+      if (!input_.keysSequenceCache)
+         input_.keysSequenceCache=input_.dataset.keys_seq?.split(',');
+      
+      return input_.keysSequenceCache;
+   }
+   
+   _filterInputs(inputs_)
+   {
+      //This method filters inputs. It nade to simplify the inputs selector, and also to check that selector can't.
+      //NOTE: overrde this method to make more custom checks or to cancel them all.
+      
+      let res=[];
+      
+      for (let input of inputs_)
+         if (input!=this._sourceInput&&
+             input!=this._defaultsInput&&
+             this._getKeysSequence(input))
+            res.push(input);
+      
+      return res;
+   }
+   //
+}

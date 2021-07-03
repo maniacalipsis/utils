@@ -79,7 +79,19 @@ function mb_icmp($str1_,$str2_)
    return strcmp(mb_convert_case($str1_,MB_CASE_LOWER),mb_convert_case($str2_,MB_CASE_LOWER));
 }
 
-
+function blend_with_spices($substance_,$spice_)
+{
+   //Blends login and password withh salt and pepper before frying with hash().
+   //This function works in pair with the same JS one on the client side.
+   
+   $len=min(mb_strlen($substance_),mb_strlen($spice_));
+   $mix="";
+   for ($i=0;$i<$len;$i++)
+      $mix.=mb_substr($spice_,$i,1).mb_substr($substance_,$i,1);
+   $mix.=(mb_strlen($spice_)>$len) ? mb_substr($spice_,$len) : mb_substr($substance_,$len);
+   
+   return $mix;
+}
 
 function translate_date($date_str_,$is_genitive_=false)
 {

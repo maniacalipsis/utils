@@ -144,7 +144,7 @@ class Metabox
       }
    }
    
-   public function add_field($field_)
+   public function add_field(InputField $field_)
    {
       foreach ($this->post_types as $post_type) //Register meta for the own post types.
          register_meta("post",$field_->key,["object_subtype"=>$post_type,"type"=>$field_->get_data_type(),"description"=>$field_->title,"default"=>$field_->default,"single"=>true]);   //TODO: "sanitize_callback" and "show_in_rest" might be subjects of update.
