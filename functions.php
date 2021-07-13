@@ -49,6 +49,58 @@ function decode_request($raw_req_)
    return $res;
 }
 
+class CheckList
+{
+   //This class helps to maintain a long check sequences.
+   //Usage example:
+   // $errors=[];
+   // $cl=new CheckList($errors);
+   // $cl->check($val1==CORRECT_VAL1,"err1");      //<- The independent check.
+   // if ($cl->check($val2==CORRECT_VAL2,"err2"))  //If master check fails, then dependent checks will not be made. But it's ok, because this one failed check made the list unable to pass the whole test.
+   //    $cl->check($val3==CORRECT_VAL3,"err3");   //<- The dependent check.
+   // if ($cl->is_passed())
+   //    do_something();
+   // else
+   //    dump($errors);
+   
+   private $checks_made=0;
+   private $checks_passed=0;
+   private $errors=null;
+   
+   public function __construct(&$errors_)
+   {
+      $this->errors=&$errors_;   //Save ptr to put error messages directly into an external array.
+   }
+   
+   public function check($check_res_,$err_msg_=null)
+   {
+      //Register a check result.
+      
+      $this->checks_made++;
+      if ($check_res_)
+         $this->checks_passed++;
+      elseif ($err_msg_&&is_array($this->errors))
+         $this->errors[]=$err_msg_;
+      
+      return $check_res_;   //Return $check_res_ to enable the chained and conditional checks.
+   }
+   
+   public function is_passed()
+   {
+      //Does the whole test is passed?
+      // This method returns true if all checks are passed.
+      // If any of checks failed false or also if there are no check was made at all, the false will be returned.
+      
+      return (($this->checks_made>0)&&($this->checks_passed==$this->checks_made));
+   }
+   
+   public function reset()
+   {
+      $this->checks_made=0;
+      $this->checks_passed=0;
+   }
+}
+
 /* --------------------------------------- string utilities --------------------------------------- */
 function to_bool($val_)
 {
@@ -392,6 +444,8 @@ function text_clip_output($val_,$params_=NULL)
    
    return $val_;
 }
+
+// ------------------------ Unified form validation ------------------------//
 
 // ------------------------ Unified form validation ------------------------//
 //Usage example:

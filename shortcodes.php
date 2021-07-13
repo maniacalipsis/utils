@@ -89,7 +89,11 @@ abstract class Shortcode
             $this->attr_data.=" ".strtoupper(str_replace("_","-",$key))."=\"".htmlspecialchars($val)."\"";      
    }
    
-   abstract protected function get_data($params_); //Get and preformat the data. Set results to $this->data.
+   protected function get_data($params_)
+   {
+      //Get and preformat the data. Set results to $this->data.
+      //Abstract, overridable.
+   }
    
    //abstract protected function default_tpl();   //Return rendered shortcode. NOTE: this method isn't declared bacause the descendant classes may has a different template keys.
 }
@@ -217,7 +221,8 @@ abstract class PostsPrefabShortcode extends DataListShortcode
 {
    //A basic class for creating a parametrized multi-template shortcodes intended to output the posts.
    
-   public $filter_defaults=["post_type"=>"post","category"=>1,"post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[]];
+   protected $filter_allowed=["post_type"=>null,"category"=>null,"category_name"=>null,"tag"=>null,"post_status"=>null,"post_parent"=>null,"orderby"=>null,"order"=>null,"numberposts"=>null,"exclude"=>null,"include"=>null,"meta_key"=>null,"meta_value"=>null,"meta_query"=>null];
+   public $filter_defaults=["post_type"=>"post","category"=>1,"post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null];
    //Rendering params, that can be redefined just at the backend:
    public $item_class="post";
    
@@ -227,14 +232,14 @@ abstract class PostsPrefabShortcode extends DataListShortcode
       
       //Get the posts filtering params:
       $params_["numberposts"]=arr_val($params_,"limit",arr_val($params_,"numberposts",$this->filter_defaults["numberposts"]));  //Translate "limit" to "numberposts" as the last one isn't intuitive.
-      $filter=array_replace($this->filter_defaults,array_intersect_key($params_,$this->filter_defaults));   //Filter params of the filter.
+      $filter=array_replace($this->filter_defaults,array_intersect_key($params_,$this->filter_allowed));   //Filter params of the filter.
       
       //Convert comma-separated values to arrays:
       $arr_param_keys=["include","exclude"];
       foreach ($arr_param_keys as $key)
          if (key_exists($key,$filter)&&(!is_array($filter[$key])))
             $filter[$key]=explode(",",$filter[$key]);
-      
+
       //Get the posts:
       $this->data=get_posts($filter);
    }

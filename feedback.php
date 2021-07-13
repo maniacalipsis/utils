@@ -13,18 +13,20 @@ namespace Utilities;
 class Feedback extends Shortcode
 {
    //Rendering
-   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","form_tpl"=>"default_form_tpl"];
+   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","form_tpl"=>"default_form_tpl","form_open_tpl"=>"default_form_open_tpl","form_submit_tpl"=>"default_form_submit_tpl","form_close_tpl"=>"default_form_close_tpl"];
    //Data-related properties:
    protected $fields=[];   //Form input fields,
    protected $response=[]; //
    protected $errors=[];   //List of messages about any kind of errors interrupted normal form processing.
    //Rendering params, that can be defined only at the backend:
-   public $identity_class="feedback_form"; //CSS-class for the form's outermost block.
    public $custom_form_class="";
    
    public function __construct($name_="")
    {
       parent::__construct($name_);
+      
+      if ($this->identity_class===null)
+         $this->identity_class="feedback_form";
       
       add_action("init",[$this,"on_init"]);
       
@@ -45,19 +47,13 @@ class Feedback extends Shortcode
       }
    }
    
-   public function add_field(FeedbackField $field_)
+   public function add_field(InputField $field_)
    {
       //Add an input field to the form.
       
       $this->fields[$field_->key]=$field_;
    }
-   
-   protected function get_data($params_)
-   {
-      //Get the default form data before the rendering.
       
-   }
-   
    protected function default_wrap_tpl()
    {
       //The default template makes no wrapping.
@@ -72,31 +68,31 @@ class Feedback extends Shortcode
       ?>
       <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->custom_class?>">
          <?php
-            echo $this->form_open_tpl();
+            echo $this->{$this->tpl_pipe["form_open_tpl"]}();
             foreach ($this->fields as $field)
                echo $field->render();
-            echo $this->form_submit_tpl();
-            echo $this->form_close_tpl();
+            echo $this->{$this->tpl_pipe["form_submit_tpl"]}();
+            echo $this->{$this->tpl_pipe["form_close_tpl"]}();
          ?>
       </DIV>
       <?php
       return ob_get_clean();
    }
    
-   protected function form_open_tpl()
+   protected function default_form_open_tpl()
    {
       //Returns form open tag and some utility fields.
       //Helper for the *_form_tpl().
       ob_start();
       ?>
-         <FORM ACTION="<?=admin_url("admin-ajax.php")?>" CLASS="<?=$this->custom_form_class?>">
+         <FORM ACTION="<?=admin_url("admin-ajax.php")?>" CLASS="<?=$this->custom_form_class?>" <?=$this->attr_data?>>
             <INPUT TYPE="hidden" NAME="action" VALUE="<?=$this->name?>">
 
       <?php
       return ob_get_clean();
    }
    
-   protected function form_close_tpl()
+   protected function default_form_close_tpl()
    {
       //Returns form open tag and some utility fields.
       //Helper for the *_form_tpl().
@@ -108,7 +104,7 @@ class Feedback extends Shortcode
       return ob_get_clean();
    }
    
-   protected function form_submit_tpl()
+   protected function default_form_submit_tpl()
    {
       //Returns form open tag and some utility fields.
       //Helper for the *_form_tpl().
@@ -163,6 +159,7 @@ class Feedback extends Shortcode
    public function handle_request()
    {
       //Handle AJAX request from the feedback form.
+      // This method is a parallel of the Dhortcode::do().
       
       $this->errors=[]; //Reset errors list.
       $this->response=["res"=>false];
@@ -190,5 +187,4 @@ class Feedback extends Shortcode
       //Do something useful here.
    }
 }
-
 ?>

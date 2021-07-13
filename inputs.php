@@ -151,6 +151,8 @@ class InputRichText extends InputText
 
 class InputFloat extends InputField
 {
+   public $default=0.0;
+   
    public function get_data_type()
    {
       //Returns compatible data type (in particular for the function register_meta()).
@@ -173,6 +175,8 @@ class InputFloat extends InputField
 
 class InputInt extends InputFloat   //NOTE: THe int is more tight than the float.
 {
+   public $default=0;
+   
    public function get_data_type()
    {
       //Returns compatible data type (in particular for the function register_meta()).
@@ -187,6 +191,8 @@ class InputInt extends InputFloat   //NOTE: THe int is more tight than the float
 
 class InputBool extends InputField
 {
+   public $default=false;
+   
    public function get_data_type()
    {
       //Returns compatible data type (in particular for the function register_meta()).
@@ -200,9 +206,9 @@ class InputBool extends InputField
    
    public function render()
    {
-      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value)]+$this->attrs
+      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value)]+$this->attrs;
       ?>
-      <LABEL> CLASS="<?=$this->key?>"<SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
@@ -288,6 +294,32 @@ class InputSelect extends InputField
       ?>
       <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <SPAN CLASS="select"><?=html_select($this->key,$this->variants,$this->value,$attrs)?></SPAN></LABEL>
       <?php
+   }
+}
+
+class InputPostsSelect extends InputSelect
+{
+   public $filter=[];
+   public $empty_option=null;
+   
+   public function __construct(array $params_=[])
+   {
+      parent::__construct($params_);
+      
+      //Prepend an empty option:
+      if ($this->empty_option!==null)
+         $this->variants[""]=$this->empty_option;
+      
+      //Get the posts and fill the selection variants with them:
+      $posts=get_posts($this->filter);
+      foreach ($posts as $post)
+         $this->variants[$post->ID]=$this->render_option_text($post);
+   }
+   
+   protected function render_option_text($post_)
+   {
+      //Makes an <OPTION> content.
+      return $post_->post_title;
    }
 }
 

@@ -39,7 +39,7 @@ function register_custom_post($post_type_,$labels_,$params_=[])
                 "hierarchical"      =>false,
                 "menu_position"     =>5,
                 "menu_icon"         =>"dashicons-format-aside",
-                "supports"          =>["title","editor","excerpt","page-attributes","thumbnail"],
+                "supports"          =>["title","editor","excerpt","page-attributes","thumbnail","custom-fields"],  //Full list of standard features: "title","editor","author","thumbnail","excerpt","trackbacks","custom-fields","comments","revisions","page-attributes","post-formats".
                 "taxonomies"        =>["category"],
                 //"query_var"=>true by WP default, that means it's equal to the $post_type_.
              ];
@@ -182,7 +182,7 @@ class Metabox
          $field->value=arr_val($_POST,$field->key);
          //dump("^^^",$field->key,$value);
          if ($field->value!==null)
-            update_post_meta($post_id_,$field->key,$field->value);  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
+            update_post_meta($post_id_,$field->key,$field->get_safe_value());  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
          else
             delete_post_meta($post_id_,$field->key);
       }
