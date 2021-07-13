@@ -121,6 +121,8 @@ abstract class DataListShortcode extends Shortcode
       parent::get_rendering_params($params_,$content_);
       
       //Get list customizations params:
+      $this->list_class=arr_val($params_,"list_class",$this->list_class);
+      $this->item_class=arr_val($params_,"item_class",$this->item_class);
       $this->empties_count=(int)arr_val($params_,"empties",$this->default_empties_count);
    }
    
