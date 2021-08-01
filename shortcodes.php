@@ -222,9 +222,11 @@ abstract class DataListShortcode extends Shortcode
 abstract class PostsPrefabShortcode extends DataListShortcode
 {
    //A basic class for creating a parametrized multi-template shortcodes intended to output the posts.
-   
+   public const META_QUERY_GLUE=";";
+   public const INCLUDE_GLUE=",";
+   public const NAMEVAL_GLUE="=";
    protected $filter_allowed=["post_type"=>null,"category"=>null,"category_name"=>null,"tag"=>null,"post_status"=>null,"post_parent"=>null,"orderby"=>null,"order"=>null,"numberposts"=>null,"exclude"=>null,"include"=>null,"meta_key"=>null,"meta_value"=>null,"meta_query"=>null];
-   public $filter_defaults=["post_type"=>"post","category"=>1,"post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null];
+   protected $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null];
    //Rendering params, that can be redefined just at the backend:
    public $item_class="post";
    
@@ -233,15 +235,30 @@ abstract class PostsPrefabShortcode extends DataListShortcode
       //Get posts data.
       
       //Get the posts filtering params:
-      $params_["numberposts"]=arr_val($params_,"limit",arr_val($params_,"numberposts",$this->filter_defaults["numberposts"]));  //Translate "limit" to "numberposts" as the last one isn't intuitive.
-      $filter=array_replace($this->filter_defaults,array_intersect_key($params_,$this->filter_allowed));   //Filter params of the filter.
+      $numberposts=$params_["numberposts"]??$params_["limit"]??null; //Translate "limit" to "numberposts" as the last one isn't intuitive.
+      if ($numberposts!=null)                                        //
+         $params_["numberposts"]=$numberposts;                       //
       
-      //Convert comma-separated values to arrays:
-      $arr_param_keys=["include","exclude"];
-      foreach ($arr_param_keys as $key)
-         if (key_exists($key,$filter)&&(!is_array($filter[$key])))
-            $filter[$key]=explode(",",$filter[$key]);
-
+      //Parse meta query parameter:
+      $meta_query=$params_["meta_query"]??null;
+      if (($meta_query!==null)&&(!is_array($meta_query)))   //If "meta_query" is naturally passed as array (e.g. using $shortcode->do([...])) then let it be.
+      {
+         $params_["meta_query"]=[];
+         
+         $pairs=explode(self::META_QUERY_GLUE,$meta_query);
+         foreach ($pairs as $pair)
+         {
+            $name_val=explode(self::NAMEVAL_GLUE,$pair);
+            $val=$name_val[1]??null;             //The equal sign may absent.
+            
+            if (($val=="true")||($val=="false")) //Convert exact "true"/"false" to boolean.
+               $val=to_bool($val);
+            
+            $params_["meta_query"][]=["key"=>$name_val[0],"value"=>$val];
+         }
+      }
+      $filter=array_extend($this->filter_defaults,array_intersect_key($params_,$this->filter_allowed));   //Filter params of the filter.
+         
       //Get the posts:
       $this->data=get_posts($filter);
    }

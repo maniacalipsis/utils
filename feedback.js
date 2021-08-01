@@ -1,7 +1,7 @@
 function initFeedbackForms(selector_)
 {
    for (let form of document.forms)
-      form.addEventListener('submit',form.dataset.onsubmit??ajaxFormOnSubmit);
+      form.addEventListener('submit',window[form.dataset.onsubmit]??ajaxFormOnSubmit);
 }
 
 function printAjaxResponse(form_,ans_)
@@ -20,63 +20,41 @@ function printAjaxResponse(form_,ans_)
 
 function ajaxFormOnSubmit(e_)
 {
-   let data={};
-   for (let input of this.elements)
-      switch (input.type)
-      {
-         case 'checkbox': {data[input.name]=input.checked; break;}
-         case 'button':
-         case 'submit':
-         case 'reset':    {break;}
-         default:         {data[input.name]=input.value;}
-      }
-   
-   let may_send=true;
-   if (data.pwd&&this.dataset.spices)
-   {
-      let hash=hashSpicy(data.pwd,this.dataset.spices.split(','));
-      if (hash!==null)
-         data.pwd=hash;
-      else
-      {
-         printAjaxResponse(this,{res:false,errors:['Не удаётся безопасно отправить пароль.']});
-         may_send=false;
-      }
-   }  
-   
-   if (may_send)
-      reqServer(
-                  this.attributes.action.value,
-                  data,
-                  this.dataset.onSuccess??((ans_)=>{printAjaxResponse(this,ans_);}),
-                  (xhr_)=>{console.warn(xhr_); printAjaxResponse(this,{res:false,errors:['Отправка данных не удалась. Проверьте подключение к Сети и попробуйте снова.']});}
-               );
+   //TODO: the way how to callbacks, defined in form dataset, are called and also how they receives the form ptr seems ugly.
+   reqServer(
+               this.attributes.action.value,
+               new FormData(this),
+               ((ans_,xhr_)=>{if (this.dataset.onsuccess) window[this.dataset.onsuccess](ans_,xhr_,this/*form ptr*/); else printAjaxResponse(this,ans_);}),
+               ((xhr_)=>{if (this.dataset.onerror) window[this.dataset.onerror](xhr_,this/*form ptr*/); else {console.warn(xhr_); printAjaxResponse(this,{res:false,errors:['Отправка данных не удалась. Возможно нет подключения к Сети или ошибка на сервере.']});}}),
+               this.method,
+               this.enctype,
+            );
    
    return cancelEvent(e_);
 }
 
-function hashSpicy(s_,sp_)
-{
-   let res=null;
-   
-   if (s_!='')
-   {
-      if (typeof SHA256 !=='undefined')
-      {
-         for (i=0;i<2;i++)
-            if ((i<1)||(sp[i]))
-            {
-               let len=Math.min(s_.length,s.length);
-               let mix='';
-               for (var i=0;i<len;i++)
-                  mix+=p[i]+s_[i];
-               mix+=(p.length>len) ? p.substring(len) : s_.substring(len);
-               pwdInput.value=SHA256(mix);
-            }
-      }
-   }
-   else
-      res='';
-   
-   return res;
-}
+// function hashSpicy(s_,sp_)
+// {
+//    let res=null;
+//    
+//    if (s_!='')
+//    {
+//       if (typeof SHA256 !=='undefined')
+//       {
+//          for (i=0;i<2;i++)
+//             if ((i<1)||(sp[i]))
+//             {
+//                let len=Math.min(s_.length,s.length);
+//                let mix='';
+//                for (var i=0;i<len;i++)
+//                   mix+=p[i]+s_[i];
+//                mix+=(p.length>len) ? p.substring(len) : s_.substring(len);
+//                pwdInput.value=SHA256(mix);
+//             }
+//       }
+//    }
+//    else
+//       res='';
+//    
+//    return res;
+// }

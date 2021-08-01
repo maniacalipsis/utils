@@ -43,7 +43,7 @@ function register_custom_post($post_type_,$labels_,$params_=[])
                 "taxonomies"        =>["category"],
                 //"query_var"=>true by WP default, that means it's equal to the $post_type_.
              ];
-   $params_=array_replace_recursive($defaults,$params_);
+   $params_=array_extend($defaults,$params_);
    $params_["labels"]=$labels_;
    
    register_post_type($post_type_,$params_);
@@ -161,7 +161,7 @@ class Metabox
       {
          //dump("???",$post_->ID,$field->key,$value);
          $field->value=get_post_meta($post_->ID,$field->key,/*single=*/true);
-         $field->render();
+         $field->render($post_);
       }
    }
    

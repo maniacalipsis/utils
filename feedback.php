@@ -13,13 +13,15 @@ namespace Utilities;
 class Feedback extends Shortcode
 {
    //Rendering
-   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","form_tpl"=>"default_form_tpl","form_open_tpl"=>"default_form_open_tpl","form_submit_tpl"=>"default_form_submit_tpl","form_close_tpl"=>"default_form_close_tpl"];
+   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","form_tpl"=>"default_form_tpl","form_open_tpl"=>"default_form_open_tpl","fields_tpl"=>"default_fields_tpl","form_submit_tpl"=>"default_form_submit_tpl","form_close_tpl"=>"default_form_close_tpl"];
+   protected $method="post";
+   protected $enctype="application/x-www-form-urlencoded";
    //Data-related properties:
    protected $fields=[];   //Form input fields,
    protected $response=[]; //
    protected $errors=[];   //List of messages about any kind of errors interrupted normal form processing.
    //Rendering params, that can be defined only at the backend:
-   public $custom_form_class="";
+   public $form_class="";
    
    public function __construct($name_="")
    {
@@ -35,6 +37,14 @@ class Feedback extends Shortcode
          add_action("wp_ajax_nopriv_".$this->name,[$this,"handle_request"]);
          add_action("wp_ajax_".$this->name       ,[$this,"handle_request"]);
       }
+   }
+   
+   protected function get_rendering_params($params_,$content_)
+   {
+      //Process the rendering params.
+      parent::get_rendering_params($params_,$content_);
+      
+      $this->form_class=arr_val($params_,"form_class",$this->form_class);
    }
    
    public function on_init()
@@ -69,8 +79,7 @@ class Feedback extends Shortcode
       <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->custom_class?>">
          <?php
             echo $this->{$this->tpl_pipe["form_open_tpl"]}();
-            foreach ($this->fields as $field)
-               echo $field->render();
+            echo $this->{$this->tpl_pipe["fields_tpl"]}();
             echo $this->{$this->tpl_pipe["form_submit_tpl"]}();
             echo $this->{$this->tpl_pipe["form_close_tpl"]}();
          ?>
@@ -85,11 +94,22 @@ class Feedback extends Shortcode
       //Helper for the *_form_tpl().
       ob_start();
       ?>
-         <FORM ACTION="<?=admin_url("admin-ajax.php")?>" CLASS="<?=$this->custom_form_class?>" <?=$this->attr_data?>>
+         <FORM ACTION="<?=admin_url("admin-ajax.php")?>" METHOD="<?=$this->method?>" ENCTYPE="<?=$this->enctype?>" CLASS="<?=$this->form_class?>" <?=$this->attr_data?>>
             <INPUT TYPE="hidden" NAME="action" VALUE="<?=$this->name?>">
 
       <?php
       return ob_get_clean();
+   }
+   
+   protected function default_fields_tpl()
+   {
+      //Returns rendered input fields.
+      $res="";
+      
+      foreach ($this->fields as $field)
+         $res.=$field->render();
+      
+      return $res;
    }
    
    protected function default_form_close_tpl()

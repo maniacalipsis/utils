@@ -80,7 +80,10 @@ class CheckList
       if ($check_res_)
          $this->checks_passed++;
       elseif ($err_msg_&&is_array($this->errors))
-         $this->errors[]=$err_msg_;
+         if (is_array($err_msg_))
+            $this->errors+=$err_msg_;
+         else
+            $this->errors[]=$err_msg_;
       
       return $check_res_;   //Return $check_res_ to enable the chained and conditional checks.
    }
@@ -106,7 +109,7 @@ function to_bool($val_)
 {
    //Returns true if val_ may be understood as some variation of boolean true.
 
-   return (is_bool($val_) ? $val_ : preg_match("/^(1|\+|on|ok|true|positive|y|yes|да)$/i",$val_));   //All, what isn't True - false.
+   return (is_bool($val_) ? $val_ : preg_match("/^(1|\+|on|ok|true|positive|y|yes|да)$/i",$val_)==1);   //All, what isn't True - false.
 }
 
 function is_any_bool($val_)
@@ -159,8 +162,22 @@ function translate_date($date_str_,$is_genitive_=false)
 function arr_val($arr_,$key_,$default_=null)
 {
    //As PHP 8.0 strict policy of array elements access, it needs a damn bunch of checks to avoid the warnings.
-   
+   //NOTE: depreciated.
    return (is_array($arr_)&&key_exists($key_,$arr_) ? $arr_[$key_] : $default_);
+}
+
+function array_extend(array $defaults_,array $array_)
+{
+   //Recursively replaces $defaults_ elements having the string keys and appends elements with the numeric keys.
+   $res=$defaults_;
+   
+   foreach ($array_ as $key=>$val)
+      if (is_int($key))
+         $res[]=$val;
+      else
+         $res[$key]=(is_array($val)&&key_exists($key,$res) ? array_extend($res[$key],$val) : $val);   //If $defaults_ has no key of $array_, then recursion is needless.
+   
+   return $res;
 }
 
 /* --------------------------------------- [de]serialization --------------------------------------- */
@@ -229,6 +246,461 @@ function html_select($name_,array $variants_,$default_="",$attrs_=[])
    $res.="</SELECT>";
    
    return $res;
+}
+
+/* --------------------------------------- File sistem utils --------------------------------------- */
+//scan_catalog filtering
+define("SCANCAT_FOLDERS",1);
+define("SCANCAT_FILES",2);
+define("SCANCAT_HIDDEN",4);
+//scan_catalog sorting
+define("SORTCAT_ASC",0);
+define("SORTCAT_DESC",1);
+define("SORTCAT_BY_NAME",2);
+define("SORTCAT_BY_SIZE",4);
+define("SORTCAT_BY_CREATED",8);
+define("SORTCAT_BY_MODIFIED",16);
+define("SORTCAT_BY_FORMAT",32);
+define("SORTCAT_BY_EXT",64);
+function scan_catalog($catalog_,$options_=[])
+{
+   //Options:
+   // "sort" - is a binary combination of <comparing_attribute>&<sort_direction>. Comparing attributes are: SORTCAT_NAME, SORTCAT_SIZE, SORTCAT_CREATED, SORTCAT_MODIFIED, SORTCAT_FORMAT or SORTCAT_EXT. NOTE: these constants should NOT be combited together.
+   //          Sort directions are: SORTCAT_ASC and SORTCAT_DESC. NOTE: ascending sorting is default and it is not necessary to designate it literally.
+   // "filter" - regexp
+   // "show"   - binary mask, defines what type of FS entries will be shown: SCANCAT_FOLDERS, SCANCAT_FILES, SCANCAT_HIDDEN.
+   // "group"  - list folders and files separately. If true, array ["folders"=>[<folder_entries...>],"files"=>[<file_entries...>]] will be returned, otherwise - [<any_entries...>].
+   // "extended" - display additional info about files and folders. If true, each returned entry will be array like ["name"=>"<entrie_name>",<entrie_attributes...>], otherwise each returned entry will be a string containing its name.
+   
+   $res=($options_["group"]??false ? ["folders"=>[],"files"=>[]] : []);
+   
+   //Init default options
+   $options_["show"]=$options_["show"]??SCANCAT_FOLDERS|SCANCAT_FILES;
+   
+   //Init filter
+   if (is_array($options_["filter"]))
+   {
+      $filter_folders=$options_["filter"]["folders"]??"";
+      $filter_files  =$options_["filter"]["files"]??"";
+   }
+   else
+      $filter_folders=$filter_files=$options_["filter"]??"";
+      
+   //Get catalog contents
+   $names=scandir($catalog_);
+   foreach ($names as $name)
+      if (($name!=".")&&($name!=".."))   //Skip "." and "..", then apply filter if it has defined.
+      {
+         $pass=true; //Pass the entry into result
+         
+         $fullpath=concat_paths($catalog_,$name);
+         $is_dir=is_dir($fullpath);
+         $is_hidden=($name[0]==".");
+         
+         //Filter entry by flags (file/folder,hidden)
+         $flags=($is_dir ? SCANCAT_FOLDERS : SCANCAT_FILES)|($is_hidden ? SCANCAT_HIDDEN : 0);
+         if (!($flags&$options_["show"]))
+            $pass=false;
+         
+         //Filter entry by name
+         if ($is_dir&&$filter_folders&&!preg_match($filter_folders,$name))
+            $pass=false;
+         elseif (!$is_dir&&$filter_files&&!preg_match($filter_files,$name))
+            $pass=false;
+         
+         //Append entry to result
+         if ($pass)
+         {
+            if ($options_["extended"])
+            {
+               $entry=[
+                        "name"=>($options_["fullpath"] ? $fullpath : $name),
+                        "ext"=>file_ext($name),
+                        "hidden"=>$is_hidden,
+                        "link"=>is_link($fullpath)
+                      ];
+               if ($entry["link"])
+               {
+                  $fullpath=readlink($fullpath);
+                  $entry["link_to"]=$fullpath;
+                  $entry["broken"]=!file_exists($fullpath);
+               }
+               if (!$entry["broken"])
+               {
+                  $entry["size"]=filesize($fullpath);
+                  $entry["mime"]=mime_content_type($fullpath);
+                  $entry["permissions"]=fileperms($fullpath);
+                  $entry["owner"]=fileowner($fullpath);
+                  $entry["group"]=filegroup($fullpath);
+                  $entry["created"]=filectime($fullpath);
+                  $entry["modified"]=filemtime($fullpath);
+               }
+            }
+            else
+               $entry=($options_["fullpath"] ? $fullpath : $name);
+            
+            //Group entries
+            if ($options_["group"])
+               $res[($is_dir ? "folders" : "files")][]=$entry;
+            else
+               $res[]=$entry;
+         }
+      }
+   
+   //Sort entries with callbacks
+   $acceptable_sort=($options_["extended"] ? 0b1111110 : SORTCAT_BY_NAME);
+   if ($options_["sort"]&$acceptable_sort)
+   {
+      $sort_callback="scan_cat_cmp_".$options_["sort"];
+      if ($options_["group"])
+      {
+         usort($res["folders"],$sort_callback);
+         usort($res["files"],$sort_callback);
+      }
+      else
+         usort($res,$sort_callback);
+   }
+   
+   return $res;
+}
+//Comparing callbacks for scan_catalog():
+function scan_cat_cmp_2($a_,$b_)   //name asc
+{
+   return is_array($a_) ? strnatcmp($a_["name"],$b_["name"]) : strnatcmp($a_,$b_);
+}
+function scan_cat_cmp_3($a_,$b_)   //name desc
+{
+   return is_array($a_) ? strnatcmp($b_["name"],$a_["name"]) : strnatcmp($b_,$a_);
+}
+function scan_cat_cmp_4($a_,$b_)   //size asc
+{
+   return $a_["size"]-$b_["size"];
+}
+function scan_cat_cmp_5($a_,$b_)   //size desc
+{
+   return $b_["size"]-$a_["size"];
+}
+function scan_cat_cmp_8($a_,$b_)   //created asc
+{
+   return $a_["created"]-$b_["created"];
+}
+function scan_cat_cmp_9($a_,$b_)   //created desc
+{
+   return $b_["created"]-$a_["created"];
+}
+function scan_cat_cmp_16($a_,$b_)  //modified asc
+{
+   return $a_["modified"]-$b_["modified"];
+}
+function scan_cat_cmp_17($a_,$b_)  //modified desc
+{
+   return $b_["modified"]-$a_["modified"];
+}
+function scan_cat_cmp_32($a_,$b_)  //format asc
+{
+   return strnatcmp($a_["format"],$b_["format"]);
+}
+function scan_cat_cmp_33($a_,$b_)  //format desc
+{
+   return strnatcmp($b_["format"],$a_["format"]);
+}
+function scan_cat_cmp_64($a_,$b_)  //extension asc
+{
+   return strnatcmp($a_["ext"],$b_["ext"]);
+}
+function scan_cat_cmp_65($a_,$b_)  //extension desc
+{
+   return strnatcmp($b_["ext"],$a_["ext"]);
+}
+
+function format_bytes($val_,$precision_=2,$space_=" ")
+{
+   $prefixes=["B","KB","MB","GB","TB"];   //binary prefixes
+   $pow=floor(log($val_,1024));           //get real power of $val_
+   $pow=min($pow,count($prefixes)-1);
+   return round($val_/(1<<($pow*10)),$precision_).$space_.$prefixes[$pow];
+}
+
+function permissions_to_str($perm_)
+{
+   return decoct($perm_&0777); //TODO: change to rwx
+}
+
+function permissions_to_int($perm_)
+{
+   return (is_int($perm_) ? $perm_ : ""); //TODO:
+}
+
+function concat_paths(...$dirs_)
+{
+   //Concatenates several parts of FS path.
+   
+   $res=rtrim(reset($dirs_),"/");
+   while ($dir=next($dirs_))
+      $res.="/".trim($dir,"/");
+   
+   return $res;
+}
+
+function file_ext($name_)
+{
+   //Return an extension from file name or path. Works correctly with unix hidden files.
+   
+   return (preg_match("/[^\\/]+\\.([^.\\/]+)$/",$name_,$matches) ? $matches[1] : "");
+}
+
+function escape_file_path($path_)
+{
+   //Removes potentially riskful, illegal and masking characters and character sequences.
+   //  It is NOT recommended to use this function at high loaded scripts and large cycles, if it not very necessary.
+   //if $path_ starts not from "/", then it is resolving as relative from top directory
+   
+   $path_=preg_replace("/[\\t\\r\\n\\\\<>{}@#$&~!%:;*?`\"'\\0]/m","",$path_); //remove disallowed characters
+   $path_=preg_replace("/^\\.{2}\\/|\\/(\s*\\.{2}\s*\\/)+/","/",$path_);      //remove /../
+   $path_=preg_replace("/\\/+/","/",$path_);                                  //collapse multiple slashes (//)
+   
+   return $path_;
+}
+
+function escape_file_name($name_)
+{
+   //Removes path to file, leaves only name. removes illegal and masking characters.
+   
+   $name_=preg_replace("/[\\t\\r\\n\\/\\\\<>{}@#$&~!%:;*?`\"'\\0]/m","",$name_); //remove disallowed characters
+   if ($name_=="."||$name_=="..") //disallow special names
+      $name_="";
+   
+   return $name_;
+}
+
+function abs_path($path_,$root_="")
+{
+   //Force $path_ to absolute according to the $root_ directory
+   if (!$root_)
+      $root_=$_SERVER["DOCUMENT_ROOT"];
+   
+   if (($path_[0]!="/")||(strncmp($path_,$root_,strlen($root_))!=0)) //attach $path_ to the $root_ directory
+      $path_=concat_paths($root_,$path_);
+   
+   return $path_;
+}
+
+function rel_path($path_,$root_="")
+{
+   //Extracts relative path from absolute
+   if (!$root_)
+      $root_=$_SERVER["DOCUMENT_ROOT"];
+   
+   $root_=rtrim($root_,"/");                          //remove trailing slash from the root directory
+   $root_len=strlen($root_);
+   if (strncmp($path_,$root_,$root_len)==0)
+      $path_=substr($path_,$root_len);
+   
+   return $path_;
+}
+
+function uploaded_files($key_,$params_=NULL)
+{
+   //Minimal action: make some tests on uploaded files and return info in more friendly-formed array.
+   //Additional action: move these files to specified destination and rename as needed.
+   //Arguments:
+   // $key_ - name of the file input. WARNING: the actual file input name in the form MUST ends with "[]".
+   // $params_ - optional set of parameters. 
+   //Parameters:
+   // "max_count" - limit amount of files. The file will not be counted if it doesn't met other conditions or it wasn't successfully uploaded.
+   // "max_size" - filter files by maximum size.
+   // "max_total_size" - limit total size of uploaded files.
+   // "types" - array, list of allowed file types.
+   // "move_to" - destination folder, where uploaded files should be moved from temp folder.
+   // "rename" - Tells what name to assign to the uploadeded file when it permanently stored on server. NOTE: works only with $params_["move_to"].
+   //            Possible values:
+   //             "original" - use the name originally given by user.
+   //             "incremental" - scan destination folder and find an existing file with the same prefix and the largest number. Store the newly uploaded file with the number incremented by one. NOTE: file extensions will be kept.
+   //             NULL or any false - store the file keeping it's temporary name.
+   // "prefix" - string, prefix of the file name, when incremental naming is selected (see "rename").
+   // "decimals" - int, While incremental renaming, the file numbers will be padded with leading zeros up to this number of digits. The default value is 0.
+   
+   global $LOCALE;
+   
+   $res=[];
+   
+   $count=0;         //counter of successfully added files (that was uploaded, passed all tests and optionally moved to dest folder)
+   $total_size=0;    //total size off these files
+   $stop=false;      //termination flag
+   
+   //Prepare error codes explanation
+   //See http://php.net/manual/en/features.file-upload.errors.php for details
+   $err_expl=[
+                UPLOAD_ERR_OK=>"",
+                UPLOAD_ERR_INI_SIZE=>"The uploaded file exceeds the upload_max_filesize directive.",
+                UPLOAD_ERR_FORM_SIZE=>"The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.",
+                UPLOAD_ERR_PARTIAL=>"The uploaded file was only partially uploaded.",
+                UPLOAD_ERR_NO_TMP_DIR=>"Missing a temporary folder.",
+                UPLOAD_ERR_CANT_WRITE=>"Failed to write file to disk.",
+                UPLOAD_ERR_EXTENSION=>"A PHP extension stopped the file upload.",
+             ];
+   
+   $move_to=escape_file_path(abs_path($params_["move_to"]));
+   
+   //Check if the destination folder exists
+   $destination_folder_exists=(file_exists($move_to)&&is_dir($move_to));
+   
+   //Prepare incremental renaming params
+   if ($move_to&&($params_["rename"]=="incremental"))
+   {
+      //Find all files with the specified prefix
+      $prefix=escape_file_name($params_["prefix"]);
+      $number_regexp="/^".preg_replace("/[\\[\\]\\(\\)\\.\\/\\\\]/","\\\\$0",$prefix)."([0-9]+)(\\.|$)/"; //Escape regexp special characters in the prefix. Also the pattern will ignore filename extension.
+      
+      //Find a maximum existing number
+      $max_num=0;
+      if ($destination_folder_exists)
+      {
+         $files=scan_catalog($move_to,["show"=>SCANCAT_FILES,"filter"=>$number_regexp]);
+         foreach ($files as $file)
+         {
+            preg_match($number_regexp,$file,$matches);   //Get a number from the filename
+            $num=(int)$matches[1];
+            if ($num>$max_num)
+               $max_num=$num;
+         }
+      }
+      
+      //Get a number length for the padding
+      $decimals=(int)$params_["decimals"];
+   }
+   
+   //Process files
+   foreach ($_FILES[$key_]["error"] as $i=>$upload_err_code)
+   {
+      $error="";
+      
+      //Check is any file was uploaded by each input.
+      if ($upload_err_code==UPLOAD_ERR_NO_FILE)
+         continue;
+      
+      //Test each file against given conditions:
+      if ($upload_err_code)
+      {
+         $error=$err_expl[$upload_err_code];   //Turn error code to human-readable
+      }
+      elseif ($params_["max_count"]&&($count>$params_["max_count"]))
+      {
+         $error=($LOCALE ? $LOCALE["Too_many_files"] : "Too many files").".";
+         $stop=true;
+      }
+      elseif (!is_uploaded_file($_FILES[$key_]["tmp_name"][$i]))
+         $error=($LOCALE ? $LOCALE["Not_uploaded_file"] : "Not an uploaded file").".";
+      elseif ($params_["max_size"]&&($_FILES[$key_]["size"][$i]>$params_["max_size"]))
+         $error=($LOCALE ? $LOCALE["File_too_large"] : "File is too large").".";
+      elseif (($params_["disallowed"]&&(is_array($params_["disallowed"]) ? array_search($_FILES[$key_]["type"][$i],$params_["disallowed"])!==false : preg_match($params_["disallowed"],$_FILES[$key_]["type"][$i])))||
+              ($params_["allowed"]&&(is_array($params_["allowed"]) ? array_search($_FILES[$key_]["type"][$i],$params_["allowed"])===false : !preg_match($params_["allowed"],$_FILES[$key_]["type"][$i])))||
+              ($params_["names_disallowed"]&&(preg_match($params_["names_disallowed"],$_FILES[$key_]["name"][$i])))||
+              ($params_["names_allowed"]&&(!preg_match($params_["names_allowed"],$_FILES[$key_]["name"][$i]))))
+         $error=($LOCALE ? $LOCALE["File_is_not_allowed"] : "File type or name is not allowed").".";
+      elseif ($params_["total_size"]&&($total_size+$_FILES[$key_]["size"][$i]>$params_["total_size"]))
+      {
+         $error=($LOCALE ? $LOCALE["Total_uploads_size_exceeded"] : "Total uploads size exceeded").".";
+         $stop=true;
+      }
+      
+      $filepath=$_FILES[$key_]["tmp_name"][$i];
+      
+      //Move file to uploads folder (if it was given)
+      if (!$error&&$move_to)
+      {
+         switch ($params_["rename"])
+         {
+            case "original":
+            {
+               $new_file_name=escape_file_name($_FILES[$key_]["name"][$i]); //Use user-defined filename
+               
+               break;
+            }
+            case "incremental":
+            {
+               $ext=file_ext($_FILES[$key_]["name"][$i]);
+               $new_file_name=$prefix.str_pad(++$max_num,$decimals,"0",STR_PAD_LEFT).($ext ? ".".$ext : "");   //Concatenate a constant prefix, file number (incremented and padded to specified length) and original filename extension if it exists.
+               
+               break;
+            }
+            default:
+            {
+               $new_file_name=escape_file_name($_FILES[$key_]["tmp_name"][$i]);   //Use temporary name, given to the file by server.
+            }
+         }
+         
+         if (!$destination_folder_exists)
+            $destination_folder_exists=mkdir($move_to,0775,true); //Create destination folder on demand
+         
+         $filepath=concat_paths($move_to,$new_file_name);
+         if (!move_uploaded_file($_FILES[$key_]["tmp_name"][$i],$filepath))
+            $error=($LOCALE ? $LOCALE["Moving_uploaded_file_failed"] : "Moving to destination folder has failed").".";
+      }
+      
+      //Add file info to result in both success and error cases. In case of error it will provide error messsage with additional info.
+      if ($upload_err_code!=UPLOAD_ERR_NO_FILE) //Simply skip items on this error
+         $res[$i]=[
+                       "error"=>$error,
+                       "tmp_name"=>$filepath,
+                       "name"=>$new_file_name,
+                       "orig_name"=>$_FILES[$key_]["name"][$i],
+                       "type"=>$_FILES[$key_]["type"][$i],
+                       "size"=>$_FILES[$key_]["size"][$i],
+                    ];
+      
+      //Continue if there was no error that requires termination
+      if (!$stop)
+      {
+         $count++;
+         $total_size+=$_FILES[$key_]["size"][$i];
+      }
+      else
+         break;   //Terminate process if error requires so. The last element in $res will contain message of the error, caused termination.
+   }
+   
+   return $res;
+}
+
+function check_perms($path_,$perms_list_)
+{
+   //
+   
+   $res=["perms"=>0,"top_dir"=>""];
+   
+   $max_matched=0;
+   foreach ($perms_list_ as $dir=>$perms)
+   {
+      $len=strlen($dir);
+      if ((strncmp($path_,$dir,$len)==0)&&($len>$max_matched))  //Find permissions with the most long path amongst all matching ones.
+      {
+         $res["perms"]=$perms; //Current permissions
+         $res["top_dir"]=$dir; //The topmost directory permitted at selected branch of FS-tree
+         $max_matched=$len;
+      }
+   }
+   
+   return $res;
+}
+
+function rmdir_r($path_)
+{
+   //Remove deirectory recursively. 
+   //NOTE: exec("rm -rf ".$path_) is good thing, but may not work on some hostings. 
+   
+   $path_=rtrim($path_,"/");
+   $list=scan_catalog($path_,["group"=>"true","show"=>SCANCAT_FOLDERS|SCANCAT_FILES|SCANCAT_HIDDEN]);
+   foreach ($list["files"] as $file)
+      unlink($path_."/".$file);
+   
+   foreach ($list["folders"] as $folder)
+   {
+      $dir=$path_."/".$folder;
+      rmdir_r($dir);
+      rmdir($dir);
+   }
+   
+   rmdir($path_);
 }
 
 /* --------------------------------------- email --------------------------------------- */
@@ -303,14 +775,27 @@ function send_email($recipients_,$subject_,$text_,$attachments_=null,$sender_="n
    }
    
    //Make headers:
-   $headers="From: ".$sender_."\r\n".
-            "Reply-To: ".$sender_."\r\n".
-            "X-Mailer: PHP/".phpversion()."\r\n".
-            "Content-type: ".$content_main_type."\r\n";
+   $headers=[
+               "From"=>$sender_,
+               "Reply-To"=>$sender_,
+               "X-Mailer"=>"PHP/".phpversion(),
+               "Content-type"=>$content_main_type,
+            ];
    
    if (is_array($recipients_))
-      $recipients_=implode(",",$recipients_);
-   
+   {
+      $recipient_groups=[];
+      foreach ($recipients_ as $recipient)
+         if (preg_match("/^ *((To|Cc|Bcc):)?([a-z0-9@а-яё_., -]+)/i",$recipient,$matches))
+            $recipient_groups[($matches[2] ? $matches[2] : "To")][]=$matches[3];
+      
+      $recipients_=implode(",",$recipient_groups["To"]??[]);
+      unset($recipient_groups["To"]);
+      if ($recipient_groups)
+         foreach ($recipient_groups as $hdr=>$grp)
+            $headers[$hdr]=implode(",",$grp);
+   }
+   //TODO: else var_dump(preg_split("/(To|Cc|Bcc):/i","trerert@mail.net,wasd@mail.net  To:Yo_wasd@mail.net, Q_wasd@mail.net",-1,PREG_SPLIT_DELIM_CAPTURE|PREG_SPLIT_NO_EMPTY));
    //Send
    return mail($recipients_,$subject_,$content,$headers);
 }

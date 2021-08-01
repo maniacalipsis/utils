@@ -46,7 +46,6 @@ abstract class InputField extends DataField
    public $errors=[];         //The field's validate() puts error messages here, while the form's validate() method gets them from here.
    //TODO: change $required and $group to private and define getters/setters.
    
-   
    public function get_data_type()
    {
       //Returns compatible data type (in particular for the function register_meta()).
@@ -87,7 +86,7 @@ class InputHidden extends InputField
    {
       //This renderer may be called from the descendant classes to render the input.
       
-      $attrs=["type"=>"hidden","name"=>$this->key,"value"=>(string)$this->value]+$this->attrs;
+      $attrs=["type"=>"hidden","name"=>$this->key,"value"=>(string)$this->value??$this->default]+$this->attrs;
       ?>
       <INPUT<?=serialize_element_attrs($attrs)?>>
       <?php
@@ -98,7 +97,7 @@ class InputPwd extends InputField
 {
    public function render()
    {
-      $attrs=["type"=>"password","name"=>$this->key,"value"=>$this->value]+$this->attrs;
+      $attrs=["type"=>"password","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
       <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
@@ -120,7 +119,7 @@ class InputString extends InputField
    
    public function render()
    {
-      $attrs=["type"=>"text","name"=>$this->key,"value"=>$this->value]+$this->attrs;
+      $attrs=["type"=>"text","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
       <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
@@ -133,7 +132,7 @@ class InputText extends InputString
    {
       $attrs=["name"=>$this->key]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <TEXTAREA <?=serialize_element_attrs($attrs)?>><?=htmlspecialchars($this->value)?></TEXTAREA></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <TEXTAREA <?=serialize_element_attrs($attrs)?>><?=htmlspecialchars($this->value??$this->default)?></TEXTAREA></LABEL>
       <?php
    }
 }
@@ -144,7 +143,7 @@ class InputRichText extends InputText
    {
       $wp_editor_params=["textarea_name"=>$this->key]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN><?=wp_editor($this->value,$this->key,$wp_editor_params)?></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN><?=wp_editor($this->value??$this->default,$this->key,$wp_editor_params)?></LABEL>
       <?php
    }
 }
@@ -166,7 +165,7 @@ class InputFloat extends InputField
    
    public function render()
    {
-      $attrs=["type"=>"number","name"=>$this->key,"value"=>$this->value]+$this->attrs;
+      $attrs=["type"=>"number","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
       <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
@@ -206,7 +205,7 @@ class InputBool extends InputField
    
    public function render()
    {
-      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value)]+$this->attrs;
+      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value??$this->default)]+$this->attrs;
       ?>
       <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
       <?php
@@ -217,7 +216,7 @@ class InputJson extends InputHidden
 {
    public function get_safe_value()
    {
-      return $this->value; //TODO: Later, try to use something like try{ $res=json_encode(json_decode($this->value),JSON_ENCODE_OPTIONS); }....
+      return json_encode(json_decode(stripcslashes($this->value),true)??[],JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
    }
    
    public function print()
@@ -245,7 +244,7 @@ class InputMedia extends InputJson
       parent::render();
       ?>
       <DIV ID="<?=$container_id?>" CLASS="media">
-         <INPUT TYPE="hidden" NAME="<?=$this->key?>" VALUE="<?=$this->value?>">
+         <INPUT TYPE="hidden" NAME="<?=$this->key?>" VALUE="<?=$this->value??$this->default?>">
          <DIV CLASS="media_list"></DIV>
          <SCRIPT>
             document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});
@@ -259,6 +258,16 @@ class InputSelect extends InputField
 {
    //TODO: This class actually can't support mulitple selection.
    public $variants=[];
+   public $empty_option=null;
+   
+   public function __construct(array $params_=[])
+   {
+      parent::__construct($params_);
+      
+      //Prepend an empty option:
+      if ($this->empty_option!==null)
+         $this->variants=[""=>$this->empty_option]+$this->variants;
+   }
    
    public function validate()
    {
@@ -278,7 +287,7 @@ class InputSelect extends InputField
       if (key_exists($this->value,$this->variants))
          $checks_passed++;
       else
-         $this->errors[]="Переданное значение не соответствует списку";
+         $this->errors[]="Значение поля «".$this->title."» не соответствует списку";
       
       return ($checks_passed==$checks_cnt);
    }
@@ -290,9 +299,9 @@ class InputSelect extends InputField
    
    public function render()
    {
-      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value)]+$this->attrs
+      $attrs=["name"=>$this->key]+$this->attrs
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <SPAN CLASS="select"><?=html_select($this->key,$this->variants,$this->value,$attrs)?></SPAN></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <SPAN CLASS="select"><?=html_select($this->key,$this->variants,$this->value??$this->default,$attrs)?></SPAN></LABEL>
       <?php
    }
 }
@@ -300,15 +309,10 @@ class InputSelect extends InputField
 class InputPostsSelect extends InputSelect
 {
    public $filter=[];
-   public $empty_option=null;
    
    public function __construct(array $params_=[])
    {
       parent::__construct($params_);
-      
-      //Prepend an empty option:
-      if ($this->empty_option!==null)
-         $this->variants[""]=$this->empty_option;
       
       //Get the posts and fill the selection variants with them:
       $posts=get_posts($this->filter);
