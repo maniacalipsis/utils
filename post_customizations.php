@@ -70,7 +70,7 @@ class MetaboxManager
       add_action("add_meta_boxes",[$this,"add_meta_boxes_callback"],10,2);
       
       //Register ajax requets handlers:
-      add_action("save_post",[$this,"ajax_extra_media_save"],10,1);
+      add_action("save_post",[$this,"ajax_extra_media_save"],10,3);
       
       //Add initial metabox:
       if ($metabox_)
@@ -93,13 +93,14 @@ class MetaboxManager
          $metabox->register($post_type_);
    }
    
-   public function ajax_extra_media_save($post_id_)
+   public function ajax_extra_media_save($post_id_,$post_,$is_update_)
    {
       //Called when post is to be saved.
       
       if (current_user_can("edit_post",$post_id_)&&!(wp_is_post_autosave($post_id_)||wp_is_post_revision($post_id_)))
          foreach ($this->metaboxes as $metabox)
-            $metabox->save($post_id_);
+            if (in_array($post_->post_type,$metabox->post_types)) //This check made for the case if the one manager is used to add metaboxes to the many post types.
+               $metabox->save($post_id_,$post_,$is_update_);
    }
 }
 
@@ -173,19 +174,19 @@ class Metabox
          add_meta_box($this->id,$this->title,[$this,"render"],$post_type_,$this->context,$this->priority);
    }
    
-   public function save($post_id_)
+   public function save($post_id_,$post_,$is_update_)
    {
       //Should be called when post is to be saved.
       
       foreach ($this->fields as $field)
-      {
-         $field->value=arr_val($_POST,$field->key);
-         //dump("^^^",$field->key,$value);
-         if ($field->value!==null)
-            update_post_meta($post_id_,$field->key,$field->get_safe_value());  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
-         else
-            delete_post_meta($post_id_,$field->key);
-      }
+         if (key_exists($field->key,$_POST)) //Don't touch the field if it isn't sent from client.
+         {
+            $field->value=$_POST[$field->key]??null;
+            if ($field->value!==null)
+               update_post_meta($post_id_,$field->key,$field->get_safe_value());  //The $_POST contents is depends on how do the renderer named the inputs. So callback $par["on_save"] must return a correct value from the entire $_POST.
+            else
+               delete_post_meta($post_id_,$field->key);
+         }
    }
 }
 

@@ -241,10 +241,9 @@ class InputMedia extends InputJson
                       "MediaSelectorParams"=>$this->selector_params,
                    ];
       $list_params_json=json_encode($list_params,JSON_ENCODE_OPTIONS);
-      parent::render();
       ?>
       <DIV ID="<?=$container_id?>" CLASS="media">
-         <INPUT TYPE="hidden" NAME="<?=$this->key?>" VALUE="<?=$this->value??$this->default?>">
+         <?=parent::render()?>
          <DIV CLASS="media_list"></DIV>
          <SCRIPT>
             document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});

@@ -175,7 +175,7 @@ function array_extend(array $defaults_,array $array_)
       if (is_int($key))
          $res[]=$val;
       else
-         $res[$key]=(is_array($val)&&key_exists($key,$res) ? array_extend($res[$key],$val) : $val);   //If $defaults_ has no key of $array_, then recursion is needless.
+         $res[$key]=(is_array($val)&&is_array($res[$key]??null) ? array_extend($res[$key],$val) : $val);   //If $defaults_ has no key of $array_, then recursion is needless.
    
    return $res;
 }
@@ -278,7 +278,7 @@ function scan_catalog($catalog_,$options_=[])
    $options_["show"]=$options_["show"]??SCANCAT_FOLDERS|SCANCAT_FILES;
    
    //Init filter
-   if (is_array($options_["filter"]))
+   if (is_array($options_["filter"]??null))
    {
       $filter_folders=$options_["filter"]["folders"]??"";
       $filter_files  =$options_["filter"]["files"]??"";
@@ -499,7 +499,7 @@ function rel_path($path_,$root_="")
    return $path_;
 }
 
-function uploaded_files($key_,$params_=NULL)
+function uploaded_files($key_,$params_=[])
 {
    //Minimal action: make some tests on uploaded files and return info in more friendly-formed array.
    //Additional action: move these files to specified destination and rename as needed.
@@ -510,7 +510,6 @@ function uploaded_files($key_,$params_=NULL)
    // "max_count" - limit amount of files. The file will not be counted if it doesn't met other conditions or it wasn't successfully uploaded.
    // "max_size" - filter files by maximum size.
    // "max_total_size" - limit total size of uploaded files.
-   // "types" - array, list of allowed file types.
    // "move_to" - destination folder, where uploaded files should be moved from temp folder.
    // "rename" - Tells what name to assign to the uploadeded file when it permanently stored on server. NOTE: works only with $params_["move_to"].
    //            Possible values:
@@ -528,6 +527,10 @@ function uploaded_files($key_,$params_=NULL)
    $total_size=0;    //total size off these files
    $stop=false;      //termination flag
    
+   $params_defaults=["move_to"=>null,"count_existing"=>false,"max_count"=>null,"max_size"=>null,"total_size"=>null,"allowed"=>null,"disallowed"=>null,"names_allowed"=>null,"names_disallowed"=>null,"rename"=>null,"prefix"=>"","decimals"=>0];
+   $params_=array_extend($params_defaults,$params_);
+   $params_["prefix"]=escape_file_name($params_["prefix"]);
+   
    //Prepare error codes explanation
    //See http://php.net/manual/en/features.file-upload.errors.php for details
    $err_expl=[
@@ -540,40 +543,37 @@ function uploaded_files($key_,$params_=NULL)
                 UPLOAD_ERR_EXTENSION=>"A PHP extension stopped the file upload.",
              ];
    
-   $move_to=escape_file_path(abs_path($params_["move_to"]));
+   //Get destination folder and check if it exists:
+   $dest_dir=($params_["move_to"]!==null ? abs_path(escape_file_path($params_["move_to"])) : null);
+   $dest_dir_exists=($dest_dir!==null)&&(file_exists($dest_dir)&&is_dir($dest_dir));
    
-   //Check if the destination folder exists
-   $destination_folder_exists=(file_exists($move_to)&&is_dir($move_to));
-   
-   //Prepare incremental renaming params
-   if ($move_to&&($params_["rename"]=="incremental"))
+   if ((($dest_dir!==null)&&$dest_dir_exists)&&(($params_["rename"]=="incremental")||$params_["count_existing"]))
    {
-      //Find all files with the specified prefix
-      $prefix=escape_file_name($params_["prefix"]);
-      $number_regexp="/^".preg_replace("/[\\[\\]\\(\\)\\.\\/\\\\]/","\\\\$0",$prefix)."([0-9]+)(\\.|$)/"; //Escape regexp special characters in the prefix. Also the pattern will ignore filename extension.
+      $files=scan_catalog($dest_dir,["show"=>SCANCAT_FILES]);
       
-      //Find a maximum existing number
-      $max_num=0;
-      if ($destination_folder_exists)
+      //Start files count from existing ones:
+      if ($params_["count_existing"])
+         $count=count($files);
+      
+      //Find a maximum existing number for incremental renaming:
+      if ($params_["rename"]=="incremental")
       {
-         $files=scan_catalog($move_to,["show"=>SCANCAT_FILES,"filter"=>$number_regexp]);
+         $max_num=0;
+         $number_regexp="/^".preg_replace("/[\\[\\]\\(\\)\\.\\/\\\\]/","\\\\$0",$params_["prefix"])."([0-9]+)(\\.|$)/"; //Escape regexp special characters in the prefix. Also the pattern will ignore filename extension.
          foreach ($files as $file)
-         {
-            preg_match($number_regexp,$file,$matches);   //Get a number from the filename
-            $num=(int)$matches[1];
-            if ($num>$max_num)
-               $max_num=$num;
-         }
+            if (preg_match($number_regexp,$file,$matches))   //Get a number from the filename
+            {
+               $num=(int)$matches[1];
+               if ($num>$max_num)
+                  $max_num=$num;
+            }
       }
-      
-      //Get a number length for the padding
-      $decimals=(int)$params_["decimals"];
    }
    
    //Process files
    foreach ($_FILES[$key_]["error"] as $i=>$upload_err_code)
    {
-      $error="";
+      $error=null;
       
       //Check is any file was uploaded by each input.
       if ($upload_err_code==UPLOAD_ERR_NO_FILE)
@@ -581,14 +581,7 @@ function uploaded_files($key_,$params_=NULL)
       
       //Test each file against given conditions:
       if ($upload_err_code)
-      {
          $error=$err_expl[$upload_err_code];   //Turn error code to human-readable
-      }
-      elseif ($params_["max_count"]&&($count>$params_["max_count"]))
-      {
-         $error=($LOCALE ? $LOCALE["Too_many_files"] : "Too many files").".";
-         $stop=true;
-      }
       elseif (!is_uploaded_file($_FILES[$key_]["tmp_name"][$i]))
          $error=($LOCALE ? $LOCALE["Not_uploaded_file"] : "Not an uploaded file").".";
       elseif ($params_["max_size"]&&($_FILES[$key_]["size"][$i]>$params_["max_size"]))
@@ -598,6 +591,11 @@ function uploaded_files($key_,$params_=NULL)
               ($params_["names_disallowed"]&&(preg_match($params_["names_disallowed"],$_FILES[$key_]["name"][$i])))||
               ($params_["names_allowed"]&&(!preg_match($params_["names_allowed"],$_FILES[$key_]["name"][$i]))))
          $error=($LOCALE ? $LOCALE["File_is_not_allowed"] : "File type or name is not allowed").".";
+      elseif (($params_["max_count"]!==null)&&($count>=$params_["max_count"]))   //NOTE: If all previous checks are passed, then the current file is to be added, but if  $count is already equal to params_["max_count"], then the limit will be exceeded.
+      {
+         $error=($LOCALE ? $LOCALE["Too_many_files"] : "Too many files").".";
+         $stop=true;
+      }
       elseif ($params_["total_size"]&&($total_size+$_FILES[$key_]["size"][$i]>$params_["total_size"]))
       {
          $error=($LOCALE ? $LOCALE["Total_uploads_size_exceeded"] : "Total uploads size exceeded").".";
@@ -607,9 +605,9 @@ function uploaded_files($key_,$params_=NULL)
       $filepath=$_FILES[$key_]["tmp_name"][$i];
       
       //Move file to uploads folder (if it was given)
-      if (!$error&&$move_to)
+      if (!$error&&($dest_dir!==null))
       {
-         switch ($params_["rename"])
+         switch ($params_["rename"]??null)
          {
             case "original":
             {
@@ -620,8 +618,7 @@ function uploaded_files($key_,$params_=NULL)
             case "incremental":
             {
                $ext=file_ext($_FILES[$key_]["name"][$i]);
-               $new_file_name=$prefix.str_pad(++$max_num,$decimals,"0",STR_PAD_LEFT).($ext ? ".".$ext : "");   //Concatenate a constant prefix, file number (incremented and padded to specified length) and original filename extension if it exists.
-               
+               $new_file_name=$params_["prefix"].str_pad(++$max_num,(int)$params_["decimals"],"0",STR_PAD_LEFT).($ext ? ".".$ext : "");   //Concatenate a constant prefix, file number (incremented and padded to specified length) and original filename extension if it exists.
                break;
             }
             default:
@@ -630,10 +627,10 @@ function uploaded_files($key_,$params_=NULL)
             }
          }
          
-         if (!$destination_folder_exists)
-            $destination_folder_exists=mkdir($move_to,0775,true); //Create destination folder on demand
+         if (!$dest_dir_exists)
+            $dest_dir_exists=mkdir($dest_dir,0775,true); //Create destination folder on demand
          
-         $filepath=concat_paths($move_to,$new_file_name);
+         $filepath=concat_paths($dest_dir,$new_file_name);
          if (!move_uploaded_file($_FILES[$key_]["tmp_name"][$i],$filepath))
             $error=($LOCALE ? $LOCALE["Moving_uploaded_file_failed"] : "Moving to destination folder has failed").".";
       }
@@ -641,13 +638,13 @@ function uploaded_files($key_,$params_=NULL)
       //Add file info to result in both success and error cases. In case of error it will provide error messsage with additional info.
       if ($upload_err_code!=UPLOAD_ERR_NO_FILE) //Simply skip items on this error
          $res[$i]=[
-                       "error"=>$error,
-                       "tmp_name"=>$filepath,
-                       "name"=>$new_file_name,
-                       "orig_name"=>$_FILES[$key_]["name"][$i],
-                       "type"=>$_FILES[$key_]["type"][$i],
-                       "size"=>$_FILES[$key_]["size"][$i],
-                    ];
+                     "error"=>$error,
+                     "tmp_name"=>$filepath,
+                     "name"=>$new_file_name,
+                     "orig_name"=>$_FILES[$key_]["name"][$i],
+                     "type"=>$_FILES[$key_]["type"][$i],
+                     "size"=>$_FILES[$key_]["size"][$i],
+                  ];
       
       //Continue if there was no error that requires termination
       if (!$stop)
@@ -837,19 +834,21 @@ function dump(...$args_)
    }
 }
 
-function dumpr(...$args_)
+function dumpf(...$args_)
 {
+   //WP-specific version of the writing to file dump function.
+   
+   ob_start();
    foreach ($args_ as $arg)
    {
-      echo "\n<pre>";
-      
-      if (is_array($arg))
-         print_r($arg);
-      else
-         echo $arg;
-      
-      echo "</pre>\n";
+      var_dump($arg);
+      echo "\n";
    }
+   $dump=ob_get_clean();
+   if (defined("WP_DEBUG_LOG"))
+      file_put_contents(WP_DEBUG_LOG,$dump,FILE_APPEND);
+   else
+      return $dump;
 }
 
 // =============================================== Wrappers =============================================== //

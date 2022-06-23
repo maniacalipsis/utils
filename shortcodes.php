@@ -227,12 +227,14 @@ abstract class PostsPrefabShortcode extends DataListShortcode
    public const NAMEVAL_GLUE="=";
    protected $filter_allowed=["post_type"=>null,"category"=>null,"category_name"=>null,"tag"=>null,"post_status"=>null,"post_parent"=>null,"orderby"=>null,"order"=>null,"numberposts"=>null,"exclude"=>null,"include"=>null,"meta_key"=>null,"meta_value"=>null,"meta_query"=>null];
    protected $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null];
+   
    //Rendering params, that can be redefined just at the backend:
    public $item_class="post";
    
-   protected function get_data($params_)
+   protected function prepare_filter($params_)
    {
-      //Get posts data.
+      //Cook the filter from the params_ and defaults.
+      //This separate method allows a derived classes to interfere into the det_data() after the filter is ready.
       
       //Get the posts filtering params:
       $numberposts=$params_["numberposts"]??$params_["limit"]??null; //Translate "limit" to "numberposts" as the last one isn't intuitive.
@@ -258,9 +260,15 @@ abstract class PostsPrefabShortcode extends DataListShortcode
          }
       }
       $filter=array_extend($this->filter_defaults,array_intersect_key($params_,$this->filter_allowed));   //Filter params of the filter.
-         
-      //Get the posts:
-      $this->data=get_posts($filter);
+      
+      return $filter;
+   }
+   
+   protected function get_data($params_)
+   {
+      //Get posts data.
+      
+      $this->data=get_posts($this->prepare_filter($params_));
    }
    
    protected function get_link($post_)

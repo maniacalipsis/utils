@@ -230,9 +230,10 @@ class MediaSelector
                                      className:'media',
                                      childNodes:[
                                                    this._params.label,
-                                                   {tagName:'img',className:'glyph',src:'',alt:'',_collectAs:'_glyphImg'},
+                                                   {tagName:'span',className:'glyph flex center x-center',childNodes:[{tagName:'img',src:'',alt:'',_collectAs:'_glyphImg'}]},
                                                    {tagName:'span',className:'url',textContent:'',title:'',_collectAs:'_urlBox'},
                                                    {tagName:'input',className:'open',type:'button',value:'Выбрать файл',onclick:(e_)=>{this._openMediaDialog();},_collectAs:'_selBtn'},
+                                                   {tagName:'span',className:'spacer'},
                                                 ]
                                   }
                                ]
@@ -255,7 +256,7 @@ class MediaSelector
       if (this._wpAttachmentAttrs)
       {
          //console.log(this._wpAttachmentAttrs.sizes);
-         this._subNodes._glyphImg.src=(this._wpAttachmentAttrs.type=='image' ? this._wpAttachmentAttrs.sizes.thumbnail?.url??this._wpAttachmentAttrs.sizes.full.url : this._wpAttachmentAttrs.icon);
+         this._subNodes._glyphImg.src=(this._wpAttachmentAttrs.type=='image' ? this._wpAttachmentAttrs.sizes?.thumbnail?.url??this._wpAttachmentAttrs.sizes?.full?.url : this._wpAttachmentAttrs.icon);
          this._subNodes._glyphImg.alt=this._wpAttachmentAttrs.title;
          this._subNodes._glyphImg.title=this._subNodes._glyphImg.src;
          

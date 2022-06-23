@@ -17,7 +17,7 @@ class ThemeSetup
    public $page_supports=[];
    public $post_supports=[];
    
-   public $allowed_mimes=["svg"=>"image/svg+xml"];
+   public $allowed_mimes=["svg"=>"image/svg+xml","webp"=>"image/webp"];
    public $disallowed_mimes=[];
    
    public $unwanted_public_styles=[];
@@ -116,7 +116,8 @@ class ThemeSetup
       //Call this after set all properties needed.
       
       //Add filters:
-      add_filter("upload_mimes",[$this,"filter_allowed_mimes_callback"]);  //Allow/disallow specified mimes.
+      add_filter("mime_types",[$this,"filter_allowed_mimes_callback"]);    //Allow/disallow to use specified mimes.
+      add_filter("upload_mimes",[$this,"filter_allowed_mimes_callback"]);  //Allow/disallow to upload specified mimes.
       if ($this->remove_category_base)
          add_filter("category_link",[$this,"filter_category_link"],99);
       

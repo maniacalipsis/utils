@@ -77,7 +77,13 @@
    padding:0.2em 0.5em;
 }
 
+/* Single inputs */
+#wpbody-content  td>label:only-child>span /*Experimental. Hides duplication of the title for fields with a single input.*/
+{
+   display:none;
+}
 
+/* MediaList */
 #wpbody-content .media_selector,
 #wpbody-content .media_selector>label,
 #wpbody-content .media_selector>label.media /*Fix overrde by the #wpbody-content .postbox label.*/
@@ -90,7 +96,7 @@
 
 #wpbody-content .media_selector
 {
-   max-width:800px;
+   flex:0 1 33em;
 }
 
 #wpbody-content .media_selector>label
@@ -100,7 +106,7 @@
 }
 #wpbody-content .media_selector>label.media
 {
-   flex-grow:1;
+   flex:0 1 34em;
 }
 
 #wpbody-content .media_selector>.close
@@ -118,18 +124,18 @@
 
 #wpbody-content .media_selector>label.media>.glyph
 {
-   max-height:3em;
-   max-width:3em;
+   flex:0 0 3em;
+   height:2.5em;
 }
-#wpbody-content .media_selector>label.media>.glyph[src='']
+#wpbody-content .media_selector>label.media>.glyph>img
 {
-   height:3em;
-   width:3em;
+   max-height:100%;
+   max-width:100%;
 }
 
 #wpbody-content .media_selector>label.media>.url
 {
-   flex:1 0 5em;
+   flex:1 1 15em;
    align-self:stretch;
    display:flex;
    flex-flow:row;
@@ -138,6 +144,10 @@
    overflow:hidden;
    padding:0.5em 0.25em;
    background:none #F5F5F5;
+}
+#wpbody-content .interface-interface-skeleton__sidebar .media_selector>label.media>.url
+{
+   display:none;
 }
 
 #wpbody-content input.close[type='button']
