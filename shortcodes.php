@@ -19,7 +19,7 @@ function date_shortcode($params_="",$content_="")
    if (!is_array($params_))
       $params_=[];
    
-   return date(arr_val($params_,"format","Y-m-d H:i:s"));
+   return date($params_["format"]??"Y-m-d H:i:s");
 }
 
 abstract class Shortcode
@@ -71,15 +71,15 @@ abstract class Shortcode
       //Select the templates:
       foreach ($this->tpl_pipe as $key=>$tpl_name)
       {
-         $tpl_method_name=arr_val($params_,$key,"default")."_".$key;
+         $tpl_method_name=($params_[$key]??"default")."_".$key;
          if (method_exists($this,$tpl_method_name))
             $this->tpl_pipe[$key]=$tpl_method_name;
       }
       
       //Get customizations params:
-      $this->custom_class=arr_val($params_,"class","");
+      $this->custom_class=$params_["class"]??"";
       
-      $id=arr_val($params_,"id","");
+      $id=$params_["id"]??"";
       if ($id!="")
          $this->attr_id="ID=\"".htmlspecialchars($id)."\"";
       
@@ -121,9 +121,9 @@ abstract class DataListShortcode extends Shortcode
       parent::get_rendering_params($params_,$content_);
       
       //Get list customizations params:
-      $this->list_class=arr_val($params_,"list_class",$this->list_class);
-      $this->item_class=arr_val($params_,"item_class",$this->item_class);
-      $this->empties_count=(int)arr_val($params_,"empties",$this->default_empties_count);
+      $this->list_class=$params_["list_class"]??$this->list_class;
+      $this->item_class=$params_["item_class"]??$this->item_class;
+      $this->empties_count=(int)($params_["empties"]??$this->default_empties_count);
    }
    
    protected function default_wrap_tpl()
@@ -309,8 +309,8 @@ class MapShortcode extends Shortcode
       //Process the rendering params.
       parent::get_rendering_params($params_,$content_);
       
-      $this->map_id=arr_val($params_,"",$this->default_map_id);
-      $this->map_zoom=(int)arr_val($params_,"",$this->default_zoom);
+      $this->map_id=$params_["map_id"]??$this->default_map_id;
+      $this->map_zoom=(int)($params_["zoom"]??$this->default_zoom);
    }
    
    protected function get_data($params_)

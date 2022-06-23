@@ -110,7 +110,7 @@ class InputString extends InputField
    {
       //Returns [properly modified] $value, safe for storing to DB or something else.
       $res=htmlspecialchars(strip_tags($this->value));
-      $maxlen=arr_val($this->attrs,"maxlength");
+      $maxlen=$this->attrs["maxlength"]??0;
       if ($maxlen)
          $res=mb_substr($res,0,$maxlen);
       

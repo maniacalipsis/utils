@@ -159,13 +159,6 @@ function translate_date($date_str_,$is_genitive_=false)
 }
 
 /* --------------------------------------- array utilities --------------------------------------- */
-function arr_val($arr_,$key_,$default_=null)
-{
-   //As PHP 8.0 strict policy of array elements access, it needs a damn bunch of checks to avoid the warnings.
-   //NOTE: depreciated.
-   return (is_array($arr_)&&key_exists($key_,$arr_) ? $arr_[$key_] : $default_);
-}
-
 function array_extend(array $defaults_,array $array_)
 {
    //Recursively replaces $defaults_ elements having the string keys and appends elements with the numeric keys.
@@ -180,67 +173,89 @@ function array_extend(array $defaults_,array $array_)
    return $res;
 }
 
+class JSONAns extends ArrayObject implements Stringable
+{
+   //Array, automatically convertable to JSON. 
+   //Usefull for making of JSON answers, that can be directly echoed.
+   
+   public function __toString():string
+   {
+      return json_encode($this,JSON_ENCODE_OPTIONS);
+   }
+}
+
 /* --------------------------------------- [de]serialization --------------------------------------- */
-function serialize_element_attrs($attrs_)
+function serialize_element_attrs(array|string|null $attrs_=NULL)
 {
    //This function allows to almost completely make any HTML element from associative array of its attributes. E.g.: echo "<INPUT".serialize_element_attrs(["name"=>"a","class"=>"someclass","value"=>$value]).">";
+   //Arguments:
+   // $attrs_ - array of tag attributes, where key is attribute name and val is its value.
+   //           If the attribute value type is boolean, it will be recognized as a boolean attribute, which is true if its name exist in the tag and false if not. But note that if not boolean attribute will come with boolean value, it will esult a logically incorrect result.
+   //           If the $attrs_ is a string, it will be returned as is. This feature can be used for optimization.
    //NOTE: this function doesn't checks are the attributes correct and suitable for the HTML element you making with it.
    
-   $res="";
-   if ($attrs_)
+   if (is_array($attrs_))
    {
-      foreach ($attrs_ as $aname_=>$aval_)
-         if (preg_match("/^(autofocus|allowfullscreen|checked|disabled|formnovalidate|hidden|multiple|readonly|required|selected)$/i",$aname_))
-            $res.=(to_bool($aval_) ? " ".strtoupper($aname_) : "");
-         else
-            $res.=" ".strtoupper($aname_)."=\"".htmlspecialchars(str_replace("\n"," ",$aval_),ENT_COMPAT|ENT_HTML5)."\"";
+      $res="";
+      foreach ($attrs_ as $name=>$val)
+         if ($val!==null)
+         {
+            //TODO: The following line is an name-based detection of the boolean attributes which can appear with no value. 
+            //      Now it was replaced with the more lightweight check, but there may be a problem if the DATA-.. attribute will have boolean value.
+            //      E.g. for ["smth"=>true] and ["smth"=>false] the new code will output " DATA-SMTH" and "" respectively, instead of " DATA-SMTH=\"1\"" and " DATA-SMTH=\"0\"". Its will not break HTML validity, but JS will recognize it as empty string and null respectively.
+            //      If this problem will not trouble, then 
+            //if (preg_match("/^(autofocus|allowfullscreen|checked|disabled|formnovalidate|hidden|multiple|readonly|required|selected)$/i",$name))
+            if (is_bool($val))   //Valid ONLY for the boolean attributes: autofocus, allowfullscreen, checked, disabled, formnovalidate, hidden, multiple, readonly, required, selected.
+            {
+               if ($val)
+                  $res.=strtoupper($name);
+            }
+            else
+               $res.=" ".strtoupper($name)."=\"".htmlspecialchars(str_replace("\n"," ",$val),ENT_COMPAT|ENT_HTML5)."\"";
+         }
    }
+   else
+      $res=$attrs_;
    
    return $res;
 }
 
 /* --------------------------------------- HTML forms, inputs --------------------------------------- */
-function html_select($name_,array $variants_,$default_="",$attrs_=[])
+function html_select($name,array $var,array|string|null $default="",array|string|null $attrs="",$is_multiple=null)
 {
    //Arguments:
-   // $name_ - name of the element.
-   // $variants_ - "key"=>"val" associative array of variants of choise, where "key" is an actual value of option and "val" is a text displaying for the option.
-   // $default_ - the value of selected option.
-   // $attrs_ - any attributes, suitable for this HTML element.
+   // $name - name of the element.
+   // $var  - ["val"=>_opt_,...] array of variants of choise, where 
+   //          "val" - is a value of option,
+   //          _opt_ - is a string or array. The string is just a simple option text, whereas array allows to add some attribute to the option tag, its format is ["text"=>"Option text","attrs"=>_tag_attrs_], where _tag_attrs_ can be string or array (see serialize_element_attrs() for details).
+   // $default - the value[s] of selected option[s]. NOTE: this function doesn't care if the number of $default values doesn't conform the "multiple" attribute.
+   // $attrs - attributes for <SELECT> tag. The value can be an array or a precomplied string (see serialize_element_attrs() for details).
+   // $is_multiple - NOTE: Use this argument only if $attrs is a precomplied string. Otherwise use $attrs["multiple"].
    
-   //NOTE: set attribute "multiple" to allow multiple selection
-   $is_multiple=arr_val($attrs_,"multiple");
+   $is_multiple??=$attrs["multiple"]??false;
    
-   $res="<SELECT NAME=\"".$name_.($is_multiple ? "[]" : "")."\"".serialize_element_attrs($attrs_).">";
+   $default??="";                  //The null has to match option with value "" but not with int(0). Btw, array key can't be null (it's casted to "").
+   $is_def_arr=is_array($default); //Array will be treaten as array, regardless to $is_multiple.
    
-   $defaults=is_array($default_) ? $default_ : explode(",",$default_);
-   foreach ($variants_ as $val=>$opt)
+   $res="<SELECT NAME=\"".$name.($is_multiple ? "[]" : "")."\"".serialize_element_attrs($attrs).">";
+   
+   foreach ($var as $val=>$opt)
    {
-      $sel="";
       if (is_array($opt))
       {
          $opt_text=$opt["text"];
-         $opt_attrs=serialize_element_attrs($opt["attrs"]);
+         $opt_attrs=serialize_element_attrs($opt["attrs"]??null);
       }
       else
       {
-         $opt_text=$opt;
          $opt_attrs="";
+         $opt_text=$opt;
       }
       
-      if ($is_multiple)
-      {
-         foreach ($defaults as $def)
-            if (similar($val,$def))
-            {
-               $sel=" SELECTED";
-               break;
-            }
-      }
-      elseif (similar($val,$default_))
-         $sel=" SELECTED";
+      if (($is_def_arr&&$default&&array_search($val,$default)!==false)||($val==$default)) //NOTE: Conditions order is important! Also $is_def_arr&&$default allows to avoid useless call of the array_search for the empty array.
+         $opt_attrs.=" SELECTED";
       
-      $res.="<OPTION VALUE=\"".htmlspecialchars($val,ENT_COMPAT|ENT_HTML5)."\"".$opt_attrs.$sel.">".$opt_text."</OPTION>";
+      $res.="<OPTION VALUE=\"".htmlspecialchars($val,ENT_COMPAT|ENT_HTML5)."\"".$opt_attrs.">".$opt_text."</OPTION>";
    }
    
    $res.="</SELECT>";
@@ -715,9 +730,6 @@ function send_email($recipients_,$subject_,$text_,$attachments_=null,$sender_="n
    //NOTE: If you have/need any restrictions for attachments, you have to test and filter $attachments_ in advance.
    //      This function only test
    
-   global $LOCALE;
-   global $ERRORS;
-   
    //Detect text mime subtype
    $is_html=preg_match("/<([!]doctype|html|body)/i",substr($text_,24));
    $text_type="text/".($is_html ? "html" : "plain")."; charset=\"utf-8\"";
@@ -792,6 +804,7 @@ function send_email($recipients_,$subject_,$text_,$attachments_=null,$sender_="n
          foreach ($recipient_groups as $hdr=>$grp)
             $headers[$hdr]=implode(",",$grp);
    }
+   
    //TODO: else var_dump(preg_split("/(To|Cc|Bcc):/i","trerert@mail.net,wasd@mail.net  To:Yo_wasd@mail.net, Q_wasd@mail.net",-1,PREG_SPLIT_DELIM_CAPTURE|PREG_SPLIT_NO_EMPTY));
    //Send
    return mail($recipients_,$subject_,$content,$headers);
@@ -854,24 +867,24 @@ function dumpf(...$args_)
 // =============================================== Wrappers =============================================== //
 function phones_output($val_,$params_=NULL)
 {
-   $glue=arr_val($params_,"glue","/");
-   $out_glue=arr_val($params_,"out_glue"," ");
+   $glue=$params_["glue"]??",";
+   $out_glue=$params_["out_glue"]??" ";
    
-   $attrs_str=(is_array(arr_val($params_,"attrs")) ? " ".serialize_element_attrs($params_["attrs"]) : "");
+   $attrs_str=is_array($params_["attrs"]??null) ? " ".serialize_element_attrs($params_["attrs"]) : "";
    $phones=is_array($val_) ? $val_ : explode($glue,$val_);
    $links=[];
    foreach ($phones as $phone)
-      $links[]="<A HREF=\"tel:".preg_replace(["/^ *8/","/доб(авочный)?/i","/[^0-9+,.]/"],["+7",",",""],$phone)."\"".$attrs_str.">".htmlspecialchars(trim($phone))."</A>";
+      $links[]="<A HREF=\"tel:".preg_replace(["/^ *8/","/доб(авочный)?|ext/i","/[^0-9+]/"],["+7",""],$phone)."\"".$attrs_str.">".htmlspecialchars(trim($phone))."</A>";
    
    return implode($out_glue,$links);
 }
 
 function emails_output($val_,$params_=NULL)
 {
-   $glue=arr_val($params_,"glue",",");
-   $out_glue=arr_val($params_,"out_glue"," ");
+   $glue=$params_["glue"]??",";
+   $out_glue=$params_["out_glue"]??" ";
    
-   $attrs_str=(is_array(arr_val($params_,"attrs")) ? " ".serialize_element_attrs($params_["attrs"]) : "");
+   $attrs_str=(is_array($params_["attrs"]??null) ? " ".serialize_element_attrs($params_["attrs"]) : "");
    $emails=is_array($val_) ? $val_ : explode($glue,$val_);
    $links=[];
    foreach ($emails as $email)
@@ -885,9 +898,9 @@ function emails_output($val_,$params_=NULL)
 
 function text_clip_output($val_,$params_=NULL)
 {
-   $max=arr_val($params_,"max",512);            //Max output length.
-   $min=arr_val($params_,"min",max(1,$max-64)); //Min output length.
-   $keep_trailing_punct=to_bool(arr_val($params_,"keep_punct"));
+   $max=$params_["max"]??512;            //Max output length.
+   $min=$params_["min"]??max(1,$max-64); //Min output length.
+   $keep_trailing_punct=to_bool($params_["keep_punct"]??false);
       
    $val_=strip_tags($val_);   //Tags currently unsupported.
    $chr_len=mb_strlen($val_); //String length in characters.
@@ -920,10 +933,10 @@ function text_clip_output($val_,$params_=NULL)
          if (!$keep_trailing_punct||($val_[$break_pos]==" "))
             $break_pos--;
          
-         $val_=mb_substr($val_,0,$min).substr($str_end,0,$break_pos+1).arr_val($params_,"suffix","");   //Concat start of the string ($min characters length) and the end of the string, truncated at the $break_pos byte offset.
+         $val_=mb_substr($val_,0,$min).substr($str_end,0,$break_pos+1).($params_["suffix"]??"");   //Concat start of the string ($min characters length) and the end of the string, truncated at the $break_pos byte offset.
       }
       else
-         $val_=mb_substr($val_,0,$max).arr_val($params_,"suffix","");
+         $val_=mb_substr($val_,0,$max).($params_["suffix"]??"");
    }
    
    return $val_;

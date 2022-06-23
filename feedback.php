@@ -44,7 +44,7 @@ class Feedback extends Shortcode
       //Process the rendering params.
       parent::get_rendering_params($params_,$content_);
       
-      $this->form_class=arr_val($params_,"form_class",$this->form_class);
+      $this->form_class=$params_["form_class"]??$this->form_class;
    }
    
    public function on_init()
@@ -186,7 +186,7 @@ class Feedback extends Shortcode
       
       //Get the from data from the request:
       foreach ($this->fields as $field)
-         $field->value=arr_val($_REQUEST,$field->key);
+         $field->value=$_REQUEST[$field->key]??null;
       
       //Validate form data and do something useful: 
       if ($this->validate())

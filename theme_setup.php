@@ -68,7 +68,7 @@ class ThemeSetup
       $was_found=false;
       //Try to find this action into the adding list:
       foreach ($this->actions_to_add as $i=>$action)
-         if (($action["tag"]==$tag_)&&($action["callback"]==$callback_)&&(arr_val($action,"priority")==$priority_)&&(arr_val($action,"argc")==$argc_))
+         if (($action["tag"]==$tag_)&&($action["callback"]==$callback_)&&(($action["priority"]??null)==$priority_)&&(($action["argc"]??null)==$argc_))
          {
             unset($this->actions_to_add[$i]);
             $was_found=true;
@@ -123,14 +123,14 @@ class ThemeSetup
       
       //Remove actions:
       foreach ($this->actions_to_remove as $action)
-         remove_action($action["tag"],$action["callback"],arr_val($action,"priority",10)); //WP's default action priority is 10,
+         remove_action($action["tag"],$action["callback"],$action["priority"]??10); //WP's default action priority is 10,
       
       //Add actions:
       if (WP_DEBUG||$this->noindex)        //
          add_action("wp_head","noindex");  //NOTE: This action will set metatag robots noindex,nofollow.
          
       foreach ($this->actions_to_add as $action)
-         add_action($action["tag"],$action["callback"],arr_val($action,"priority",10),arr_val($action,"argc",1)); //WP's default action priority is 10, args count is 1.
+         add_action($action["tag"],$action["callback"],$action["priority"]??10,$action["argc"]??1); //WP's default action priority is 10, args count is 1.
    }
    
    //Callbacks
@@ -174,7 +174,7 @@ class ThemeSetup
    {
       //Add deferred actions:
       foreach ($this->actions_deferred as $action)
-         add_action($action["tag"],$action["callback"],arr_val($action,"priority",10),arr_val($action,"argc",1)); //WP's default action priority is 10, args count is 1.
+         add_action($action["tag"],$action["callback"],$action["priority"]??10,$action["argc"]??1); //WP's default action priority is 10, args count is 1.
          
       //Tell about supported features:
       foreach ($this->theme_supports as $feature=>$formats)
