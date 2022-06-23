@@ -1,11 +1,11 @@
 /*==================================*/
-/* The Pattern Engine Version 3     */
+/* The Pattern Engine Version 4     */
 /* Copyright: FSG a.k.a ManiaC      */
 /* Contact: imroot@maniacalipsis.ru */
 /* License: GNU GPL v3              */
 /*----------------------------------*/
-/* Main JS utils useful for both    */
-/* user and admin sides             */
+/* Main JS utils, useful for public */
+/* and admin sides.                 */
 /*==================================*/
 
 /*===========================================================================================================*/
@@ -18,10 +18,6 @@
 /* You should have received a copy of the GNU General Public License along with The Pattern Engine.          */
 /* If not, see http://www.gnu.org/licenses/.                                                                 */
 /*===========================================================================================================*/
-
-/*---------------------------------------------------*/
-/* Define site-specific scrpits into different files */
-/*---------------------------------------------------*/
 
 //------ common funcs for working with content sizes and positions ------//
 function touchesToRelative(e_,node_)
@@ -199,14 +195,8 @@ function mixed_input_scroll(e_) //allow to change numeric values of text input u
 
 function toggle(val_,val1_,val2_)
 {
-   var res=val_;
-   
-   if (val_==val1_)
-      res=val2_;
-   else
-      res=val1_;
-   
-   return res;
+   //TODO: Removal candidate. Reason: rarely needed.
+   return (val_==val1_) ? val2_ : val1_;
 }
 
 function InitNumericInputs()
@@ -224,7 +214,7 @@ function numericInputRestrict(e_)
 
 function switch_val(form_name_,input_name_,val1_,val2_,case_sensitive_)  //assigns val2_ to input's value if it is equal to val1_, Otherwise assigns val1_.
 {
-   //TODO: replace with "toggle"
+   //TODO: Removal candidate.  Reason: rarely needed.
    var input__=document.forms[form_name_][input_name_];
    var reg=new RegExp('^'+val1_+'$',(case_sensitive_ ? 'i' : ''));
    if (input__.value&&reg.test(input__.value))
@@ -235,6 +225,7 @@ function switch_val(form_name_,input_name_,val1_,val2_,case_sensitive_)  //assig
 
 function forceKbLayout(e_,dest_)  //convert entering characters to target layout
 {
+   //TODO: Seems shold be moved to separate library. Reason: rarely used.
    //console.log(e_);
    var char=e_.charCode; 
    char=String.fromCharCode(char);
@@ -289,59 +280,124 @@ function forceKbLayout(e_,dest_)  //convert entering characters to target layout
    return true;
 }
 
-//------- Cookie-based sorting controls -------//
-function initSortingButtons(buttons_)
+function filterSelectOptions(selectInp_,attr_,val_)
 {
-   if (buttons_)
+   for (let opt of selectInp_.options)
    {
-      for  (var i=0;i<buttons_.length;i++)
-      {
-         var reg=new RegExp('(^|; +)'+buttons_[i].dataset.cookie+'=([^,;]+,)*'+buttons_[i].dataset.key+'-'+buttons_[i].dataset.order+'(,[^,;]+)*(;|$)','i');
-         if (reg.test(document.cookie))
-            buttons_[i].classList.add('sel');
-         
-         buttons_[i].addEventListener("click",set_sort_order);
-      }
+      opt.hidden=opt.disabled=(attr_===null ? opt.value!=val_ : opt.dataset[attr_]!=val_);   //Hide and disable unmatching options.
+      if (opt.disabled)        //Deselect disabled options.
+         opt.selected=false;   //
    }
 }
 
-function set_sort_order(e_)
+//------- Cookie-based sorting controls -------//
+class SortingController
 {
-   //Get cookie value
-   var thisOrder=this.dataset.key+'-'+this.dataset.order;
-   
-   var reg=new RegExp('(?:^|; +)'+this.dataset.cookie+'=([^;]*)(?:;|$)','i');
-   var matches=reg.exec(document.cookie);
-   var cookie=matches ? matches[1] : '';
-   
-   if (cookie&&e_.ctrlKey)
+   constructor(params_)
    {
-      //Replace/remove same sorting key in list if Ctrl key pressed
-      var sorts=cookie.split(',');
-      console.log(sorts);
-      var replace=true;
-      reg=new RegExp('^'+this.dataset.key+'-(asc|desc)?$');
-      for (var i=0;i<sorts.length;i++)
-         if (reg.test(sorts[i]))
-         {
-            replace=(sorts[i]!=thisOrder);
-            sorts.splice(i,1);
-            i--;
-         }
-      
-      if (replace)
-         sorts.push(thisOrder);
-      
-      cookie=sorts.join(',');
+      this._root=params_?.container??(params_?.containerSelector ? document.querySelector(params_.containerSelector) : null);
+      if (this._root)
+      {
+         //Get sorting data source:
+         this._cookieKey=params_?.cookieKey??this._root.dataset?.sortingCookie??this._cookieKey;
+         this._cookiePath=params_?.cookiePath??this._cookiePath;
+         this.onChange=params_.onChange;
+         
+         //Init buttons:
+         let buttons=params_?.buttons??this._root.querySelectorAll(params_?.buttonsSelector??'.sort_btn');   //Find buttons into container.
+         for (let btn of buttons)
+            if ((btn.dataset.key!='')&&(/^(ASC|DESC)$/i.test(btn.dataset.order)))   //Buttons must has correct DATA-KEY and DATA-ORDER attributes.
+            {
+               btn.dataset.order=btn.dataset.order.toUpperCase();       //Normalize order's char case.
+               this._buttons[btn.dataset.key]??={ASC:null,DESC:null};   //Cache buttons by key and order 
+               this._buttons[btn.dataset.key][btn.dataset.order]=btn;   // for easy access.
+               
+               btn.addEventListener('click',(e_)=>{this.toggle_sorting(e_.target.dataset.key,e_.target.dataset.order,e_.ctrlKey);});   //NOTE: If click with the Ctrl key pressed, then new sorting will be appended to existing ones, else the previous sortings will be discarded.
+               btn.classList.toggle(this._selClassName,this.sortings[btn.dataset.key]==btn.dataset.order); //Init button state: set button selected if its order match corresponding sorting.
+            }
+      }
    }
-   else
-      cookie=thisOrder; //Otherwise replace whole cookie value
    
-   var exp_date=new Date;
-   exp_date.setDate(exp_date.getDate() + (cookie!='' ? 31 : -1));
-   document.cookie=this.dataset.cookie+'='+cookie+'; expires='+exp_date.toUTCString()+';'+(this.dataset.path ? 'path='+this.dataset.path : '');
+   //public props
+   get sortings()
+   {
+      try
+      {
+         this._sortings??=JSON.parse(getCookie(this._cookieKey)??'{}'); //NOTE: JSON.parse(null) doesn't rise exception, while JSON.parse(undefined) and JSON.parse('') does.
+      }
+      catch (ex)
+      {
+         this._sortings={};
+      }
+      finally
+      {
+         return this._sortings;
+      }
+   }
+   set sortings(new_val_)
+   {
+      this._sortings=new_val_;
+      
+      let cookieVal=(this._sortings&&(Object.keys(this._sortings).length) ? JSON.stringify(this._sortings) : '');  //If sortings is empty, the cookie will be unset.
+      setCookie(this._cookieKey,cookieVal,31,this._cookiePath);
+      console.log('set sortings',this._cookieKey,this._sortings);
+   }
    
-   window.location.reload();
+   //private props
+   _root=null;
+   _buttons={};
+   _selClassName='sel';
+   _cookieKey='sort';
+   _cookiePath=document.location.pathname;
+   _sortings=null;
+   
+   //public methods
+   toggle_sorting(key_,order_,append_)
+   {
+      //Toggle sorting.
+      // If there is only one sorting it will be simply toggled. The same if append_ is set.
+      // If there are many sortings, they will be replaced with the key_+order_, unless append_ is set.
+      
+      if ((this.sortings[key_]==order_)&&(append_||(Object.keys(this.sortings).length==1)))
+         order_='';
+      this.set_sorting(key_,order_,append_);
+   }
+   
+   set_sorting(key_,order_,append_)
+   {
+      //Set sorting by the key_ to the order_.
+      // If order_
+      // If key_ already exists, its order will be updated with new value. By the way, if append_==false then all previous sortings will be discarded.
+      // If key_ doesn't exists and append_==true, it will be appended to the end of existing sortings.
+      
+      if (this._buttons[key_]&&/^(ASC|DESC)?$/i.test(order_))   //First, check is key_ and order_ are valid (as this method may be called manually).
+      {
+         if (!append_)
+            this.discard_sortings()
+         
+         let sortings=this.sortings;
+         if (order_!='')
+            sortings[key_]=order_;
+         else
+            delete sortings[key_];
+         
+         this._buttons[key_].ASC.classList.toggle(this._selClassName,order_=='ASC');
+         this._buttons[key_].DESC.classList.toggle(this._selClassName,order_=='DESC');
+         
+         this.sortings=sortings;
+         this.onChange?.();
+      }
+   }
+   
+   discard_sortings()
+   {
+      this.sortings={};
+      for (const key in this._buttons)
+      {
+         this._buttons[key].ASC.classList.remove(this._selClassName);
+         this._buttons[key].DESC.classList.remove(this._selClassName);
+      }
+   }
 }
 
 //------- Scrolling boxes handling -------//
@@ -368,10 +424,8 @@ class Scroller
    // Params:
    //    node_ - the main scroller container. All scroller presets may be set via its DATA-... attributes.
    //       data-handle - toggles an input events which scroller should handle. TODO: complete the docs and implementation of this feature.
-   //       data-speed - mixed. Speed is distance which content block covers per iteration. It may be defined in px, em, vw, vh or %. The % are counted from the current area width. For other units conversion details see the function toPixels(). Negative values inverts scrolling direction.
+   //       data-speed - mixed. Speed is distance which content block covers per iteration. It may be defined in px, em, vw, vh or %. The % are counted from the current area width. For other units conversion details see the function toPixels().
    //       data-cycled - boolean. If true the scrolling will be infinite, if false it will stop when the content end reaches the same end of the area.
-   //       data-interval - Interval of automatic scrolling iterations in seconds. Default - 0 (turned-off).
-   //       data-threshold - Threshold in pixels for detection whether the content box is scrolled to the begining or to the end of the area.
    // The buttons are optional.
    
    //TODO: Revision required!
@@ -391,7 +445,7 @@ class Scroller
          this.speed=params_?.speed??this._root.dataset.speed??this.speed;
          this.cycled=toBool(params_?.cycled??this._root.dataset.cycled??this.cycled);
          this._handle=params_?.handle??this._root.dataset.handle?.split(',')??this._handle;
-         this.threshold=parseInt(params_?.threshold??this._root.dataset.threshold??this.threshold);
+         this.treshold=parseInt(params_?.treshold??this._root.dataset.treshold??this.treshold);
          this._interval=parseInt(params_?.interval??this._root?.dataset?.interval??this._interval);
          
          //Init nodes:
@@ -415,11 +469,7 @@ class Scroller
          
          //content container that scrolls into scroling area
          this._content=this._root.querySelector('.content');
-         let recalcSizeDelay=parseInt(params_?.recalcSizeDelay??this._root.dataset.recalcSizeDelay??0);  //Fix for the case when sizes of the images into the slider content doesn't obtains at DOMContentLoaded, that leads to incorrect calculation of the slider content width, which makes the slider not scroling.
-         if (recalcSizeDelay>0)                                                                          // If this issue occures, set the param recalcSizeDelay or attribute DATA-RECALC-SIZE-DELAY to value about 1000ms.
-            setTimeout(()=>{this.recalcContentSize();},recalcSizeDelay);                                 // - Calculate content size with additional delay after the DOMContentLoaded.
-         else                                                                                            //
-            this.recalcContentSize();                                                                    // - Calculate content size at DOMContentLoaded.
+         this.recalcContentSize();
                   
          //Attach event handlers
          for (var i=0;i<this._handle.length;i++)
@@ -463,7 +513,7 @@ class Scroller
    //public props
    speed='33%';    //scrolling speed (affects scrolling by cklicking on buttons and by mouse wheel scrolling).
    cycled=false;   //allow to continue from the opposite end or stop scrolling when the end or the start has reached.
-   threshold=10;    //corner positions detection threshold
+   treshold=10;    //corner positions detection treshold
    get interval(){return this._interval;}
    set interval(val_)
    {
@@ -578,14 +628,14 @@ class Scroller
       
       if (this._buttons.left)
       {
-         if (-parseFloat(conStyle.marginLeft)<=this.threshold)
+         if (-parseFloat(conStyle.marginLeft)<=this.treshold)
             this._buttons.left.classList.add('disabled');
          else
             this._buttons.left.classList.remove('disabled');
       }
       if (this._buttons.right)
       {
-         if ((parseFloat(conStyle.width)+parseFloat(conStyle.marginLeft)-this._area.clientWidth)<=this.threshold)
+         if ((parseFloat(conStyle.width)+parseFloat(conStyle.marginLeft)-this._area.clientWidth)<=this.treshold)
             this._buttons.right.classList.add('disabled');
          else
             this._buttons.right.classList.remove('disabled');
@@ -698,8 +748,8 @@ class TabsController
       // somewhat_ - a value, that one of the tabs should match.
       // callback_ - a function, that decides if a tab matches the somewhat_ (see arraySearch() description for details). Optional. If omitted the switchCmpCallback will be used instead.
       
-      let callback=callback_??this.switchCmpCallback;
-      this.currIndex=arraySearch(somewhat_,this._tabs,callback);
+      callback_??=this.switchCmpCallback;
+      this.currIndex=arraySearch(somewhat_,this._tabs,callback_);
    }
    
    //private methods
@@ -1074,6 +1124,7 @@ function initSpoilers(selector_)
 //------- Range bar -------//
 class RangeBar
 {
+   //TODO: Legacy code, revision required.
    constructor(node_,params_)
    {
       if (node_)
@@ -1456,7 +1507,7 @@ class RangeBar
       
       var res=null;
       
-      indx_??(indx_=0);
+      indx_??=0;
       
       if ((indx_>=0)&&(indx_<this._values.length))
          res=this._values[indx_];
@@ -1516,34 +1567,202 @@ function initRangeBars(selector_,params_)
    return res;
 }
 
-//------- Coupled Selects -------//
-function coupleSelects(naster_,slave_,filterCallback_,reverseCallback_)
+//------- Inputs List -------//
+class InputsList
 {
-   //Makes an options availability in the slave_ select dependendent on which options are selected in a master_ select.
-   //Arguments:
-   // master_ - primary select input. When user selects a master_'s option[s], the slave_'s options are being filtered depending on this selection.
-   // slave_ - select input with dependent options. It also may has backward influence on the master_'s selection, if the reverseCallback_ is defined.
-   // filterCallback_(masterSelection_,slaveOption_) - a callback which is called in a cycle for the each slave_'s option and have to compare it against the array of the selected master_'s options. It result of comparison it should enable/disable or show/hide a slave_'s option.
-   // reverseCallback_(slaveSelection_,masterOption_) - a callback which is simmetrical to the filterCallback_ except it's called ONLY when slave_ option receives a user input event.
+   //This class allows to collect input elements (except buttons) from container_ to access them by keys and manipulate.
+   //Parameters:
+   // selector - CSS-selector to find inputs.
+   // regExp - RegExp to match a key parts of input's name: a row and a key.
+   // matchIndexes - Indexes of the name key parts in regExp matches. Format: {row:<index>,key:<index>}.
+   // replacement - A string for replaceing of the input's name key parts.
+   // NOTE: All of regExp, matchIndexes and replacement are optional, but pay attention to keep'em in sync.
+   //Usage:
+   //Default parameters are disigned for inputs named like 'prefix[0][col_name]' or 'prefix[0][col_name][sub_prop]' or 'prefix[][col_name]'. In this example regExp matches will be ['[0][col_name]','0','col_name'], so matchIndexes.row=1, matchIndexes.key==1 and replacement string is conform 0th match.
+   // someClass
+   // {
+   //    constructor(node_,row_,value_)
+   //    {
+   //       this._inpList=new InputsList(node_);            //Instantiate with default params (will collect all inputs into the node_).
+   //       this._inpList.inputs['col_name'].value=value_;  //Access input by its key.
+   //       this._inpList.rowIndex=row_;                    //Set row index for all inputs.
+   //    }
+   // }
    
+   constructor(container_,params_)
+   {
+      //Init params:
+      this._regExp=params_?.regExp??this._regExp;
+      this._matchIndexes=params_?.matchIndexes??this._matchIndexes;
+      this._replacement=params_?.replacement??this._replacement;
+      
+      //Find inputs:
+      let foundInputs=container_.querySelectorAll(params_?.selector??'input:not([type=button]):not([type=submit]):not([type=image]),select,textarea'); //Find all inputs except buttons.
+      for (let input of foundInputs)
+      {
+         let matches=this._regExp.exec(input.name);          //Get the input's key from its name
+         let key=matches?.[this._matchIndexes.key]??null;   //
+         if (key)                                           //
+            this.inputs[key]=input;                        // and store input to associative array.
+         else
+            console.warn('InputsList: input\'s name doesn\'t match regExp',input,this._regExp);
+      }
+   }
    
-   master_.addEventListener('change',function(e_){coupledSelectsFilter(master_,slave_,filterCallback_);});
-   coupledSelectsFilter(master_,slave_,filterCallback_);
+   //public props
+   inputs={};
    
-   if (reverseCallback_)
-      slave_.addEventListener('input',function(e_){coupledSelectsFilter(slave_,master_,reverseCallback_);});
+   get rowIndex()
+   {
+      //Get first input and exam its row index:
+      let res=null;
+      for (let key in this.inputs)
+      {
+         let matches=this._regExp.exec(this.inputs[key].name);
+         res=matches?.[this._matchIndexes.row]??''; //If row index isn't set (input is named like "prefix[][col_name]")
+         res=(res!='' ? parseInt(res) : null);      // then return null. Else don't forget to convert a numeric string to int.
+         break;
+      }
+      
+      return res;
+   }
+   set rowIndex(newVal_)
+   {
+      //Replace row index for all inputs:
+      let replacement=this._replacement.replace('$'+this._matchIndexes.row,newVal_); //Insert a new value into replacement string, e.g. '[$1][$2]' --> '[8][$1]'.
+      for (let key in this.inputs)
+         this.inputs[key].name=this.inputs[key].name.replace(this._regExp,replacement);
+   }
+   
+   //private props
+   _regExp=/^([a-z0-9_]+)\[([0-9]*)\]\[([a-z0-9_]+)\]/i;
+   _matchIndexes={prefix:1,row:2,key:3};
+   _replacement='$1[$2][$3]';
 }
 
-function coupledSelectsFilter(master_,slave_,callback_)
+//------- Coupled Inputs -------//
+class InputsCoupler
 {
-   //This is a helper function for the coupleSelects(). It performs a cycle over selects options.
-   let sel=[];
-   for (let mOpt of master_.options)
-      if (mOpt.selected)
-         sel.push(opt);
+   //This class allows to couple inputs to make changes of master input be reflected on slave inputs.
+   // The InputsCoupler instance attaches itself to its own input by means of property "coupler", whch allows couplers to interact with each other by setting/getting their properties.
+   // Thus control over the inputs can be implemented in setters/getters of InputsCoupler's derived classes. However, in trivial cases when is needed just to set a value of the slave input, it can has no coupler attached.
    
-   for (let sOpt of slave_.options)
-      callback_(sel,sOpt);
+   constructor(masterInp_,relations_,container_)
+   {
+      //Arguments:
+      // masterInp_ - master (own) input, which changes controls the slave inputs.
+      // relations_ - string or array of relations definitions. Format: 'slave_inp_selector?own_prop=slave_prop,...' or [{inp:'input.selector',own_prop:'prop_name',slave_prop:'prop_name'},...] or [{inp:input_itself,own_prop:'prop_name',slave_prop:'prop_name'},...].
+      // container_ - DOM node, where nearby coupled inputs located. This allows to make different isolated groups of coupled inputs. Optional, by default, slave inputs are searched in entire document. Has no effect if slave inputs defined directly.
+      
+      if (masterInp_)
+      {
+         this._input=masterInp_;
+         this._input.coupler=this;  //Reference for the couplers of the coupled inputs.
+         this._input.addEventListener('change',(e_)=>{this.sync();});
+         
+         container_??=(this._input.dataset.containerSelector ? this._input.closest(this._input.dataset.containerSelector)??document : document);   //Different groups of a similar inputs (e.g. if many data rows are edited atonce) must be localized within separate containers to avoid interference.
+         
+         relations_??=this._input.dataset.relations;  //Get relations definitions from the argument or the input's dataset.
+         if (relations_)                              //Coupler can have no relations if it is only slave.
+         {
+            if (typeof relations_ == 'string')        //Relations can be defined as comma-separated string or as array.
+               relations_=relations_?.split(',');     //
+            
+            for (let rel of relations_)
+            {
+               //Parse relation from string (if it's defined this way):
+               if (typeof rel == 'string')
+               {
+                  let matches=/^([^?=]+)\?([^?=]+)=([^?=]+)$/i.exec(rel);  //Format: slave_inp_selector?own_prop=slave_prop.
+                  rel={
+                         inp:matches[1],           //Slave input selector.
+                         own_prop:matches[2],      //Name of the own property.
+                         slave_prop:matches[3],    //Name of the slave input property.
+                      }
+               }
+               //Next, get the slave input:
+               if (typeof rel.inp == 'string')                 //Relation input can be defined directly or by CSS-selector.
+               {
+                  let selector=rel.inp;
+                  rel.inp=container_.querySelector(selector);   // In las case, find this input in the container.
+                  if (!rel.inp)
+                     console.warn('InputsCoupler failed to get slave input .',this,container_,selector);
+               }
+               
+               //Finally, check relation and collect it:
+               if (rel.inp&&rel.own_prop&&rel.slave_prop)
+                  this._relations.push(rel);
+            }
+         }
+      }
+   }
+   
+   //public props
+   get value()
+   {
+      //Default getter for the inputs relation.
+      return this._input.value;
+   }
+   set value(newVal_)
+   {
+      //Default setter for the inputs relation.
+      this._input.value=newVal_;
+      this.onValueSync?.();
+   }
+   //NOTE: define your own getters/setters in derived classes for all the variety of relations you need.
+   
+   //private props
+   _input=null;
+   _relations=[];
+   
+   //public methods
+   sync()
+   {
+      //Updates slave inputs when master input is changed.
+      
+      for (let rel of this._relations)
+         if (rel.inp.coupler)
+            rel.inp.coupler[rel.slave_prop]=this[rel.own_prop];  //Sync slave coupler property "slave_prop" with the own property "own_prop".
+         else if (rel.slave_prop=='value')
+            rel.inp.value=this[rel.own_prop];  //This fallback allows to avoid creating a slave couplers for trivial rels.
+         else
+            console.warn('InputsCoupler failed to sync slave input: it has no coupler and is not related by value.',this,rel);
+   }
+}
+
+function initCoupledInputs(containers_,couplers_)
+{
+   //Arguments:
+   // containers_ - array of DOM nodes or string CSS-selector. Optional.
+   // couplers_ - object with pairs 'input.selector':InputsCoupler.
+   //Usage:
+   // initCoupledInputs('.container',{'input.coupled':InputsCoupler,'select.somewhat.coupled':SomewhatSelectCoupler}); 
+   // or 
+   // initCoupledInputs(document.querySelectorAll('.somewat'),{'input.coupled':InputsCoupler,...});
+   
+   //Get containers by CSS selector:
+   if (typeof containers_ == 'string')
+      containers_=document.querySelectorAll(containers_);
+   else if (!containers_)
+      containers_[document];  //By default, search inputs within entire document.
+   
+   //Assign couplers to inputs:
+   let initialSyncList=[];
+   for (let container of containers_)  //NOTE: Container is a local space which separates groups of the similar master and slave selects.
+      for (let inputsSelector in couplers_)
+      {
+         let inputs=container.querySelectorAll(inputsSelector);
+         for (let input of inputs)
+         {
+            let coupler=new couplers_[inputsSelector](input,null,container);
+            if (toBool(input.dataset.syncOnInit))
+               initialSyncList.push(coupler);
+         }
+      }
+   
+   //When all couplers created, make initial sync:
+   for (let coupler of initialSyncList)
+      coupler.sync();
 }
 
 //------- Modal dialogs functions -------//
@@ -1570,7 +1789,7 @@ function buildNodes(struct_,collection_)
    {
       res=document.createDocumentFragment();
       for (let structItem of struct_)
-         res.appendChild(buildNodes(structItem,collection_));
+         res.appendChild(buildNodes(structItem));
    }
    else if ((typeof struct_ == 'object')&&struct_.tagName)
    {
@@ -1581,8 +1800,11 @@ function buildNodes(struct_,collection_)
       if (res)
       {
          //Collect created node:
-         if (struct_._collectAs&&collection_)
-            collection_[struct_._collectAs]=res;
+         if (struct_._collectAs)
+         {
+            if (collection_)
+               collection_[struct_._collectAs]=res;
+         }
          
          //Setup node:
          for (let prop in struct_)
@@ -1666,7 +1888,7 @@ function popupsClose()
 //common popups structures//
 function iframePopupStruct(link_,caption_)
 {
-   caption_??(caption_='');
+   caption_??='';
    
    var res={
               tagName:'div',
@@ -1702,7 +1924,7 @@ function iframePopupStruct(link_,caption_)
 
 function imagePopupStruct(link_,caption_) //makes structure of window for displaying of enlarged image
 {
-   caption_??(caption_='');
+   caption_??='';
    
    var res={
               tagName:'div',
@@ -1741,6 +1963,7 @@ function imagePopupStruct(link_,caption_) //makes structure of window for displa
 
 function dialogPopupStruct(link_,caption_,ok_btn_value_,ok_action_,cancel_btn_value_,cancel_action_)  //makes dialog window with "ok" and "cancel" buttons
 {
+   //TODO: Add the _collectAs attribute to active elements.
    var res={
               tagName:'div',
               className:'popup',
@@ -1796,11 +2019,11 @@ function dialogPopupStruct(link_,caption_,ok_btn_value_,ok_action_,cancel_btn_va
 
 function parsePhones(phonesStr_,glue_)
 {
-   //buildNodes()-ready phone numbers parser.
+   //The buildNodes()-ready phone numbers parser.
    
    let res=[];
    
-   glue_=glue_??',';
+   glue_??=',';
    let phones=phonesStr_?.split(glue_)
    for (let phone of phones)
    {
@@ -1851,20 +2074,45 @@ class SemiDynamicListItem
    _parent=null;
 }
 
+class SemiDynamicFormItem extends SemiDynamicListItem
+{
+   //This class implements a form-specific features.
+   // Use this class with the class SemiDynamicForm.
+   constructor(node_,params_,parent_,data_)
+   {
+      super(node_,params_,parent_,data_);
+      
+      //Get all form inputs within this item:
+      if (this._node)
+         this._inpList=new InputsList(this._node,params_?.inputsListParams??null);
+   }
+   
+   //public props
+   get rowIndex()
+   {
+      //Get data row ordinal index. See InputsList.rowIndex.
+      return this._inpList.rowIndex;
+   }
+   set rowIndex(newVal_)
+   {
+      //Set data row ordinal index. See InputsList.rowIndex.
+      this._inpList.rowIndex=newVal_;
+   }
+   
+   //private props
+   _inpList=null; //Instance of InputsList.
+}
+
 class SemiDynamicList extends SemiDynamicListItem
 {
-   //Manager of the dynamic DOM lists. It can work with lists having initial content, statically created at the server side.
-   // Typical applications are: dynamic loading of the additional list items as pagination alternative, dynamic [re]loading or managing of the list items, managing of the t-graphs like a menus.
+   //Manager of the DOM element lists, that are created statically on the server side and then should be managed by JS.
    //Constructor arguments:
-   // node_ - the parentNode of the list items. (It's required to be a direct parent of the item nodes.)
-   // params_ - object, initialization parameters:
-   //    itemNodePrototype - HTMLElement that will serve as prototype for creating of the new list items.
-   //       It may be selected from outside of this list's node or created dynamically. Also it may be a predefined pointer to the proto node in this list, but this is hacky, unnecessary and discouraged.
-   //       This option is very useful if this class is used to manage a trees (e.g. menus).
-   //    protoClassName - the special class to mark the special item node, that will be an items prototype. This parameter will be used if the itemNodePrototype isn't set.
-   //       NOTE: The item node, having the protoClassName shouldn't expose any data because it will be removed from the list while initialization.
-   //       NOTE: If there are neither itemNodePrototype nor special proto node in the list, then normal list item will be cloned in their stead. But if there will be no normal items too, then it'll be a critical error.
-   //       NOTE: Special proto node must be found after the prefix nodes and before the suffix ones (see params excludeBefore and excludeAfter).
+   // listNode_ - the DOM node that is a direct parent of the list items.
+   // params_ - object with initialization parameters:
+   //    itemNodePrototype - the DOM node that will serve as prototype of the new list nodes. But there are two another ways to obtain node prototype: 
+   //       one of the listNode_'s children that have special css class (see protoClassName) will be extracted from listNode_ and used as prototype.
+   //       If will be neither itemNodePrototype nor listNode_ child with protoClassName, then the first common item node will be cloned for the prototype. But this way may be used only for lists that are initially never may be empty.
+   //    protoClassName - the special css class that marks a node as the prototype. While creating of a new list item by cloning of the prototype, this css class is removing.
    //    excludeBefore - number of the prefix _listNode children that aren't a list items. It may be e.g. row[s] with table header that mightn't be placed outside the listNode_.
    //    excludeAfter - number of the postfix _listNode children.
    //       NOTE: non-element nodes (like text nodes and comments) aren't counted at all. Thus meaningful text nodes mightn't be placed inside the listNode_, but on the other hand whitespaces will makes no harm to the list operationing.
@@ -1877,46 +2125,40 @@ class SemiDynamicList extends SemiDynamicListItem
    // data_ - array of data for the list items.
    constructor(node_,params_,parent_,data_)
    {
-      try
+      super(node_,params_,parent_,data_);
+      
+      if (this._node&&params_)
       {
-         super(node_,params_,parent_,data_);
-         
          //Init params:
          this._Controller=params_.Controller;
          this._controllerParams=params_.controllerParams;
          this._idProp=params_.idProp??'id';
          
-         //Get the list node:
-         this._listNode=params_.listNode??(params_.listNodeSelector ? this._node.querySelector(params_.listNodeSelector) : this._node);
-         
          //Exclude elements that aren't elements of the list (e.g. table head row):
          var start=params_.excludeBefore??0;
-         var end=this._listNode.childElementCount-(params_.excludeAfter??0);
-         if (end<this._listNode.childElementCount)
-            this._appendixStart=this._listNode.children[end];
+         var end=this._node.childElementCount-(params_.excludeAfter??0);
+         if (end<this._node.childElementCount)
+            this._appendixStart=this._node.children[end];
          
-         //Get the node that serve as prototype for cloning of a new items:
+         //Get the pointer to the node that will be cloned while creating a new items:
          let protoClassName=params_.protoClassName??'proto';
-         this._itemNodePrototype=params_.itemNodePrototype??this._listNode.querySelector(':scope>.'+protoClassName)??this._listNode.children[start]?.cloneNode(true);  //Get item node proto: 1)from params_, 2)directly from the list (a special proto node), 3)by cloning of the normal list item.
-         if ((this._itemNodePrototype.parentNode==this._listNode)&&this._itemNodePrototype.classList.contains(protoClassName))   //If this._itemNodePrototype is a special proto node in THIS list,
-         {                                                                                                                       //
-            this._listNode.removeChild(this._itemNodePrototype);                                                                 // then remove it from the DOM, as there is no need to keep it there,
-            end--;                                                                                                               // and shift the index of the last list item (the proto node is required to be found after the prefix nodes and before the suffix ones).
+         if (this._node.children[start].classList.contains(protoClassName))      //If the list node [can] has no item nodes then it should contain a hidden element [with no actual data] that will be used for cloning.
+         {
+            this._itemNodePrototype=this._node.children[start];
+            this._node.removeChild(this._itemNodePrototype);                     // As the pointer to prototype node is stored in this._itemNodePrototype, there is no need to keep this node into th list.
+            end--;
+            this._itemNodePrototype.classList.remove(protoClassName);
          }
-         this._itemNodePrototype.classList.remove(protoClassName);   //Remove protoClassName. NOTE: If this._itemNodePrototype doesn't belong to this list, it WILL NOT be removed from the DOM and may become visible.
-                                                                     //                             This case is better to be handled externally: this is not the area of responsibility of this class to know anything about potential shared usage of the item node proto if it comes from params_.itemNodePrototype.
+         else
+            this._itemNodePrototype=this._node.children[start].cloneNode(true);  //If the list node [always] has some initial item nodes then one of them can become an item nodes prototype.
          
          //Init statically created item nodes
          for (var i=start;i<end;i++)
-            this._items.push(new this._Controller(this._listNode.children[i],this._controllerParams,this)); //Create new controller instance for the statically created node.
+            this._items.push(new this._Controller(this._node.children[i],this._controllerParams,this)); //Create new controller instance for the statically created node.
       
          //Update list with initial data:
          if (data_)
             this.data=data_;
-      }
-      catch (ex)
-      {
-         console.error(ex,this,node_,params_,parent_,data_);
       }
    }
    
@@ -1962,7 +2204,7 @@ class SemiDynamicList extends SemiDynamicListItem
    //private properties
    _listNode=null;           //Parent node of all the item nodes
    _itemNodePrototype=null;  //Prototype node itself.
-   _appendixStart=null;      //First extra node in this._listNode after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
+   _appendixStart=null;      //First extra node in this._node after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
    _Controller=null;         //Class of the item.
    _controllerParams=null;   //Parameters for the Controller constructor
    _items=[];                //Array of the items, represented by Controller instances.
@@ -1981,9 +2223,9 @@ class SemiDynamicList extends SemiDynamicListItem
       //Append a new item to list and allocate its node into container:
       this._items.push(item);
       if (this._appendixStart)
-         this._listNode.insertBefore(itemNode,this._appendixStart);  //This avail to use empty blocks after the actual items for layout alignment.
+         this._node.insertBefore(itemNode,this._appendixStart);  //This avail to use empty blocks after the actual items for layout alignment.
       else
-         this._listNode.appendChild(itemNode);
+         this._node.appendChild(itemNode);
       
       return item;
    }
@@ -1992,7 +2234,7 @@ class SemiDynamicList extends SemiDynamicListItem
    {
       //Update an existing item with id equal to itemData_.id or create a new one.
       
-      prop_??(prop_=this._idProp);
+      prop_??=this._idProp;
       
       let found=false;
       for (let item of this._items)
@@ -2014,7 +2256,7 @@ class SemiDynamicList extends SemiDynamicListItem
       let index=(what_ instanceof SemiDynamicListItem ? this._itemIndex(what_) : what_)
       let removed=this._items.splice(index,1)[0];
       if (removed)
-         this._listNode.removeChild(removed.node);
+         this._node.removeChild(removed.node);
    }
    
    removeBy(val_,prop_,single_)
@@ -2022,7 +2264,7 @@ class SemiDynamicList extends SemiDynamicListItem
       //Removes an item[s] by value of its/their data property. 
       //NOTE: Allows to remove multiple items.
       
-      prop_??(prop_=this._idProp);
+      prop_??=this._idProp;
       
       for (let i in this._items)
          if (this._items[i].data[prop_]==val_)
@@ -2038,7 +2280,7 @@ class SemiDynamicList extends SemiDynamicListItem
       //Remove all items from the list.
       
       for (var item of this._items)
-         this._listNode.removeChild(item.node);
+         this._node.removeChild(item.node);
       this._items=[];
    }
    
@@ -2063,6 +2305,31 @@ class SemiDynamicList extends SemiDynamicListItem
          }
       
       return index;
+   }
+}
+
+class SemiDynamicForm extends SemiDynamicList
+{
+   //This class designed to handle forms based on SemiDynamicList's principle.
+   // It maintains indexing of form inputs into its items in order. This required for inputs named like "prefix[row_index][col_name]", because they can't be left without explicit indexing like simple "field_name[]'.
+   //NOTE: Neither frontend, nor backednd are MUST NOT rely on the data rows indexes even it's not planned to remove items. For example may be a cases when inputs can be indexed not from 0.
+   
+   add(itemData_)
+   {
+      super.add(itemData_);
+      this._reindexItems();   //It's posible just to get row index of previous item and increment, but full reindex is more reliable because it's the same for both add() and remove() methods.
+   }
+   
+   remove(what_)
+   {
+      super.remove(what_);
+      this._reindexItems();
+   }
+   
+   _reindexItems()
+   {
+      for (let i in this._items)
+         this._items[i].rowIndex=i;
    }
 }
 
@@ -2102,7 +2369,7 @@ class AsyncList extends SemiDynamicList
    {
       var sender=this;
       if (this._currPage<this._pagesTotal)
-         reqServerGet(this._urlBase+(this._currPage+1),function(ans_){sender._onServerAns(ans_);},function(xhr_){sender._onServerFail(xhr_);});
+         reqServer(this._urlBase+(this._currPage+1),null,function(ans_){sender._onServerAns(ans_);},function(xhr_){sender._onServerFail(xhr_);},'GET');
    }
    
    //protected
@@ -2220,54 +2487,13 @@ function cancelEvent(e_)
 function mouseWheelOrt(e_)
 {
    //Returns scrolling direction of mouse wheel
+   //TODO: Legacy code, check the modern 'wheel' event, verify optional chaining.
    
-   var ort=0;
-   if (e_.deltaY)
-      ort=e_.deltaY;
-   else if (e_.wheelDelta)
-      ort=e_.wheelDelta;
-   else if (e_.detail)
-      ort=-e_.detail;
-   
+   var ort=e_.deltaY??e_.wheelDelta??-e_.detail??0;
    return (ort!=0) ? ort/Math.abs(ort) : 0; //ort of whell delta
 }
 
 //--------------------- XHR ----------------------//
-function reqServerGet(request_,success_callback_,fail_callback_)
-{
-   //Send request to server using GET
-   //TODO: OBSOLETE, DEPRECATED.
-   
-   reqServer(request_,null,success_callback_,fail_callback_,'GET');
-   console.log('Function reqServerGet() is obsolete and deprecated. Use reqServer instead.');
-   
-   //Old Code:
-   //var xhr=new XMLHttpRequest();
-   //xhr.addEventListener('load',function(e_){if(xhr.readyState === 4){if (xhr.status === 200)success_callback_(xhr.response); else fail_callback_(xhr);}});
-   //xhr.open('GET',request_);
-   //xhr.setRequestHeader('X-Requested-With','JSONHttpRequest');
-   //xhr.responseType='json';
-   //xhr.send();
-}
-function reqServerPost(url_,data_,success_callback_,fail_callback_)
-{
-   //Send data to server using POST
-   //TODO: OBSOLETE, DEPRECATED.
-   reqServer(url_,data_,success_callback_,fail_callback_);
-   console.log('Function reqServerPost() is obsolete and deprecated. Use reqServer instead.');
-   
-   //Old Code:
-   //var body=serializeUrlQuery(data_);
-   //
-   //var xhr=new XMLHttpRequest();
-   //xhr.addEventListener('load',function(e_){if(xhr.readyState === 4){if (xhr.status === 200)success_callback_(xhr.response); else fail_callback_(xhr);}});
-   //xhr.open('POST',url_);
-   //xhr.setRequestHeader('X-Requested-With','JSONHttpRequest');
-   //xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
-   //xhr.responseType='json';
-   //xhr.send(body);
-}
-
 function reqServer(url_,data_,success_callback_,fail_callback_,method_,enctype_,responseType_)
 {
    //Send a data to server using AJAX.
@@ -2278,6 +2504,8 @@ function reqServer(url_,data_,success_callback_,fail_callback_,method_,enctype_,
    // fail_callback_ - a callback function for the case if request will not be sent.
    // method_ - string, http request method.
    // enctype_ - string, type of data encoding. NOTE: if 'multipart/form-data', the data_ must be an instance of FormData.
+   // responseType_ - string, variants: ''|'text' - text in a DOMString object; 'json' - JS object, parsed from JSON data; 'document' - HTML or XML document; 'blob' - Blob object with binary data; 'arraybuffer' - ArrayBuffer containing binary data.
+   
    //Init parameters:
    url_=url_??'/'+document.location.pathname;
    method_=(method_??'POST').toUpperCase();
@@ -2336,9 +2564,6 @@ function ajaxSendForm(form_,success_callback_,fail_callback_)
    reqServer(form_.getAttribute('action'),reqData,success_callback_,fail_callback_,form_.method,form_.encoding);
 }
 
-
-
-
 //--------------------- Cookies ---------------------//
 function getCookie(name_)
 {
@@ -2353,11 +2578,10 @@ function setCookie(name_,val_,expires_,path_)
    //Set/remove cookie.
    //If val_=='' or expires_ ==-1 - coookie with name name_ will be removed.
    
-   expires_??(expires_=31);
-   path_??(path_='/');
+   path_??='/';
    
    var exp_date=new Date;
-   exp_date.setDate(exp_date.getDate() + (val_!='' ? expires_ : -1));
+   exp_date.setDate(exp_date.getDate() + ((val_==undefined)||(val_=='') ? -1 : expires_??31));  //Unset cookie if value is undefined, null or ''.
    
    document.cookie=name_+'='+val_+(path_!='' ? '; path='+path_ : '')+'; expires='+exp_date.toUTCString();
 }
@@ -2370,7 +2594,10 @@ function functionExists(func_)
 function arraySearch(val_,array_,callback_)
 {
    //Analog of the array_search() in PHP.
+   //TODO: Obsolete. Reason: can be easily replaced by Array.find() and Array.indexOf().
+   //      It's better to write a function which can find a "best match"
    
+   console.warn('function arraySearch() is obsolete. Replace it with Array.find() or Array.indexOf().');
    var res=null;
    
    if (callback_ instanceof Function)
@@ -2502,6 +2729,7 @@ function parseCompleteFloat(val_)
 {
    //Unlike standard parseFloat() this function returns NaN if number input was incomplete, i.e. a decimal point was left without any digits after.
    // Its useful for the "input" event listeners with correcting feedback: doing something like {var val=parseFloat(input.value); if(!isNaN(val)) input.value=val;} will makes the user unable to enter a decimal point.
+   //TODO: Seems this func is better to appear in the scientific.js.
    
    res=NaN;
    
@@ -2515,8 +2743,9 @@ function parseCompleteFloat(val_)
 
 function mUnit(size_)
 {
-   //Returns measuring unit from the single linear dimension value in CSS format.
+   //Returns measurement unit from the single linear dimension value in CSS format.
    //NOTE: Tolerant to leading and trailing spaces.
+   //TODO: To avoid the ambiguation with class PhisicalQuantity from scientific.js, seems better to rename this func to cssUnit.
    
    var matches=/^\s*-?\d*\.?\d*(em|%|px|vw|vh)\s*$/i.exec(size_);
    return matches ? matches[1].toLowerCase() : '';
@@ -2524,6 +2753,7 @@ function mUnit(size_)
 
 function toPixels(size_,context_)
 {
+   //TODO: This func may be transformed to something like PhisicalQuantity from scientific.js
    var res=null;
    
    var val=parseFloat(size_);
@@ -2600,7 +2830,7 @@ function getTransitionDuration(element_,durIndex_)
    
    let targetDur=0;
    
-   durIndex_=durIndex_??-1;
+   durIndex_??=-1;
    
    let style=window.getComputedStyle(element_);
    let trDurations=style.transitionDuration?.split(',');
@@ -2639,6 +2869,7 @@ function clone(obj_)
 {
    //Clone make a deep clone of the object or array.
    //NOTE: Use the spread syntax if the cloning shouldn't be deep.
+   //TODO: Revision required: Rewrite using the spread syntax recursively.
    
    var res=null;
    
@@ -2664,6 +2895,7 @@ function cloneOverriden(default_,actual_,strict_)
 {
    //Recursively clone default_, overriding it with actual_.
    //NOTE: this function is similar to the the php's array_merge(default_,actual_) used for the associative arrays.
+   //TODO: Revision required: Rewrite using the spread syntax recursively.
    
    let res=null;
    
@@ -2707,36 +2939,12 @@ function cloneOverriden(default_,actual_,strict_)
 function extend(Child_,Parent_)
 {
    //WARNING: this function is obsolete and deprecated.
-   console.log('Function extend() is obsolete and deprecated. Replace objects that using it with classes.');
-   //This function makes correct inheritance relations between Parent_ constructor function and Child_ constructor function.
-   //Example of use:
-   //function ParentClass(){/*properties and methods*/}     //declare parent constructor
-   //func ChildClass(){/*extended properties and methods*/} //declare child constructor
-   //extend(ChildClass,ParentClass);                        //make ParentClass a parent of ChildClass
-   //var child=new ChildClass();                            //create ChildClass instance
-   //(child instanceof ChildClass)==true;                   //-inheritance chain correctly works for multiply nesting
-   //(child instanceof ParentClass)==true;                  //-nested properties are not sharing between different instances of child class
-   
-   Child_.prototype = new Parent_();
-   Child_.constructor.prototype = Child_;
-   Child_.super/*class*/ = Parent_.prototype;
+   console.error('Function extend() is obsolete and deprecated and now removed. Replace objects that using it with classes.');
 }
 
 function include(src_,once_)
 {
    //Attches JS file to the html document.
    //WARNING: deprecated. Since ECMAScript (ES6) use import('./my_script.js'); instead.
-   
-   var isDuplicate=false;
-   if (once_)
-      isDuplicate=(document.querySelector('script[src="'+src_+'"]')!==null);
-   
-   if (!isDuplicate)
-   {
-      var scriptNode=document.createElement('script');
-      scriptNode.src=src_;
-      document.head.appendChild(scriptNode);
-   }
-   
-   return !isDuplicate;
+   console.warn('Function include(src_,once_) is deprecated and removed. Use import() istead.');   
 }
