@@ -36,13 +36,14 @@ abstract class Shortcode
    protected $attr_id="";           //ID attribute to be attached  e.g. to the main shortcode layout element.
    protected $attr_data="";         //DATA-... attributes for some kinds of JS-controlled lists like a scrollers or slideshows.
    
+   private $stack=[];
+   
    public function __construct($name_="")
    {
       if ($name_!="")         //NOTE: For the single
          $this->name=$name_;
       
-      if ($this->identity_class===null)
-         $this->identity_class=$this->name;
+      $this->identity_class??=$this->name;
       
       //Register shortcode.
       add_shortcode($this->name,[$this,"do"]);
@@ -56,12 +57,18 @@ abstract class Shortcode
       if (!is_array($params_))
          $params_=[];
       
+      $this->push_state(); //Save shortcode params in case of recursive call. NOTE: When shortcode rendering a post content which contains a same shortcode it will be called recursively. However there is only one instance of each shortcode is created. Thus such recursive call can mess params for the previous level.
+      
       //Process params and get the data:
       $this->get_rendering_params($params_,$content_);
       $this->get_data($params_);
       
       //Render shortcode:
-      return $this->{reset($this->tpl_pipe)}();  //Run the top-level template.
+      $res=$this->{reset($this->tpl_pipe)}();  //Run the top-level template.
+      
+      $this->pop_state();  //Restore shortcode params after call.
+      
+      return $res;
    }
    
    protected function get_rendering_params($params_,$content_)
@@ -85,8 +92,8 @@ abstract class Shortcode
       
       //Get params with data for JS:
       foreach ($params_ as $key=>$val)
-         if (str_starts_with($key,"data_"))
-            $this->attr_data.=" ".strtoupper(str_replace("_","-",$key))."=\"".htmlspecialchars($val)."\"";      
+         if (str_starts_with($key,"data_")||str_starts_with($key,"data-"))                                  //TODO: WP supports dashes in shortcode attributes well, so this conversion may be removed.
+            $this->attr_data.=" ".strtoupper(str_replace("_","-",$key))."=\"".htmlspecialchars($val)."\"";  //    
    }
    
    protected function get_data($params_)
@@ -96,6 +103,37 @@ abstract class Shortcode
    }
    
    //abstract protected function default_tpl();   //Return rendered shortcode. NOTE: this method isn't declared bacause the descendant classes may has a different template keys.
+   
+   private function push_state()
+   {
+      //Saves shortcode state for the case of recursive call.
+      
+      $state=[];
+      foreach (get_object_vars($this) as $prop=>$val)
+         switch ($prop)
+         {
+            case "stack":
+            case "name":
+            case "identity_class":
+            {
+               break;
+            }
+            default:
+            {
+               $state[$prop]=$val;
+            }
+         }
+      array_push($this->stack,$state);
+   }
+   private function pop_state()
+   {
+      //Restores shortcode state for the case of recursive call.
+      
+      $state=array_pop($this->stack);
+      if ($state)
+         foreach ($state as $prop=>$val)
+            $this->{$prop}=$val;
+   }
 }
 
 abstract class DataListShortcode extends Shortcode

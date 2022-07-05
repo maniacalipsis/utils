@@ -205,9 +205,10 @@ class InputBool extends InputField
    
    public function render()
    {
-      $attrs=["type"=>"checkbox","name"=>$this->key,"checked"=>to_bool($this->value??$this->default)]+$this->attrs;
+      $attrs_hdden=["type"=>"hidden","name"=>$this->key,"value"=>$this->value??$this->default];
+      $attrs_ccheck=["type"=>"checkbox","checked"=>to_bool($this->value??$this->default),"onclick"=>"let inp=this.parentNode.querySelector('input[type=hidden]'); console.log(inp); if (inp) inp.value=(this.checked ? '1' : '0');"]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs_hdden)?>> <INPUT<?=serialize_element_attrs($attrs_ccheck)?>></LABEL>
       <?php
    }
 }
@@ -223,6 +224,35 @@ class InputJson extends InputHidden
    {
       //Outputs the value to any kind of document. 
       echo json_encode(json_decode($this->value),JSON_ENCODE_OPTIONS|JSON_PRETTY_PRINT);
+   }
+}
+
+class InputStruct extends InputJson
+{
+   public $limit=0;
+   public $struct=[];
+   
+   public function render()
+   {
+      $container_id="extra_media_".$this->key;
+      $list_params=[
+                      "dataInputSelector"=>"input[type=hidden][name=".$this->key."]",
+                      "listNodeSelector"=>".struct_list",
+                      "limit"=>$this->limit,
+                      "itemClass"=>"StructForm",
+                      "itemClassParams"=>$this->struct,
+                      "node"=>null
+                   ];
+      $struct_params_json=json_encode($this->struct,JSON_ENCODE_OPTIONS);
+      ?>
+      <DIV ID="<?=$container_id?>" CLASS="struct">
+         <?=parent::render()?>
+         <DIV CLASS="struct_list"></DIV>
+         <SCRIPT>
+            document.addEventListener('DOMContentLoaded',function(e_){let params={dataInputSelector:'input[type=hidden][name=<?=$this->key?>]',listNodeSelector:'.struct_list',limit:<?=(int)$this->limit?>,itemClass:StructForm,itemClassParams:<?=$struct_params_json?>,node:document.getElementById('<?=$container_id?>')}; new StructList(params);});
+         </SCRIPT>
+      </DIV>
+      <?php
    }
 }
 

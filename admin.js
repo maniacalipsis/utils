@@ -1,4 +1,48 @@
 //Media setter ------------------------------------------------------------------------------------------------------
+class StructList extends DynamicForm
+{
+   //A list of the data structures.
+   
+   constructor(params_)
+   {
+//       try
+//       {
+      super(null,params_);
+      console.log('After super: ',this);
+      this._data_input=params_.dataInput??this.node.querySelector(params_.dataInputSelector);
+      this._data_input.form?.addEventListener('submit',()=>{this.updateSourceInput();});
+         //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
+         if (this._data_input.value)
+            this.data=JSON.parse(this._data_input.value);
+//       }
+//       catch (ex)
+//       {
+//          console.error('StructList.constructor suffers error:',ex,' This:',this,' Params:',params_);
+//       }
+//       finally
+//       {
+         //this.add(); //+ one empty row.
+//       }
+   }
+   
+   _data_input=null;      //The input which hold the media files list
+}
+
+class StructForm extends DynamicListItem
+{
+   //Form for the structured data input.
+   
+   _setupNode(params_)
+   {
+      let nodeStruct={tagName:'div',className:'item',childNodes:[]};
+      for (let key in params_)
+         nodeStruct.childNodes.push({tagName:'label',className:key,childNodes:[params_[key].label,{...params_[key].input,_collectAs:key}??{tagName:'input',type:'text',value:'',_collectAs:key}]});
+      nodeStruct.childNodes.push({tagName:'input',className:'close',type:'button',value:String.fromCharCode(9747),onclick:(e_)=>{this._parent?.remove?.(this);}});
+      
+      super._setupNode({nodeStruct:nodeStruct});
+   }
+}
+
 class MediaList
 {
    constructor(params_)
@@ -244,7 +288,7 @@ class MediaSelector
          inputStruct._collectAs=key;
          struct.childNodes.push({tagName:'label',className:key,childNodes:[this._params.options[key].label,inputStruct]});
       }
-      struct.childNodes.push({tagName:'input',className:'close',type:'button',value:'☓',onclick:(e_)=>{this._parent?.remove?.(this);}});
+      struct.childNodes.push({tagName:'input',className:'close',type:'button',value:String.fromCharCode(9747),onclick:(e_)=>{this._parent?.remove?.(this);}});
       
       this._node=buildNodes(struct,this._subNodes);
    }

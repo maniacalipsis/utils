@@ -13,7 +13,7 @@ namespace Utilities;
 class Feedback extends Shortcode
 {
    //Rendering
-   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","form_tpl"=>"default_form_tpl","form_open_tpl"=>"default_form_open_tpl","fields_tpl"=>"default_fields_tpl","form_submit_tpl"=>"default_form_submit_tpl","form_close_tpl"=>"default_form_close_tpl"];
+   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","header_tpl"=>"default_header_tpl","form_tpl"=>"default_form_tpl","form_open_tpl"=>"default_form_open_tpl","fields_tpl"=>"default_fields_tpl","form_submit_tpl"=>"default_form_submit_tpl","form_close_tpl"=>"default_form_close_tpl"];
    protected $method="post";
    protected $enctype="application/x-www-form-urlencoded";
    //Data-related properties:
@@ -21,7 +21,10 @@ class Feedback extends Shortcode
    protected $response=[]; //
    protected $errors=[];   //List of messages about any kind of errors interrupted normal form processing.
    //Rendering params, that can be defined only at the backend:
-   public $form_class="";
+   public $h_level=3;      //Level of the form header.
+   public $header=null;    //Form header.
+   public $form_class="";  //Form class attribute.
+   public $default_h_level=3;
    
    public function __construct($name_="")
    {
@@ -44,6 +47,8 @@ class Feedback extends Shortcode
       //Process the rendering params.
       parent::get_rendering_params($params_,$content_);
       
+      $this->header=$params_["header"]??null;
+      $this->h_level=$params_["h_level"]??$this->default_h_level;
       $this->form_class=$params_["form_class"]??$this->form_class;
    }
    
@@ -78,6 +83,7 @@ class Feedback extends Shortcode
       ?>
       <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->custom_class?>">
          <?php
+            echo $this->{$this->tpl_pipe["header_tpl"]}();
             echo $this->{$this->tpl_pipe["form_open_tpl"]}();
             echo $this->{$this->tpl_pipe["fields_tpl"]}();
             echo $this->{$this->tpl_pipe["form_submit_tpl"]}();
@@ -86,6 +92,12 @@ class Feedback extends Shortcode
       </DIV>
       <?php
       return ob_get_clean();
+   }
+   
+   protected function default_header_tpl()
+   {
+      dumpf($this->header,$this->h_level);
+      return ($this->header!==null ? "         <H".$this->h_level.">".$this->header."</H".$this->h_level.">\n" : "");
    }
    
    protected function default_form_open_tpl()

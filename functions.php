@@ -208,7 +208,7 @@ function serialize_element_attrs(array|string|null $attrs_=NULL)
             if (is_bool($val))   //Valid ONLY for the boolean attributes: autofocus, allowfullscreen, checked, disabled, formnovalidate, hidden, multiple, readonly, required, selected.
             {
                if ($val)
-                  $res.=strtoupper($name);
+                  $res.=" ".strtoupper($name);
             }
             else
                $res.=" ".strtoupper($name)."=\"".htmlspecialchars(str_replace("\n"," ",$val),ENT_COMPAT|ENT_HTML5)."\"";

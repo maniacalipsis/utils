@@ -225,7 +225,7 @@ function switch_val(form_name_,input_name_,val1_,val2_,case_sensitive_)  //assig
 
 function forceKbLayout(e_,dest_)  //convert entering characters to target layout
 {
-   //TODO: Seems shold be moved to separate library. Reason: rarely used.
+   //TODO: Seems should be moved to separate library. Reason: rarely used.
    //console.log(e_);
    var char=e_.charCode; 
    char=String.fromCharCode(char);
@@ -467,11 +467,11 @@ class Scroller
                this._buttons.right=buttons[i];
          }
          
-         //content container that scrolls into scroling area
+         //content container that scrolls into scroling area:
          this._content=this._root.querySelector('.content');
          this.recalcContentSize();
                   
-         //Attach event handlers
+         //Attach event handlers:
          for (var i=0;i<this._handle.length;i++)
          {
             switch (this._handle[i])
@@ -505,6 +505,9 @@ class Scroller
             }
          }
          
+         document.addEventListener('readystatechange',(e_)=>{this.recalcContentSize();}); //After DOMContentLoaded, browser may still load other resources and re-render page.
+         window.addEventListener('resize',(e_)=>{this.recalcContentSize();});             //Content size may depends on viewport size.
+         
          //Start autoscrolling timer (if the interval>0):
          this.resume();
       }
@@ -525,14 +528,40 @@ class Scroller
       }
    }
    
+   get contentWidth()
+   {
+      //Width of the content block. See this.recalcContentSize().
+      return this._contentWidth;
+   }
+   
+   get scrollLength()
+   {
+      //Maximum scrolling distance.
+      return Math.max(0,this._contentWidth-this._area.clientWidth);
+   }
+   
+   get isAtLeftEnd()
+   {
+      //If scrolled to the very begining.
+      return (this._scrollPos<=this.treshold);
+   }
+   
+   get isAtRightEnd()
+   {
+      //If scrolled to the very end.
+      return (this.scrollLength-this._scrollPos<=this.treshold);
+   }
+   
    //private props
    _root=null;      //root node.
    _area=null;      //scrolling area node.
    _content=null;   //content container node.
+   _contentWidth=0; //Width of content container node in pixels. NOTE: must be in sync with actual content width, see this.recalcContentSize().
+   _scrollPos=0;    //Current scrolling offset in pixels.
    _buttons={left:null,right:null};   //nodes of left and right buttons.
    _handle=['click','wheel','touch']; //default handled events. Full list: 'click' - clicking on button nodes; 'wheel' - mouse wheel scrolling; 'touch' - gragging by touch input device; 'drag' - like touch, but by main mouse button; 'middlebtn' - like touch, but by the middle mouse button.
-   _interval=0;
-   _intervalID=null;
+   _interval=0;      //Period of autoscrolling iterations.
+   _intervalID=null; //Autoscrolling timer ID.
    
    //public methods
    scroll(ort_)
@@ -543,29 +572,26 @@ class Scroller
          this.scrollBy((ort_*parseFloat(this.speed))+mUnit(this.speed));
    }
    
-   scrollBy(deltaX_,from_start_)
+   scrollBy(deltaX_,absolute_)
    {
       //Scroll on specified amount of pixels or percents.
       
       let offset=toPixels(deltaX_,{subj:this._content,axis:'x'});
-      //console.log('scroll by ',offset,'px (computed from ',deltaX_,') at ',this._root);
-      let conStyle=window.getComputedStyle(this._content);
-      let oldPos=(from_start_ ? 0 : -parseFloat(conStyle.marginLeft));
-      let maxPos=Math.max(0,parseFloat(conStyle.width)-this._area.clientWidth);
-      let pos=oldPos+offset;
+      let newPos=(absolute_ ? offset : this._scrollPos+offset);
       
       if (this.cycled)
       {
          //Handle position out of range cases:
-         if (pos<0)
-            pos=oldPos>0 ? 0 : maxPos; //Step to beginning, then turn to the end.
-         else if (pos>maxPos)
-            pos=oldPos<maxPos ? maxPos : 0;  //Step to the end, then return to beginning.
+         if (newPos<0)
+            newPos=this._scrollPos>0 ? 0 : this.scrollLength; //Step to beginning, then turn to the end.
+         else if (newPos>this.scrollLength)
+            newPos=this._scrollPos<this.scrollLength ? this.scrollLength : 0;  //Step to the end, then return to beginning.
       }
       else
-         pos=Math.min(Math.max(0,pos),maxPos);
+         newPos=Math.min(Math.max(0,newPos),this.scrollLength);
       
-      this._content.style.marginLeft=(-pos)+'px';
+      this._scrollPos=newPos;
+      this._content.style.marginLeft=(-this._scrollPos)+'px';
       this.updateButtons();
    }
    
@@ -614,32 +640,20 @@ class Scroller
       //TODO: in future, this method should calculate elements' sizes by the scrolling axis.
       
       let style=window.getComputedStyle(this._content);
-      let w=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight);
+      this._contentWidth=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight);
       for (let child of this._content.children)
-         w+=this._calcItemPlaceWidth(child);
-      this._content.style.width=w+'px';
+         this._contentWidth+=this._calcItemPlaceWidth(child);
+      this._content.style.width=this._contentWidth+'px';
       
       this.updateButtons();
+      this.onRecalcContentSize?.(this); //User-defined callback.
    }
    
    updateButtons()
    {
-      let conStyle=window.getComputedStyle(this._content);
+      this._buttons.left?.classList.toggle('disabled',this.isAtLeftEnd);
       
-      if (this._buttons.left)
-      {
-         if (-parseFloat(conStyle.marginLeft)<=this.treshold)
-            this._buttons.left.classList.add('disabled');
-         else
-            this._buttons.left.classList.remove('disabled');
-      }
-      if (this._buttons.right)
-      {
-         if ((parseFloat(conStyle.width)+parseFloat(conStyle.marginLeft)-this._area.clientWidth)<=this.treshold)
-            this._buttons.right.classList.add('disabled');
-         else
-            this._buttons.right.classList.remove('disabled');
-      }
+      this._buttons.right?.classList.toggle('disabled',this.isAtRightEnd);
    }
    
    //private methods
@@ -1570,9 +1584,9 @@ function initRangeBars(selector_,params_)
 //------- Inputs List -------//
 class InputsList
 {
-   //This class allows to collect input elements (except buttons) from container_ to access them by keys and manipulate.
+   //This class allows to collect input fields (except buttons) from container_ to access them by keys and manipulate.
    //Parameters:
-   // selector - CSS-selector to find inputs.
+   // selector - CSS-selector to find input fields. Optional. NOTE: The default selector doesn't takes into account a nested containers. If you need so, write a custom selector that will do.
    // regExp - RegExp to match a key parts of input's name: a row and a key.
    // matchIndexes - Indexes of the name key parts in regExp matches. Format: {row:<index>,key:<index>}.
    // replacement - A string for replaceing of the input's name key parts.
@@ -2017,46 +2031,34 @@ function dialogPopupStruct(link_,caption_,ok_btn_value_,ok_action_,cancel_btn_va
    return res;
 }
 
-function parsePhones(phonesStr_,glue_)
-{
-   //The buildNodes()-ready phone numbers parser.
-   
-   let res=[];
-   
-   glue_??=',';
-   let phones=phonesStr_?.split(glue_)
-   for (let phone of phones)
-   {
-      res.push({tagName:'a',
-                href:'tel:'+phone.trim().replace(/^8/,'+7').replace(/доб(авочный)?|ext(ension|ended)?/i,',').replace(/[^0-9+,.]/,''),
-                textContent:phone.trim()});
-   }
-   
-   return res;
-}
-
 //------- Dynamic DOM controller -------//
-class SemiDynamicListItem
+class DynamicListItem
 {
-   //Interface for classes that controls behavior of the DOM nodes into SemiDynamicList container.
+   //Interface for classes that controls behavior of the DOM nodes into DynamicList container.
+   //Constructor arguments:
+   // parent_ - parent instance of DynamicList, which allows to build a trees.
+   // params_ - object, initialization parameters.
+   // data_ - array of initial data
    
-   constructor(node_,params_,parent_,data_)
+   constructor(parent_,params_,data_)
    {
       //Abstract.
       //Arguments:
-      // node_ - item DOM node that should taken under control of the descendant of this class. Mandatory.
+      // parent_ - parent DynamicList instance. Optional. NOTE: as DynamicList implements DynamicListItem it allows to create a tree structure of such lists.
       // params_ - any parameters that an implementation of this interface may need. Optional.
-      // parent_ - parent SemiDynamicList instance. Optional. NOTE: as SemiDynamicList implements SemiDynamicListItem it allows to create a tree structure of such lists.
       // data_ - mixed, initial data. Typically an object or an array. Optional.
       
-      this._node=node_;
       this._parent=parent_;
+      this._setupNode(params_);
+      console.log('DynamicListItem goes to set data.',this,data_);
+      if (data_)           //Overwrite item's data with the data_ argument. If data_ isn't defined, the initial item's data should remain.
+         this.data=data_;  //
    }
    
    //public properties
    get node()
    {
-      //Readonly. This property is required by SemiDynamicList to access the list item's node.
+      //Readonly. This property is required by DynamicList to access the list item's node.
       return this._node;
    }
    
@@ -2070,22 +2072,23 @@ class SemiDynamicListItem
    }
    
    //private properties
-   _node=null;
    _parent=null;
+   _node=null;
+   _insidesCollection={}; //This property is dedicated for dynamic this._node creation. See this._setupNode() and function buildNodes() for details.
+   
+   //private methods
+   _setupNode(params_)
+   {
+      //Initializes list item's DOM node.
+      //NOTE: params_.node may be set by DynamicList in semidynamic mode which is triggered on if the DynamicList founds a statically created item nodes.
+      this._node=params_.node??buildNodes(params_.nodeStruct,this._insidesCollection); //Attach to statically created DOM node or build a new one dynamically.
+   }
 }
 
-class SemiDynamicFormItem extends SemiDynamicListItem
+class DynamicFormItem extends DynamicListItem
 {
    //This class implements a form-specific features.
-   // Use this class with the class SemiDynamicForm.
-   constructor(node_,params_,parent_,data_)
-   {
-      super(node_,params_,parent_,data_);
-      
-      //Get all form inputs within this item:
-      if (this._node)
-         this._inpList=new InputsList(this._node,params_?.inputsListParams??null);
-   }
+   // Use this class with the class DynamicForm.
    
    //public props
    get rowIndex()
@@ -2101,68 +2104,108 @@ class SemiDynamicFormItem extends SemiDynamicListItem
    
    //private props
    _inpList=null; //Instance of InputsList.
+   
+   //private methods
+   _setupNode(params_)
+   {
+      //Initializes list item's DOM node.
+      super._setupNode(params_);
+      let inputsListClass=params_.inputsListClass??InputsList;
+      this._inpList=new inputsListClass(this._node,params_?.inputsListParams??null); //Get all form inputs within this item. NOTE: Pay attention that the inputsListClass may also grab input fields from the nested items.
+   }
 }
 
-class SemiDynamicList extends SemiDynamicListItem
+class DynamicList extends DynamicListItem
 {
-   //Manager of the DOM element lists, that are created statically on the server side and then should be managed by JS.
+   //Manager of the dynamic lists.
+   // Its works with statically and dynamically initialized lists and trees.
    //Constructor arguments:
-   // listNode_ - the DOM node that is a direct parent of the list items.
-   // params_ - object with initialization parameters:
-   //    itemNodePrototype - the DOM node that will serve as prototype of the new list nodes. But there are two another ways to obtain node prototype: 
-   //       one of the listNode_'s children that have special css class (see protoClassName) will be extracted from listNode_ and used as prototype.
-   //       If will be neither itemNodePrototype nor listNode_ child with protoClassName, then the first common item node will be cloned for the prototype. But this way may be used only for lists that are initially never may be empty.
-   //    protoClassName - the special css class that marks a node as the prototype. While creating of a new list item by cloning of the prototype, this css class is removing.
-   //    excludeBefore - number of the prefix _listNode children that aren't a list items. It may be e.g. row[s] with table header that mightn't be placed outside the listNode_.
-   //    excludeAfter - number of the postfix _listNode children.
-   //       NOTE: non-element nodes (like text nodes and comments) aren't counted at all. Thus meaningful text nodes mightn't be placed inside the listNode_, but on the other hand whitespaces will makes no harm to the list operationing.
-   //    Controller - class (not an instance) that implements SemiDynamicListItem interface.
-   //       At the list initialization this class will be instantiated for the each child of the listNode_ except those which has a protoClassName or an excludingClassName in the classList.
-   //       While creating of a new item, Controller instantiated for the clone of the prototype node and then method update() is called with an actual data.
-   //       NOTE: As the SemiDynamicList extends SemiDynamicListItem, it may be used to build a hierarchical lists.
-   //    idProp - the default name of the item data's property which serves as unique identifier. Optional.
-   // parent_ - reserved for compatibility for the case if Controller inherits from SemiDynamicList.
-   // data_ - array of data for the list items.
-   constructor(node_,params_,parent_,data_)
+   // parent_ - parent instance of DynamicList, which allows to build a trees.
+   // params_ - object, initialization parameters.
+   // data_ - array of initial data.
+   //Parameters:
+   // First, see DynamicListItem parameters.
+   // params_.itemClass - JS Class of the list items. Has to implement the DynamicListItem. Mandatory.
+   // params_.itemClassParams - object, initialization parameters for the itemClass. Optional.
+   // params_.listNode - Container node for the items' nodes. Optional, may be altered with params_.listNodeSelector or this._node. See this._setupNode() at "Get the list items container node".
+   // params_.listNodeSelector - CSS-selector to get the list node from this.node.
+   //Semidynamic mode parameters: 
+   // params_.protoClassName - the special css class that marks a dedicated item node should be used as item's node prototype. Such node will be extracted from the list node and the protoClassName will be removed from its classList. Conditionally optional. See this._setupNode() at "Semidynamic mode initialization".
+   // params_.excludeBefore - number of the prefix _listNode children that aren't a list items. It may be e.g. row[s] with table header that mightn't be placed outside the node_.
+   // params_.excludeAfter - number of the postfix _listNode children.
+   //       NOTE: non-element nodes (like text nodes and comments) aren't counted at all. Thus meaningful text nodes mightn't be placed inside the node_, but on the other hand whitespaces will makes no harm to the list operationing.
+   // params_.idProp - the default name of the item's data property which serves as unique identifier. Optional.
+   
+   constructor(parent_,params_,data_)
    {
-      super(node_,params_,parent_,data_);
+      super(parent_,params_,data_);
+   }
+   
+   _setupNode(params_)
+   {
+      super._setupNode(params_);
+      this._itemClass=params_.itemClass;
+      this._itemClassParams=params_.itemClassParams??null;
+      this._idProp=params_.idProp??'id';
+      console.log('DynamicList._setupNode',this._itemClass,params_);
       
-      if (this._node&&params_)
+      //Get the list items container node:
+      if (params_.listNode)                                    //Directly defined in params.
+         this._listNode=params_.listNode;
+      else if (this._insidesCollection['listNode'])            //Get from inner elements collection, defined at dynamic _node creation. (See DynamicFormItem._setupNode().)
+         this._listNode=this._insidesCollection['listNode'];
+      else if (params_.listNodeSelector)                       //Get from this._node by CSS-selector.
+         this._listNode=this._node.querySelector(params_.listNodeSelector);
+      else                                                     //In a trivial cases, this._node and this._listNode is the same node. (E.g. in simple standalone lists).
+         this._listNode=this._node;
+      
+      //Init list:
+      // If the list is statically created on the backend, this._listNode can contain item nodes needs to be initialized with a DynamicListItem class.
+      // Also list may contain a non-item extra nodes.
+      
+      //Exclude elements that aren't a list items (e.g. table head row):
+      var first=params_.excludeBefore??0;
+      var last=this._listNode.childElementCount-1-(params_.excludeAfter??0);
+      if (last<(this._listNode.childElementCount-1))
+         this._appendixStart=this._listNode.children[last]; //A new list item nodes will be inserted before the first extra node (or to the list end).
+      
+      //Detect if the list is semidynamic:
+      this._isSemidynamic=(first<last);   //If this._listNode has initial (statically created) item nodes, it considered as semidynamic.
+      
+      //Semidynamic mode initialization:
+      //NOTE: Do not use DynamicListItem classes which relies on  In the semidynamic mode this case all new list items will be created from the prototype node, regardless to possible DynamicListItem expectations.
+      if (this._isSemidynamic)
       {
-         //Init params:
-         this._Controller=params_.Controller;
-         this._controllerParams=params_.controllerParams;
-         this._idProp=params_.idProp??'id';
-         
-         //Exclude elements that aren't elements of the list (e.g. table head row):
-         var start=params_.excludeBefore??0;
-         var end=this._node.childElementCount-(params_.excludeAfter??0);
-         if (end<this._node.childElementCount)
-            this._appendixStart=this._node.children[end];
-         
-         //Get the pointer to the node that will be cloned while creating a new items:
+         //Get a item's node prototype:
          let protoClassName=params_.protoClassName??'proto';
-         if (this._node.children[start].classList.contains(protoClassName))      //If the list node [can] has no item nodes then it should contain a hidden element [with no actual data] that will be used for cloning.
-         {
-            this._itemNodePrototype=this._node.children[start];
-            this._node.removeChild(this._itemNodePrototype);                     // As the pointer to prototype node is stored in this._itemNodePrototype, there is no need to keep this node into th list.
-            end--;
-            this._itemNodePrototype.classList.remove(protoClassName);
-         }
-         else
-            this._itemNodePrototype=this._node.children[start].cloneNode(true);  //If the list node [always] has some initial item nodes then one of them can become an item nodes prototype.
-         
-         //Init statically created item nodes
-         for (var i=start;i<end;i++)
-            this._items.push(new this._Controller(this._node.children[i],this._controllerParams,this)); //Create new controller instance for the statically created node.
+         if (this._listNode.children[first].classList.has(protoClassName))             //Check if the first node in the list is a dedicated prototype node. NOTE: If the list [can] initially has no payload item nodes the dedicated prototype node is required (except params_.protoNodeStruct is defined).
+         {                                                                             //If so, 
+            this._listNode.removeChild(this._itemNodePrototype);                       // remove it from list
+            last--;                                                                    //
+            this._itemNodePrototype.classList.remove(protoClassName);                  // and prepare for clonning.
+         }                                                                             //
+         else                                                                          //If  not so,
+            this._itemNodePrototype=this._listNode.children[first].cloneNode(true);    // clone a common list item node.
       
-         //Update list with initial data:
-         if (data_)
-            this.data=data_;
+         //Init statically created item nodes:
+         //NOTE: used _itemClass should support semidynamic initialization.
+         for (var i=first;i<=last;i++)
+            this._items.push(new this._itemClass(this,{...this._itemClassParams,node:this._listNode.children[i]})); //Create new DynamicListItem instance for the statically created item node.
       }
    }
    
+   //private properties
+//    _items=[];                 //Array of the items, represented by Controller instances.
+//    _listNode=null;            //Container node for the items' nodes.
+//    _appendixStart=null;       //First extra node in this._node after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
+//    _isSemidynamic=false;      //If the semidynamic mode detected. Needed mostly for diagnostical purposes.
+//    _itemNodePrototype=null;   //Prototype node for creating a new items. Set only if this._isSemidynamic is true.
+//    _itemClass=null;           //JS Class of the list items. Has to implement the DynamicListItem.
+//    _itemClassParams=null;     //Parameters for the _itemClass constructor.
+   
    //public props
+   get isSemidynamic() {return this._isSemidynamic;} //Needed mostly for diagnostical purposes.
+   
    get data()
    {
       //Collect all item's data into array.
@@ -2176,58 +2219,42 @@ class SemiDynamicList extends SemiDynamicListItem
    }
    set data(data_)
    {
-      //Update whole list with the new array of data.
+      //Replace whole list with the new data.
       
-      //First, update existing list items with entirely new data:
-      var i=0;
-      var end=Math.min(this._items.length,data_.length);
-      while (i<end)
-      {
-         this._items[i].data=data_[i];
-         i++;
-      }
-      
-      //If data_ is longer than the list, then append a new items:
-      while (i<data_.length)
-      {
-         this.add(data_[i]);
-         i++;
-      }
-      
-      //if data_ is shorter than the list, then remove extra items:
-      while (this._items.length>data_.length)
-         this.remove(i);
+      this.clear();
+      for (let itemData of data_)
+         this.add(itemData);
    }
    
    get length(){return this._items.length;}
    
-   //private properties
-   _listNode=null;           //Parent node of all the item nodes
-   _itemNodePrototype=null;  //Prototype node itself.
-   _appendixStart=null;      //First extra node in this._node after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
-   _Controller=null;         //Class of the item.
-   _controllerParams=null;   //Parameters for the Controller constructor
-   _items=[];                //Array of the items, represented by Controller instances.
-   
    //public methods
-   add(itemData_)
+   add(mixed_)
    {
-      //Append a new list item with the itemData_.
+      //Appends a new list item or item data.
       
-      let item=null;
+      let newItem=null;
       
-      //Create a new item node by cloning a prototype and a new item controller (symply "item") for it:
-      let itemNode=this._itemNodePrototype.cloneNode(true);
-      item=new this._Controller(itemNode,this._controllerParams,this,itemData_);
-      
-      //Append a new item to list and allocate its node into container:
-      this._items.push(item);
-      if (this._appendixStart)
-         this._node.insertBefore(itemNode,this._appendixStart);  //This avail to use empty blocks after the actual items for layout alignment.
+      if (mixed_ instanceof DynamicListItem)
+         newItem=mixed_;
+      else if (this._isSemidynamic)
+      {
+         let itemNode=this._itemNodePrototype.cloneNode(true);
+         newItem=new this._itemClass(this,{...this._itemClassParams,node:itemNode},mixed_);   //Treat mixed_ as item data.
+      }
       else
-         this._node.appendChild(itemNode);
+      {
+         console.log('DynamicList.add: ',this,mixed_);
+         newItem=new this._itemClass(this,this._itemClassParams,mixed_);   //Treat mixed_ as item data.
+      }
+      //Append a new item to list and allocate its node into container:
+      if (newItem)
+      {
+         this._items.push(newItem);
+         this._listNode.insertBefore(newItem.node,this._appendixStart);  //NOTE: If there are no extra (non list item) elements in the list container, i.e. _appendixStart is null, then insertBefore() will insert a new item to the end, as needed.
+      }
       
-      return item;
+      return newItem;
    }
    
    replaceBy(itemData_,prop_)
@@ -2248,12 +2275,12 @@ class SemiDynamicList extends SemiDynamicListItem
          this.add(itemData_);
    }
    
-   remove(what_)
+   remove(mixed_)
    {
       //Remove a single item by index or pointer.
       //It's a basic remove method also sutable for the cases when items has no IDs.
       
-      let index=(what_ instanceof SemiDynamicListItem ? this._itemIndex(what_) : what_)
+      let index=(mixed_ instanceof DynamicListItem ? this._itemIndex(mixed_) : mixed_)
       let removed=this._items.splice(index,1)[0];
       if (removed)
          this._node.removeChild(removed.node);
@@ -2284,12 +2311,6 @@ class SemiDynamicList extends SemiDynamicListItem
       this._items=[];
    }
    
-   flush()
-   {
-      console.warn('SemiDynamicList.flush() is deprecated alias of the clear().')
-      this.clear();
-   }
-   
    //private methods
    _itemIndex(item_)
    {
@@ -2308,21 +2329,25 @@ class SemiDynamicList extends SemiDynamicListItem
    }
 }
 
-class SemiDynamicForm extends SemiDynamicList
+class DynamicForm extends DynamicList
 {
-   //This class designed to handle forms based on SemiDynamicList's principle.
+   //This class designed to handle forms based on DynamicList's principle.
    // It maintains indexing of form inputs into its items in order. This required for inputs named like "prefix[row_index][col_name]", because they can't be left without explicit indexing like simple "field_name[]'.
    //NOTE: Neither frontend, nor backednd are MUST NOT rely on the data rows indexes even it's not planned to remove items. For example may be a cases when inputs can be indexed not from 0.
-   
-   add(itemData_)
+   constructor(parent_,params_,data_)
    {
-      super.add(itemData_);
+      super(parent_,params_,data_);
+   }
+   
+   add(mixed_)
+   {
+      super.add(mixed_);
       this._reindexItems();   //It's posible just to get row index of previous item and increment, but full reindex is more reliable because it's the same for both add() and remove() methods.
    }
    
-   remove(what_)
+   remove(mixed_)
    {
-      super.remove(what_);
+      super.remove(mixed_);
       this._reindexItems();
    }
    
@@ -2334,11 +2359,13 @@ class SemiDynamicForm extends SemiDynamicList
 }
 
 //------- Async lists loader -------//
-class AsyncList extends SemiDynamicList
+class AsyncList extends DynamicList
 {
-   constructor(listNode_,params_,parent_)
+   //Implements an asyncronous loading of list items from server.
+   
+   constructor(parent_,params_)
    {
-      super(listNode_,params_,parent_);
+      super(parent_,params_,null);
       
       //protected props
       this._btnNext=params_.btnNext||document.querySelector(params_.btnNextSelector||this._listNode.dataset.btnNextSelector);                      //Next page button.
@@ -2466,9 +2493,7 @@ function elementHorizontalScrollHandler(e_)
          e_.target.scrollLeft+=(delta.X);
          e_.target.scrollTop+=(delta.Y);
          
-         e_.preventDefault&&e_.preventDefault();
-         e_.stopPropagation&&e_.stopPropagation();
-         return false;
+         return cancelEvent(e_);
       }
    else
        return true;
@@ -2477,10 +2502,10 @@ function elementHorizontalScrollHandler(e_)
 //--------------------- Events handling ---------------------//
 function cancelEvent(e_)
 {
-   //This function just groups all actions, needed to completely cancel a DOM event
+   //A shorthand to completely cancel a DOM event
    
-   e_.preventDefault&&e_.preventDefault();
-   e_.stopPropagation&&e_.stopPropagation();
+   e_.preventDefault();
+   e_.stopPropagation();
    return false;
 }
 
@@ -2861,6 +2886,24 @@ function formatDate(format_,date_)
    res=res.replace('H',date_.getHours().toString().padStart(2,'0'));
    res=res.replace('i',date_.getMinutes().toString().padStart(2,'0'));
    res=res.replace('s',date_.getSeconds().toString().padStart(2,'0'));
+   
+   return res;
+}
+
+function parsePhones(phonesStr_,glue_)
+{
+   //The buildNodes()-ready phone numbers parser.
+   
+   let res=[];
+   
+   glue_??=',';
+   let phones=phonesStr_?.split(glue_)
+   for (let phone of phones)
+   {
+      res.push({tagName:'a',
+                href:'tel:'+phone.trim().replace(/^8/,'+7').replace(/доб(авочный)?|ext(ension|ended)?/i,',').replace(/[^0-9+,.]/,''),
+                textContent:phone.trim()});
+   }
    
    return res;
 }
