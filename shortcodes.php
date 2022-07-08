@@ -76,12 +76,7 @@ abstract class Shortcode
       //Process the rendering params.
       
       //Select the templates:
-      foreach ($this->tpl_pipe as $key=>$tpl_name)
-      {
-         $tpl_method_name=($params_[$key]??"default")."_".$key;
-         if (method_exists($this,$tpl_method_name))
-            $this->tpl_pipe[$key]=$tpl_method_name;
-      }
+      $this->setup_tpl_pipe($this->tpl_pipe,$params_);
       
       //Get customizations params:
       $this->custom_class=$params_["class"]??"";
@@ -103,6 +98,17 @@ abstract class Shortcode
    }
    
    //abstract protected function default_tpl();   //Return rendered shortcode. NOTE: this method isn't declared bacause the descendant classes may has a different template keys.
+   
+   protected function setup_tpl_pipe(&$tpl_pipe_,$params_)
+   {
+      //Assign templates to given $tpl_pipe_ from given $params_:
+      foreach ($tpl_pipe_ as $key=>$tpl_name)
+      {
+         $tpl_method_name=($params_[$key]??"default")."_".$key;
+         if (method_exists($this,$tpl_method_name))
+            $tpl_pipe_[$key]=$tpl_method_name;
+      }
+   }
    
    private function push_state()
    {
@@ -268,6 +274,16 @@ abstract class PostsPrefabShortcode extends DataListShortcode
    
    //Rendering params, that can be redefined just at the backend:
    public $item_class="post";
+   public $image_size=null;
+   public $default_image_size="full";
+   
+   protected function get_rendering_params($params_,$content_)
+   {
+      //Process the rendering params.
+      parent::get_rendering_params($params_,$content_);
+      
+      $this->image_size=$params_["image_size"]??$this->default_image_size;
+   }
    
    protected function prepare_filter($params_)
    {
@@ -317,12 +333,13 @@ abstract class PostsPrefabShortcode extends DataListShortcode
       return get_permalink($post_->ID);
    }
    
-   protected function get_image($post_,$size_="full")
+   protected function get_image($post_,$size_=null)
    {
       //Returns post's thumbnail src.
       //Helper function. 
+      //$size_ - [full|large|medium|thumbnail].
       
-      return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_));
+      return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_??$this->image_size));
    }
 }
 
@@ -331,7 +348,7 @@ class MapShortcode extends Shortcode
    public $name="map";
    public $key="map";
    protected $data="";  //JSON encoded data.
-   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","map_tpl"=>"default_map_tpl","baloon_tpl"=>"default_baloon_tpl"];  //Templates pipe.
+   protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","map_tpl"=>"default_map_tpl","balloon_tpl"=>"default_balloon_tpl"];  //Templates pipe.
    //Map parameters' defaults:
    public $default_map_id="ymap";
    public $default_map_zoom=16;
@@ -341,6 +358,9 @@ class MapShortcode extends Shortcode
    //Map parameters set by shortcode params:
    protected $map_id=null;
    protected $map_zoom=null;
+   //Mapa data source::
+   protected $map_data_meta=null;   //Name of user meta field which contains a JSON map data.
+   protected $default_map_data_meta="map_data";
    
    protected function get_rendering_params($params_,$content_)
    {
@@ -348,26 +368,76 @@ class MapShortcode extends Shortcode
       parent::get_rendering_params($params_,$content_);
       
       $this->map_id=$params_["map_id"]??$this->default_map_id;
-      $this->map_zoom=(int)($params_["zoom"]??$this->default_zoom);
+      $this->map_zoom=(int)($params_["zoom"]??$this->default_map_zoom);
+      
+      $this->map_data_meta=$params_["map_data_meta"]??$this->default_map_data_meta;
    }
    
    protected function get_data($params_)
    {
-      $this->data=get_option($this->key,"[]");
+      $this->data=json_decode(get_option($this->map_data_meta,"[]"),true);
+   }
+   
+   protected function default_wrap_tpl()
+   {
+      //The default template makes no wrapping.
+      
+      return $this->{$this->tpl_pipe["map_tpl"]}();  //Just pass and run the next template in the pipe.
    }
    
    protected function default_map_tpl()
    {
       //Render the simple list.
+      ob_start();
+      ?>
+      <DIV <?=$this->attr_id?> CLASS="map <?=$this->custom_class?>" <?=$attr_data?>><DIV CLASS="inner" ID="<?=$this->map_id?>"></DIV></DIV>
+      <?=$this->script_tpl()?>
+      <?php
+      return ob_get_clean();
+   }
+   
+   protected function section_map_tpl()
+   {
+      //Render the simple list.
+      ob_start();
+      ?>
+      <SECTION <?=$this->attr_id?> CLASS="map <?=$this->custom_class?>"><MAP CLASS="inner" ID="<?=$this->map_id?>"></MAP></SECTION>
+      <?=$this->script_tpl()?>
+      <?php
+      return ob_get_clean();
+   }
+   
+   protected function default_balloon_tpl($place_)
+   {
+      ob_start();
+      ?>
+      <H6><?=$place_["hint"]??""?></H6>
+      <P CLASS="address"><?=$place_["address"]??""?></P>
+      <P CLASS="coords"><?=$place_["lat_long"]??""?></P>
+      <?php
+      return ob_get_clean();
+   }
+   
+   protected function script_tpl()
+   {
+      //Prepare map data:
+      $data=[];
+      foreach ($this->data as $place)
+         if ($place["lat_long"]??null)
+         {
+            $place["lat_long"]=(is_array($place["lat_long"]) ? $place["lat_long"] : array_map("floatval",explode(",",$place["lat_long"])));
+            $place["balloon"]=addcslashes($place["balloon"]??$this->{$this->tpl_pipe["balloon_tpl"]}($place),"'\\");  //Use a predefined balloon contents or the template. Then, escape resulting plaintext or HTML for use as JS string value.
+            $data[]=$place;
+         }
+         //TODO: Report warning.
       
       ob_start();
       ?>
-      <DIV <?=$this->attr_id?> CLASS="map <?=$this->custom_class?>" <?=$attr_data?>><DIV CLASS="inner" ID="<?=$map_id?>"></DIV></DIV>
       <SCRIPT>
         function mapInitCallback()
         {
            //Source data:
-           let places=<?=$this->data?>;
+           let places=<?=json_encode($data,JSON_ENCODE_OPTIONS)?>;
            
            let mapId='<?=$this->map_id?>';
            let zoom=<?=$this->map_zoom?>;
@@ -378,7 +448,7 @@ class MapShortcode extends Shortcode
            //Create places:
            let yClusterer=new ymaps.Clusterer();
            for (let place of places)
-              yClusterer.add(new ymaps.Placemark(place.lat_long,{iconContent:place.text,hintContent:place.hint,balloonContent:place.baloon},{...placeOptions,preset:place.preset}));
+              yClusterer.add(new ymaps.Placemark(place.lat_long,{iconContent:place.text??'',hintContent:place.hint??'',balloonContent:place.balloon},{...placeOptions,preset:place.preset??'islands#redStretchyIcon'}));
            
            //Adjust view area:
            if (places.length>1)
@@ -389,11 +459,17 @@ class MapShortcode extends Shortcode
            //Create map and add the places on it:
            let yMap=new ymaps.Map(mapId,mapState,mapOptions);
            yMap.geoObjects.add(yClusterer);
+           //Bounds hotfix:
+           if (mapState.bounds)
+              window.setTimeout(()=>{yMap.setBounds(mapState.bounds);},1000);
+           
+           window.yMap=yMap;  //Debug.
         }
         ymaps.ready(mapInitCallback);
       </SCRIPT>
       <?php
       return ob_get_clean();
+      
    }
    
 }

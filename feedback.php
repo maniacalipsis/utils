@@ -16,6 +16,7 @@ class Feedback extends Shortcode
    protected $tpl_pipe=["wrap_tpl"=>"default_wrap_tpl","header_tpl"=>"default_header_tpl","form_tpl"=>"default_form_tpl","form_open_tpl"=>"default_form_open_tpl","fields_tpl"=>"default_fields_tpl","form_submit_tpl"=>"default_form_submit_tpl","form_close_tpl"=>"default_form_close_tpl"];
    protected $method="post";
    protected $enctype="application/x-www-form-urlencoded";
+   protected $email_tpl_pipe=["subject_tpl"=>"default_subject_tpl","email_tpl"=>"default_email_tpl"];
    //Data-related properties:
    protected $fields=[];   //Form input fields,
    protected $response=[]; //
@@ -25,6 +26,9 @@ class Feedback extends Shortcode
    public $header=null;    //Form header.
    public $form_class="";  //Form class attribute.
    public $default_h_level=3;
+   //Email params:
+   protected $recipients_meta=null; //Name of user meta field contains a recipient emails.
+   protected $default_recipients_meta="feedback_recipients";
    
    public function __construct($name_="")
    {
@@ -50,6 +54,10 @@ class Feedback extends Shortcode
       $this->header=$params_["header"]??null;
       $this->h_level=$params_["h_level"]??$this->default_h_level;
       $this->form_class=$params_["form_class"]??$this->form_class;
+      
+      $this->recipients_meta=$params_["recipients_meta"]??$this->default_recipients_meta;
+      
+      $this->setup_tpl_pipe($this->email_tpl_pipe,$params_);
    }
    
    public function on_init()
@@ -96,7 +104,6 @@ class Feedback extends Shortcode
    
    protected function default_header_tpl()
    {
-      dumpf($this->header,$this->h_level);
       return ($this->header!==null ? "         <H".$this->h_level.">".$this->header."</H".$this->h_level.">\n" : "");
    }
    
@@ -148,6 +155,40 @@ class Feedback extends Shortcode
             <DIV CLASS="result message"></DIV>
          
       <?php
+      return ob_get_clean();
+   }
+   
+   protected function default_subject_tpl()
+   {
+      return "Письмо с сайта ".$_SERVER["SERVER_NAME"];
+   }
+   
+   protected function plain_email_tpl($title_="")
+   {
+      $res="";
+      foreach ($this->fields as $field)
+         $res.=$field->title.": ".strip_tags($field->get_safe_value())."\n";
+      
+      return $res;
+   }
+   
+   protected function default_email_tpl($title_="")
+   {
+      ob_start();
+      ?><!DOCTYPE HTML>
+<HTML LANG="ru">
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
+<TITLE><?=$title_?></TITLE>
+</HEAD>
+   <BODY>
+      <TABLE>
+         <?php foreach($this->fields as $field): ?>
+         <TR><TH><?=$field->title?></TH><TD><?=$field->get_safe_value()?></TD></TR>
+         <?php endforeach; ?>
+      </TABLE>
+   </BODY>
+</HTML><?php
       return ob_get_clean();
    }
    
@@ -216,7 +257,20 @@ class Feedback extends Shortcode
    public function handle_request_payload()
    {
       //This method is called at the handle_request() when the form is validated.
-      //Do something useful here.
+      $recipients=get_option($this->recipients_meta,"");
+      if ($recipients)
+      {
+         $subj=$this->{$this->email_tpl_pipe["subject_tpl"]}();
+         $text=$this->{$this->email_tpl_pipe["email_tpl"]}($subj);
+         
+         $this->response["res"]=send_email($recipients,$subj,$text);
+         if ($this->response["res"])
+            $this->response["message"]="Письмо отправлено успешно.";
+         else
+            $this->errors[]="Не удалось отправить письмо: ошибка на сервере.";
+      }
+      else
+         $this->response["errors"][]="Не удалось отправить письмо: на сайте не настроены адреса получателей.";
    }
 }
 ?>
