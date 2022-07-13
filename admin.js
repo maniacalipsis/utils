@@ -5,41 +5,106 @@ class StructList extends DynamicForm
    
    constructor(params_)
    {
-//       try
-//       {
-      super(null,params_);
-      console.log('After super: ',this);
-      this._data_input=params_.dataInput??this.node.querySelector(params_.dataInputSelector);
-      this._data_input.form?.addEventListener('submit',()=>{this.updateSourceInput();});
-         //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
-         if (this._data_input.value)
-            this.data=JSON.parse(this._data_input.value);
-//       }
-//       catch (ex)
-//       {
-//          console.error('StructList.constructor suffers error:',ex,' This:',this,' Params:',params_);
-//       }
-//       finally
-//       {
-         //this.add(); //+ one empty row.
-//       }
+      try
+      {
+         super(null,params_);
+         
+         this._data_input=params_.dataInput??this.node.querySelector(params_.dataInputSelector);
+         this._data_input.form?.addEventListener('submit',()=>{this.updateSourceInput();});
+            //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
+            if (this._data_input.value)
+               this.data=JSON.parse(this._data_input.value);
+      }
+      catch (ex)
+      {
+         console.error('StructList.constructor suffers error:',ex,' This:',this,' Params:',params_);
+      }
+      finally
+      {
+         this.add(); //+ one empty row.
+      }
    }
    
    _data_input=null;      //The input which hold the media files list
+   
+   //public methods
+   updateSourceInput()
+   {
+      this._data_input.value=JSON.stringify(this.data);
+      this._data_input.dispatchEvent(new Event('change',{cancelable:true}));
+   }
 }
 
 class StructForm extends DynamicListItem
 {
    //Form for the structured data input.
    
-   _setupNode(params_)
+   constructor(parent_,params_)
    {
+      
       let nodeStruct={tagName:'div',className:'item',childNodes:[]};
       for (let key in params_)
-         nodeStruct.childNodes.push({tagName:'label',className:key,childNodes:[params_[key].label,{...params_[key].input,_collectAs:key}??{tagName:'input',type:'text',value:'',_collectAs:key}]});
+         nodeStruct.childNodes.push({
+                                       tagName:'label',
+                                       className:key,
+                                       childNodes:[
+                                                     params_[key].label??'',   //Input label (string or node struct), optional.
+                                                     (params_[key].input ? {...params_[key].input,_collectAs:key} : {tagName:'input',type:'text',value:params_[key].default??'',_collectAs:key})   //Input field (nodes truct), optional. Allow to define input field of custom type, the text input is default.
+                                                  ]
+                                     });
       nodeStruct.childNodes.push({tagName:'input',className:'close',type:'button',value:String.fromCharCode(9747),onclick:(e_)=>{this._parent?.remove?.(this);}});
       
-      super._setupNode({nodeStruct:nodeStruct});
+      super(parent_,{nodeStruct:nodeStruct});
+      
+      this._inputs=this._insidesCollection;
+   }
+   
+   _inputs=null;
+   
+   get data()
+   {
+      let res={};
+      for (let key in this._inputs)
+         switch(this._inputs[key].type)
+         {
+            case 'checkbox':
+            {
+               res[key]=this._inputs[key].checked;
+               break;
+            }
+            case 'radio':
+            {
+               console.warn('Radios are not supported by StructForm');
+               break;
+            }
+            default:
+            {
+               res[key]=this._inputs[key].value;
+            }
+         }
+      
+      return res;
+   }
+   set data(data_)
+   {
+      for (let key in this._inputs)
+         switch(this._inputs[key].type)
+         {
+            case 'checkbox':
+            {
+               this._inputs[key].checked=data_[key]??false;
+               break;
+            }
+            case 'radio':
+            {
+               console.warn('Radios are not supported by StructForm');
+               break;
+            }
+            default:
+            {
+               this._inputs[key].value=data_[key]??'';
+            }
+         }
    }
 }
 

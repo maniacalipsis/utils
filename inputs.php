@@ -266,7 +266,7 @@ class InputMedia extends InputJson
       $container_id="extra_media_".$this->key;
       $list_params=[
                       "inputSelector"=>"#$container_id input[type=hidden][name=".$this->key."]",
-                      "containerSelector"=>"#$container_id .media_list",
+                      "containerSelector"=>"#$container_id .struct_list.media",
                       "limit"=>$this->limit,
                       "MediaSelectorParams"=>$this->selector_params,
                    ];
@@ -274,7 +274,7 @@ class InputMedia extends InputJson
       ?>
       <DIV ID="<?=$container_id?>" CLASS="media">
          <?=parent::render()?>
-         <DIV CLASS="media_list"></DIV>
+         <DIV CLASS="struct_list media"></DIV>
          <SCRIPT>
             document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});
          </SCRIPT>

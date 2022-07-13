@@ -1582,7 +1582,7 @@ function initRangeBars(selector_,params_)
 }
 
 //------- Inputs List -------//
-class InputsList
+class InputFieldsList
 {
    //This class allows to collect input fields (except buttons) from container_ to access them by keys and manipulate.
    //Parameters:
@@ -1597,9 +1597,9 @@ class InputsList
    // {
    //    constructor(node_,row_,value_)
    //    {
-   //       this._inpList=new InputsList(node_);            //Instantiate with default params (will collect all inputs into the node_).
-   //       this._inpList.inputs['col_name'].value=value_;  //Access input by its key.
-   //       this._inpList.rowIndex=row_;                    //Set row index for all inputs.
+   //       this._inpFieldsList=new InputFieldsList(node_);            //Instantiate with default params (will collect all inputs into the node_).
+   //       this._inpFieldsList.inputs['col_name'].value=value_;  //Access input by its key.
+   //       this._inpFieldsList.rowIndex=row_;                    //Set row index for all inputs.
    //    }
    // }
    
@@ -1619,7 +1619,7 @@ class InputsList
          if (key)                                           //
             this.inputs[key]=input;                        // and store input to associative array.
          else
-            console.warn('InputsList: input\'s name doesn\'t match regExp',input,this._regExp);
+            console.warn('InputFieldsList: input\'s name doesn\'t match regExp',input,this._regExp);
       }
    }
    
@@ -2035,24 +2035,19 @@ function dialogPopupStruct(link_,caption_,ok_btn_value_,ok_action_,cancel_btn_va
 class DynamicListItem
 {
    //Interface for classes that controls behavior of the DOM nodes into DynamicList container.
-   //Constructor arguments:
-   // parent_ - parent instance of DynamicList, which allows to build a trees.
-   // params_ - object, initialization parameters.
-   // data_ - array of initial data
    
-   constructor(parent_,params_,data_)
+   constructor(parent_,params_)
    {
       //Abstract.
       //Arguments:
-      // parent_ - parent DynamicList instance. Optional. NOTE: as DynamicList implements DynamicListItem it allows to create a tree structure of such lists.
-      // params_ - any parameters that an implementation of this interface may need. Optional.
-      // data_ - mixed, initial data. Typically an object or an array. Optional.
+      // parent_ - parent instance of DynamicList, which allows to build a trees.
+      // params_ - object, initialization parameters.
       
       this._parent=parent_;
-      this._setupNode(params_);
-      console.log('DynamicListItem goes to set data.',this,data_);
-      if (data_)           //Overwrite item's data with the data_ argument. If data_ isn't defined, the initial item's data should remain.
-         this.data=data_;  //
+      
+      //Initialize list item's DOM node:
+      //NOTE: params_.node may be set by DynamicList in semidynamic mode which is triggered on if the DynamicList founds a statically created item nodes.
+      this._node=params_.node??buildNodes(params_.nodeStruct,this._insidesCollection); //Attach to statically created DOM node or build a new one dynamically.
    }
    
    //public properties
@@ -2065,24 +2060,18 @@ class DynamicListItem
    get data()
    {
       //Abstract. This getter may has no implementation if there is no need to return the data to the parent. E.g. if the item just displays something.
+      console.warn('Using of abstract getter DynamicListItem.data');
    }
    set data(data_)
    {
       //Abstract. Implementation should apply this new data_ to the instance.
+      console.warn('Using of abstract setter DynamicListItem.data');
    }
    
    //private properties
    _parent=null;
    _node=null;
    _insidesCollection={}; //This property is dedicated for dynamic this._node creation. See this._setupNode() and function buildNodes() for details.
-   
-   //private methods
-   _setupNode(params_)
-   {
-      //Initializes list item's DOM node.
-      //NOTE: params_.node may be set by DynamicList in semidynamic mode which is triggered on if the DynamicList founds a statically created item nodes.
-      this._node=params_.node??buildNodes(params_.nodeStruct,this._insidesCollection); //Attach to statically created DOM node or build a new one dynamically.
-   }
 }
 
 class DynamicFormItem extends DynamicListItem
@@ -2090,29 +2079,28 @@ class DynamicFormItem extends DynamicListItem
    //This class implements a form-specific features.
    // Use this class with the class DynamicForm.
    
+   constructor(parent_,params_)
+   {
+      super(parent_,params_);
+      
+      let inputsListClass=params_.inputsListClass??InputFieldsList;
+      this._inpFieldsList=new inputsListClass(this._node,params_?.inputsListParams??null); //Get all form inputs within this item. NOTE: Pay attention that the inputsListClass may also grab input fields from the nested items.
+   }
+   
    //public props
    get rowIndex()
    {
-      //Get data row ordinal index. See InputsList.rowIndex.
-      return this._inpList.rowIndex;
+      //Get data row ordinal index. See InputFieldsList.rowIndex.
+      return this._inpFieldsList.rowIndex;
    }
    set rowIndex(newVal_)
    {
-      //Set data row ordinal index. See InputsList.rowIndex.
-      this._inpList.rowIndex=newVal_;
+      //Set data row ordinal index. See InputFieldsList.rowIndex.
+      this._inpFieldsList.rowIndex=newVal_;
    }
    
    //private props
-   _inpList=null; //Instance of InputsList.
-   
-   //private methods
-   _setupNode(params_)
-   {
-      //Initializes list item's DOM node.
-      super._setupNode(params_);
-      let inputsListClass=params_.inputsListClass??InputsList;
-      this._inpList=new inputsListClass(this._node,params_?.inputsListParams??null); //Get all form inputs within this item. NOTE: Pay attention that the inputsListClass may also grab input fields from the nested items.
-   }
+   _inpFieldsList=null; //Instance of InputFieldsList.
 }
 
 class DynamicList extends DynamicListItem
@@ -2122,7 +2110,6 @@ class DynamicList extends DynamicListItem
    //Constructor arguments:
    // parent_ - parent instance of DynamicList, which allows to build a trees.
    // params_ - object, initialization parameters.
-   // data_ - array of initial data.
    //Parameters:
    // First, see DynamicListItem parameters.
    // params_.itemClass - JS Class of the list items. Has to implement the DynamicListItem. Mandatory.
@@ -2136,14 +2123,10 @@ class DynamicList extends DynamicListItem
    //       NOTE: non-element nodes (like text nodes and comments) aren't counted at all. Thus meaningful text nodes mightn't be placed inside the node_, but on the other hand whitespaces will makes no harm to the list operationing.
    // params_.idProp - the default name of the item's data property which serves as unique identifier. Optional.
    
-   constructor(parent_,params_,data_)
+   constructor(parent_,params_)
    {
-      super(parent_,params_,data_);
-   }
-   
-   _setupNode(params_)
-   {
-      super._setupNode(params_);
+      super(parent_,params_);
+      
       this._itemClass=params_.itemClass;
       this._itemClassParams=params_.itemClassParams??null;
       this._idProp=params_.idProp??'id';
@@ -2195,13 +2178,13 @@ class DynamicList extends DynamicListItem
    }
    
    //private properties
-//    _items=[];                 //Array of the items, represented by Controller instances.
-//    _listNode=null;            //Container node for the items' nodes.
-//    _appendixStart=null;       //First extra node in this._node after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
-//    _isSemidynamic=false;      //If the semidynamic mode detected. Needed mostly for diagnostical purposes.
-//    _itemNodePrototype=null;   //Prototype node for creating a new items. Set only if this._isSemidynamic is true.
-//    _itemClass=null;           //JS Class of the list items. Has to implement the DynamicListItem.
-//    _itemClassParams=null;     //Parameters for the _itemClass constructor.
+    _items=[];                 //Array of the items, represented by Controller instances.
+    _listNode=null;            //Container node for the items' nodes.
+    _appendixStart=null;       //First extra node in this._node after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
+    _isSemidynamic=false;      //If the semidynamic mode detected. Needed mostly for diagnostical purposes.
+    _itemNodePrototype=null;   //Prototype node for creating a new items. Set only if this._isSemidynamic is true.
+    _itemClass=null;           //JS Class of the list items. Has to implement the DynamicListItem.
+    _itemClassParams=null;     //Parameters for the _itemClass constructor.
    
    //public props
    get isSemidynamic() {return this._isSemidynamic;} //Needed mostly for diagnostical purposes.
@@ -2237,16 +2220,21 @@ class DynamicList extends DynamicListItem
       
       if (mixed_ instanceof DynamicListItem)
          newItem=mixed_;
-      else if (this._isSemidynamic)
-      {
-         let itemNode=this._itemNodePrototype.cloneNode(true);
-         newItem=new this._itemClass(this,{...this._itemClassParams,node:itemNode},mixed_);   //Treat mixed_ as item data.
-      }
       else
       {
-         console.log('DynamicList.add: ',this,mixed_);
-         newItem=new this._itemClass(this,this._itemClassParams,mixed_);   //Treat mixed_ as item data.
+         //Treat mixed_ as item data:
+         if (this._isSemidynamic)
+         {
+            let itemNode=this._itemNodePrototype.cloneNode(true);
+            newItem=new this._itemClass(this,{...this._itemClassParams,node:itemNode});
+         }
+         else
+            newItem=new this._itemClass(this,this._itemClassParams);
+         
+         if (mixed_!=null)
+            newItem.data=mixed_;
       }
+      
       //Append a new item to list and allocate its node into container:
       if (newItem)
       {
@@ -2283,7 +2271,7 @@ class DynamicList extends DynamicListItem
       let index=(mixed_ instanceof DynamicListItem ? this._itemIndex(mixed_) : mixed_)
       let removed=this._items.splice(index,1)[0];
       if (removed)
-         this._node.removeChild(removed.node);
+         this._listNode.removeChild(removed.node);
    }
    
    removeBy(val_,prop_,single_)
@@ -2307,7 +2295,7 @@ class DynamicList extends DynamicListItem
       //Remove all items from the list.
       
       for (var item of this._items)
-         this._node.removeChild(item.node);
+         this._listNode.removeChild(item.node);
       this._items=[];
    }
    
