@@ -59,76 +59,74 @@ function getElementOffset(element_,fromElement_)
 //------------------------------- Utilities for several common site elements ----------------------------------------//
 
 //------- Functions for customized input elements -------//
-function onWrappedInputFocusChange(e_)
+function decorateCheckbox(checkbox_)
 {
-   //Reflects a focusing of an input which is styled by a wrapping tag.
-   // Common targets for this function are customized checkboxes, radio buttons and selects.
+   //Decorate checkbox checked and disabled setters to make checkbox repainted when it changed by code:
+   {
+      let descr=Object.getOwnPropertyDescriptor(checkbox_.__proto__,'checked');
+      let orig_setter=descr.set;
+      descr.set=function (newVal_){orig_setter.call(this,newVal_); this.closest('label')?.classList.toggle('checked',this.checked);};
+      Object.defineProperty(checkbox_,'checked',descr);
+   }
+   {
+      let descr=Object.getOwnPropertyDescriptor(checkbox_.__proto__,'disabled');
+      let orig_setter=descr.set;
+      descr.set=function (newVal_){orig_setter.call(this,newVal_); this.closest('label')?.classList.toggle('disabled',this.disabled);};
+      Object.defineProperty(checkbox_,'disabled',descr);
+   }
    
-   e_.target.parentNode.classList.toggle('focused',document.activeElement==this);
+   //Also repaint on user input:
+   checkbox_.addEventListener('click',function(e_){this.closest('label')?.classList.toggle('checked',this.checked);});  //NOTE: click doesn't invoke the checkbox_.checked setter.
+   checkbox_.addEventListener('focus',function(e_){this.closest('label')?.classList.toggle('focused',document.activeElement==this);});
+   checkbox_.addEventListener('blur' ,function(e_){this.closest('label')?.classList.toggle('focused',document.activeElement==this);});
 }
 
-function checkboxRepaint()
-{
-   //Reflects changes of the customized checkbox state. See initCheckboxes() for details.
-   
-   this.parentNode.classList.toggle('checked',this.checked);
-   this.parentNode.classList.toggle('focused',document.activeElement==this);
-}
-
-function initCheckboxes(container_)
+function initCheckboxes(params_)
 {
    //Initializes all customized checkboxes into the given container_ or entire document.
    //Usage: 
-   // Wrap each checkbox with some tag and write some css to make it looks like a checkbox you want. The css for this tag should has rules for "checked" and "focused" classes to properly reflect the checkbox state.
-   // Also the checkbox should be wrapped by a label with css-class "checkbox" to be found with this initializer.
-   // Thus simpliest layout may be so: <LABEL><INPUT TYPE="checkbox"> some text</LABEL>
-   //  or if the label text can be huge: <LABEL><SPAN><INPUT TYPE="checkbox"></SPAN> some long multiline text</LABEL>
-   // If you need to control such checkbox by script, you may use checkbox.repaint() method, that assigned by this initializer.
+   // Wrap each checkbox with <LABEL> and write some css to make it looks like a checkbox you want.
    
-   var checkboxes=(container_??document).querySelectorAll('label.checkbox input[type=checkbox]');
-   for (var checkbox of checkboxes)
+   var checkboxes=(params_?.container??document).querySelectorAll((params_?.containerSelector ? params_.containerSelector+' ' : '')+(params_?.selector??'label.checkbox input[type=checkbox]'));
+   for (let checkbox of checkboxes)
    {
-      checkbox.repaint=checkboxRepaint;  //Add a function to repaint checkbox by scripts.
-      checkbox.addEventListener('click',checkboxRepaint);
-      checkbox.addEventListener('focus',onWrappedInputFocusChange);
-      checkbox.addEventListener('blur' ,onWrappedInputFocusChange);
-      
-      checkbox.repaint(); //Reflect initial state.
+      decorateCheckbox(checkbox);        //TODO: Find how to detect already decorated checkboxes.
+      checkbox.checked=checkbox.checked; //Reflect initial state.
    }
 }
 
-function radioRepaint(repaint_single_)
+function radioRepaint(initial_repaint_)
 {
    //Reflects changes of the customized radio button[s] state. See initRadios() for details.
    
-   if (repaint_single_)
+   if (initial_repaint_)
       this.parentNode.classList.toggle('checked',this.checked);   //Use while batch initialization.
    else
    {
       var coupled_radios=document.querySelectorAll('input[type=radio][name=\''+this.name+'\']');   //Select all radios with the same name as they are coupled together
-      for (var radio of coupled_radios)                                                            // but only the currently checked one receives a certain event.
+      for (let radio of coupled_radios)                                                            // but only the currently checked one receives a certain event.
          radio.parentNode.classList.toggle('checked',radio.checked);
    }
    
    this.parentNode.classList.toggle('focused',document.activeElement==this);
 }
 
-function initRadios(container_)
+function initRadios(params_)
 {
    //Initializes all customized radio buttons into the given container_ or entire document.
    //Usage:
    // Refer description of the initCheckboxes() as it's the same in an essence.
    // The only difference in that the radios with the same name are coupled but the automatically unchecking radios doesn't receive any event and thus they should be handled from the checked one.
    
-   var radios=(container_??document).querySelectorAll('.radio>input[type=radio]');
-   for (var radio of radios)
+   var radios=(params_?.container??document).querySelectorAll((params_?.containerSelector ? params_.containerSelector+' ' : '')+(params_?.selector??'.radio>input[type=radio]'));
+   for (let radio of radios)
    {
       radio.repaint=radioRepaint;
-      radio.addEventListener('click',radioRepaint);
-      radio.addEventListener('focus',onWrappedInputFocusChange);  //Unlike a click,change and input, 
-      radio.addEventListener('blur' ,onWrappedInputFocusChange);  // the focus and blur events are delivering as normal.
+      radio.addEventListener('click',(e_)=>{radio.repaint();});
+      //radio.addEventListener('focus',onWrappedInputFocusChange);  //Unlike a click,change and input, 
+      //radio.addEventListener('blur' ,onWrappedInputFocusChange);  // the focus and blur events are delivering as normal.
       
-      radio.repaint(true); //Reflect initial state. (Set repaint_single_ argument ony while an initialization.)
+      radio.repaint(true); //Reflect initial state. (Set initial_repaint_ argument ony while an initialization.)
    }
 }
 
@@ -144,16 +142,16 @@ function numericInputScroll(e_) //allows to change value of text input using a m
          
          if (isFinite(e_.target.value)) //if target.value is numeric, then inc or dec it.
          {
-            var new_val=Number(e_.target.value)+(ort*inc);
-            new_val.toPrecision(3);
+            var newVal=Number(e_.target.value)+(ort*inc);
+            newVal.toPrecision(3);
             
             if (max!==undefined)   //bound new value to limits
-               if (new_val>max)
-                  new_val=max;
-            if (new_val<min)
-               new_val=min;
+               if (newVal>max)
+                  newVal=max;
+            if (newVal<min)
+               newVal=min;
             
-            e_.target.value=new_val;         //assign new value
+            e_.target.value=newVal;         //assign new value
          }
          else
              e_.target.value=(ort>0) ? min : max||min;   //if target.value is not numeric, assign a numeric value.
@@ -280,14 +278,198 @@ function forceKbLayout(e_,dest_)  //convert entering characters to target layout
    return true;
 }
 
-function filterSelectOptions(selectInp_,attr_,val_)
+function decorateInputFieldVal(inpField_,propName_)
 {
+   //This is an almost decorator of the HTMLInputElements.
+   //It allows to uniformly access the fields value in a sae manner as it would be with form data on a server-side or with JSON data in the response.
+   
+   propName_??='valueAsMixed';
+   
+   let getter;
+   let setter;
+   
+   switch (inpField_.type)
+   {
+      case 'number':
+      {
+         getter=function (){return ((this.step??1)==1 ? parseInt(this.value) : parseFloat(this.value));};
+         setter=function (newVal_){this.value=((this.step??1)==1 ? parseInt(newVal_??0) : parseFloat(newVal_??0));};
+         inpField_.addEventListener('keypress',(e_)=>{if (['0','1','2','3','4','5','6','7','8','9','e','-','+','.',','].indexOf(e_.key)<0) {e_.key=''; return cancelEvent(e_);}});
+         break;
+      }
+      case 'checkbox':
+      {
+         getter=function (){return this.checked;};
+         setter=function (newVal_){this.checked=toBool(newVal_??false);};
+         break;
+      }
+      case 'select-multiple':
+      {
+         getter=function ()
+                {
+                   let res=[];
+                   for (let opt of this.options)
+                      if (opt.selected)
+                         res.push(opt.value);
+                   return res;
+                };
+         setter=function (newVal_)
+                {
+                   if (newVal_ instanceof Array)
+                      for (let opt of this.options)
+                         opt.selected=(newVal_.indexOf(opt.value)>=0);
+                   else
+                      this.value=newVal_??'';
+                };
+         break;
+      }
+      default:
+      {
+         getter=function (){return this.value;};
+         setter=function (newVal_){this.value=newVal_;};
+      }
+   }
+   
+   Object.defineProperty(inpField_,propName_,{configurable:true,enumerable:true,get:getter,set:setter});
+   
+   return inpField_;
+}
+
+class RadioGroup
+{
+   //This class allows to work with the group of radios as with a single input fueld.
+   
+   constructor(mixed_)
+   {
+      //NOTE: Don't forget that this.add() rejects the radios which names doesn't match the first one added.
+      
+      if (!(mixed_ instanceof Array))
+         mixed_=[mixed_];
+      
+      for (let radio of mixed_)
+         this.add(radio);
+   }
+   
+   //public props
+   get type()
+   {
+      return 'radiogroup'; //Return a synthetic type to make user don't mess this class with the radios themselves.
+   }
+   
+   get name()
+   {
+      return this._radios[0]?.name??null;
+   }
+   set name(newVal_)
+   {
+      for (let radio of this._radios)
+         radio.name=newVal_;
+      
+      this.on_rename?.();
+   }
+   
+   get value()
+   {
+      let res=null;
+      for (let radio of this._radios)
+         if (radio.checked)
+         {
+            res=radio.value;
+            break;
+         }
+      return res;
+   }
+   set value(newVal_)
+   {
+      for (let radio of this._radios)
+      {
+         radio.checked=(radio.value==newVal_);
+         radio.repaint?.();
+      }
+      
+      this.on_set_value?.(this.value);
+   }
+   
+   get disabled()
+   {
+      //Returns false if at least one radio is not disabled.
+      let res=true;
+      for (let radio of this._radios)
+         if (!radio.disabled)
+         {
+            res=false
+            break;
+         }
+      return res;
+   }
+   set disabled(newVal_)
+   {
+      for (let radio of this._radios)
+         radio.disabled=newVal_;
+      
+      this.on_set_disabled?.(this.disabled);
+   }
+   
+   get required(){return this._required; /*TODO: this is a draft.*/}
+   set required(newVal_){this._required=newVal_; /*TODO: this is a draft.*/}
+   
+   //private props
+   _radios=[];
+   _required=false;
+   
+   //public methods
+   add(radio_)
+   {
+      //NOTE: As the radios in the group must have exactly equal names, this method rejects the radios which names doesn't match the first one added.
+      
+      if (((radio_ instanceof HTMLInputElement)&&(radio_.type=='radio'))&&    //Type check, //TODO: test type check on <radio>
+          (this._radios.indexOf(radio_)<0)&&                                  // disallow duplicates,
+          ((this._radios.length==0)||(radio_.name==this.name)))               // same name check.
+      {
+         this._radios.push(radio_);
+         radio_.parentRadioGroup=this;
+         radio_.addEventListener('click',this._on_radio_click);
+      }
+   }
+   
+   remove(what_)
+   {
+      let indx=(typeof what_ == 'number' ? what_ : this._radios.indexOf(what_));
+      if (indx>-1)
+      {
+         let removed=this._radios.splice(indx,1)[0];
+         removed.removeEventListener('click',this._on_radio_click);
+         removed.parentRadioGroup=null;
+      }
+   }
+   
+   //private methods
+   _on_radio_click(e_)
+   {
+      e_.target.parentRadioGroup.on_set_value?.(e_.target.parentRadioGroup.value);
+   }
+}
+
+function filterSelectOptions(selectInp_,callback_,postprocess_)
+{
+   let enabledOpts=[];
+   let selectedOpts=[];
    for (let opt of selectInp_.options)
    {
-      opt.hidden=opt.disabled=(attr_===null ? opt.value!=val_ : opt.dataset[attr_]!=val_);   //Hide and disable unmatching options.
-      if (opt.disabled)        //Deselect disabled options.
-         opt.selected=false;   //
+      let matched=callback_(opt);
+      if (matched!==null)                    //If null, leave unchanged,
+         opt.hidden=opt.disabled=!matched;   // else hide and disable unmatching options.
+                                             //
+      if (opt.disabled)                      //
+         opt.selected=false;                 //Deselect disabled options.
+      else                                   //
+         enabledOpts.push(opt);              //Collect supplementary data for postprocess.
+                                             //
+      if (opt.selected)                      //
+         selectedOpts.push(opt);             //Collect supplementary data for postprocess.
    }
+   
+   postprocess_?.call(this,selectInp_,enabledOpts,selectedOpts);
 }
 
 //------- Cookie-based sorting controls -------//
@@ -334,9 +516,9 @@ class SortingController
          return this._sortings;
       }
    }
-   set sortings(new_val_)
+   set sortings(newVal_)
    {
-      this._sortings=new_val_;
+      this._sortings=newVal_;
       
       let cookieVal=(this._sortings&&(Object.keys(this._sortings).length) ? JSON.stringify(this._sortings) : '');  //If sortings is empty, the cookie will be unset.
       setCookie(this._cookieKey,cookieVal,31,this._cookiePath);
@@ -426,6 +608,7 @@ class Scroller
    //       data-handle - toggles an input events which scroller should handle. TODO: complete the docs and implementation of this feature.
    //       data-speed - mixed. Speed is distance which content block covers per iteration. It may be defined in px, em, vw, vh or %. The % are counted from the current area width. For other units conversion details see the function toPixels().
    //       data-cycled - boolean. If true the scrolling will be infinite, if false it will stop when the content end reaches the same end of the area.
+   //       data-interval - interval of autoscrolling iterations in msec.
    // The buttons are optional.
    
    //TODO: Revision required!
@@ -467,7 +650,7 @@ class Scroller
                this._buttons.right=buttons[i];
          }
          
-         //content container that scrolls into scroling area:
+         //content container that scrolls into scroling area
          this._content=this._root.querySelector('.content');
          this.recalcContentSize();
                   
@@ -505,9 +688,6 @@ class Scroller
             }
          }
          
-         document.addEventListener('readystatechange',(e_)=>{this.recalcContentSize();}); //After DOMContentLoaded, browser may still load other resources and re-render page.
-         window.addEventListener('resize',(e_)=>{this.recalcContentSize();});             //Content size may depends on viewport size.
-         
          //Start autoscrolling timer (if the interval>0):
          this.resume();
       }
@@ -528,40 +708,14 @@ class Scroller
       }
    }
    
-   get contentWidth()
-   {
-      //Width of the content block. See this.recalcContentSize().
-      return this._contentWidth;
-   }
-   
-   get scrollLength()
-   {
-      //Maximum scrolling distance.
-      return Math.max(0,this._contentWidth-this._area.clientWidth);
-   }
-   
-   get isAtLeftEnd()
-   {
-      //If scrolled to the very begining.
-      return (this._scrollPos<=this.treshold);
-   }
-   
-   get isAtRightEnd()
-   {
-      //If scrolled to the very end.
-      return (this.scrollLength-this._scrollPos<=this.treshold);
-   }
-   
    //private props
    _root=null;      //root node.
    _area=null;      //scrolling area node.
    _content=null;   //content container node.
-   _contentWidth=0; //Width of content container node in pixels. NOTE: must be in sync with actual content width, see this.recalcContentSize().
-   _scrollPos=0;    //Current scrolling offset in pixels.
    _buttons={left:null,right:null};   //nodes of left and right buttons.
    _handle=['click','wheel','touch']; //default handled events. Full list: 'click' - clicking on button nodes; 'wheel' - mouse wheel scrolling; 'touch' - gragging by touch input device; 'drag' - like touch, but by main mouse button; 'middlebtn' - like touch, but by the middle mouse button.
-   _interval=0;      //Period of autoscrolling iterations.
-   _intervalID=null; //Autoscrolling timer ID.
+   _interval=0;
+   _intervalID=null;
    
    //public methods
    scroll(ort_)
@@ -572,26 +726,29 @@ class Scroller
          this.scrollBy((ort_*parseFloat(this.speed))+mUnit(this.speed));
    }
    
-   scrollBy(deltaX_,absolute_)
+   scrollBy(deltaX_,from_start_)
    {
       //Scroll on specified amount of pixels or percents.
       
       let offset=toPixels(deltaX_,{subj:this._content,axis:'x'});
-      let newPos=(absolute_ ? offset : this._scrollPos+offset);
+      //console.log('scroll by ',offset,'px (computed from ',deltaX_,') at ',this._root);
+      let conStyle=window.getComputedStyle(this._content);
+      let oldPos=(from_start_ ? 0 : -parseFloat(conStyle.marginLeft));
+      let maxPos=Math.max(0,parseFloat(conStyle.width)-this._area.clientWidth);
+      let pos=oldPos+offset;
       
       if (this.cycled)
       {
          //Handle position out of range cases:
-         if (newPos<0)
-            newPos=this._scrollPos>0 ? 0 : this.scrollLength; //Step to beginning, then turn to the end.
-         else if (newPos>this.scrollLength)
-            newPos=this._scrollPos<this.scrollLength ? this.scrollLength : 0;  //Step to the end, then return to beginning.
+         if (pos<0)
+            pos=oldPos>0 ? 0 : maxPos; //Step to beginning, then turn to the end.
+         else if (pos>maxPos)
+            pos=oldPos<maxPos ? maxPos : 0;  //Step to the end, then return to beginning.
       }
       else
-         newPos=Math.min(Math.max(0,newPos),this.scrollLength);
+         pos=Math.min(Math.max(0,pos),maxPos);
       
-      this._scrollPos=newPos;
-      this._content.style.marginLeft=(-this._scrollPos)+'px';
+      this._content.style.marginLeft=(-pos)+'px';
       this.updateButtons();
    }
    
@@ -612,7 +769,7 @@ class Scroller
    
    resume()
    {
-      //[Re]start the slideshow timer (only if the interval>0).
+      //[Re]start the scroller timer (only if the interval>0).
       //NOTE: This method named "resume" because it doesn't affect the currIndex, which might be implied for "reset" or "restart".
       //NOTE: This method doesnt preserves a time passed from the last tick to the stop and this is the feature.
       
@@ -625,7 +782,7 @@ class Scroller
    
    stop()
    {
-      //Stop the slideshow timer.
+      //Stop the scroller timer.
       
       if (this._intervalID)
       {
@@ -640,20 +797,32 @@ class Scroller
       //TODO: in future, this method should calculate elements' sizes by the scrolling axis.
       
       let style=window.getComputedStyle(this._content);
-      this._contentWidth=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight);
+      let w=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight);
       for (let child of this._content.children)
-         this._contentWidth+=this._calcItemPlaceWidth(child);
-      this._content.style.width=this._contentWidth+'px';
+         w+=this._calcItemPlaceWidth(child);
+      this._content.style.width=w+'px';
       
       this.updateButtons();
-      this.onRecalcContentSize?.(this); //User-defined callback.
    }
    
    updateButtons()
    {
-      this._buttons.left?.classList.toggle('disabled',this.isAtLeftEnd);
+      let conStyle=window.getComputedStyle(this._content);
       
-      this._buttons.right?.classList.toggle('disabled',this.isAtRightEnd);
+      if (this._buttons.left)
+      {
+         if (-parseFloat(conStyle.marginLeft)<=this.treshold)
+            this._buttons.left.classList.add('disabled');
+         else
+            this._buttons.left.classList.remove('disabled');
+      }
+      if (this._buttons.right)
+      {
+         if ((parseFloat(conStyle.width)+parseFloat(conStyle.marginLeft)-this._area.clientWidth)<=this.treshold)
+            this._buttons.right.classList.add('disabled');
+         else
+            this._buttons.right.classList.remove('disabled');
+      }
    }
    
    //private methods
@@ -669,7 +838,8 @@ function initScrollers(selector_,scrollerClass_,defaultParams_)
 {
    var containers=document.body.querySelectorAll(selector_??'.scroller');
    for (var container of containers)
-      container.scroller=new (scrollerClass_??Scroller)({...defaultParams_,container:container});
+      if (!container.scroller)
+         container.scroller=new (scrollerClass_??Scroller)({...defaultParams_,container:container});
    
    return containers;
 }
@@ -859,7 +1029,7 @@ class TabBox extends TabsController
       
       //Assign event listeners:
       for (let button of this._tabBtnsCtrl.tabs)
-         button.addEventListener(params_.eventType??'click',(e_)=>{this.switchToBtn(e_.target); return cancelEvent(e_);});
+         button.addEventListener(params_.eventType??'click',(e_)=>{this.switchToBtn(button); return cancelEvent(e_);});
    }
    
    //public props
@@ -897,7 +1067,8 @@ function initTabBoxes(selector_,TabBoxClass_,defaultParams_)
    
    let containers=document.querySelectorAll(selector_??'.tabbox');
    for (let container of containers)
-      container.tabbox=new (TabBoxClass_??TabBox)({...defaultParams_,container:container});
+      if (!container.tabbox)
+         container.tabbox=new (TabBoxClass_??TabBox)({...defaultParams_,container:container});
    
    return containers;
 }
@@ -967,10 +1138,10 @@ class SlideShow extends TabBox
       
       //Assign enent listeners to the new controls:
       for (let btnPrev of this._buttons.prev)
-         btnPrev.addEventListener('click',(e_)=>{this.prev(); this.resume();});
+         btnPrev.addEventListener('click',(e_)=>{this.prev(); this.resume(); return cancelEvent(e_);});
       
       for (let btnNext of this._buttons.next)
-         btnNext.addEventListener('click',(e_)=>{this.next(); this.resume();});
+         btnNext.addEventListener('click',(e_)=>{this.next(); this.resume(); return cancelEvent(e_);});
       
       //Start slideshow timer (if the interval>0):
       this.resume();
@@ -1201,14 +1372,14 @@ class RangeBar
    
    //props methods
    get _isVolatile(){return this.__isVolatile;}
-   set _isVolatile(new_val_)
+   set _isVolatile(newVal_)
    {
-      if ((!this.__isVolatile)&&new_val_)
+      if ((!this.__isVolatile)&&newVal_)
          this.__commitedVals=this._values.slice();
-      else if (this.__isVolatile&&(!new_val_))
+      else if (this.__isVolatile&&(!newVal_))
          this.__commitedVals=null;
       
-      this.__isVolatile=new_val_;
+      this.__isVolatile=newVal_;
    }
    
    //protected methods
@@ -1249,15 +1420,15 @@ class RangeBar
       return res_arr;
    }
    
-   _setValueAt(indx_,new_val_)
+   _setValueAt(indx_,newVal_)
    {
       //Set a single value without repaint
       //NOTE: Don't mess with the public setValueAt()
       
       var res=null;
       
-      new_val_=this._parseNum(new_val_);  //Convert value into the current format
-      if (!(isNaN(indx_)||isNaN(new_val_)))
+      newVal_=this._parseNum(newVal_);  //Convert value into the current format
+      if (!(isNaN(indx_)||isNaN(newVal_)))
       {
          if (this._isVolatile)                           //While dragging a value, another values may be affected indirectly (stacked to the dragging one).
             this._values=this.__commitedVals.slice();    //Therefore they are has to be restored at each movement until the dragged value is released.
@@ -1265,7 +1436,7 @@ class RangeBar
          if ((indx_>=0)&&(indx_<this._values.length))
          {
             //Limit new value to range bounds
-            this._values[indx_]=Math.max(this._min,new_val_);
+            this._values[indx_]=Math.max(this._min,newVal_);
             this._values[indx_]=Math.min(this._values[indx_],this._max);
             
             //Stack previous values if they are greater
@@ -1284,7 +1455,7 @@ class RangeBar
             console.warn('RangeBar._setValueAt: Unable to set value: index out of range.');
       }
       else
-         console.warn('RangeBar._setValueAt: Unable to set value: '+(isNaN(indx_) ? 'index is NaN' : '')+(isNaN(new_val_) ? 'value is NaN' : '')+'');
+         console.warn('RangeBar._setValueAt: Unable to set value: '+(isNaN(indx_) ? 'index is NaN' : '')+(isNaN(newVal_) ? 'value is NaN' : '')+'');
       
       return res;
    }
@@ -1311,12 +1482,12 @@ class RangeBar
       return values_;
    }
    
-   _setValues(new_vals_)
+   _setValues(newVals_)
    {
       //Set all the values without repaint.
       
-      if (new_vals_ instanceof Array)
-         this._values=this._correctValues(new_vals_);
+      if (newVals_ instanceof Array)
+         this._values=this._correctValues(newVals_);
       else
          console.error('RangeBar._setValues: Argument is not an array.');
       
@@ -1438,9 +1609,9 @@ class RangeBar
    {
       return this._values.slice();  //Isolate protected prop.
    }
-   set values(new_vals_)
+   set values(newVals_)
    {
-      this._setValues(new_vals_.slice());
+      this._setValues(newVals_.slice());
       
       this._repaint();
       this._updateInputs();
@@ -1451,15 +1622,15 @@ class RangeBar
    {
       return this._defaultVals.slice();  //Isolate protected prop.
    }
-   set defaults(new_vals_)
+   set defaults(newVals_)
    {
-      this._defaultVals=this._correctValues(new_vals_.slice());
+      this._defaultVals=this._correctValues(newVals_.slice());
    }
    
    get min(){return this._min;}
-   set min(new_val_)
+   set min(newVal_)
    {
-      this._min=new_val_;
+      this._min=newVal_;
       if (this._min<this._max)
       {
          this._values=this._correctValues(this._values);
@@ -1474,9 +1645,9 @@ class RangeBar
    }
    
    get max(){return this._max;}
-   set max(new_val_)
+   set max(newVal_)
    {
-      this._max=new_val_;
+      this._max=newVal_;
       if (this._min<this._max)
       {
          this._values=this._correctValues(this._values);
@@ -1500,11 +1671,11 @@ class RangeBar
       return (val_*(this._max-this._min)+this._min).toFixed(this._precision);
    }
    
-   setValueAt(indx_,new_val_)
+   setValueAt(indx_,newVal_)
    {
       //Set a single value with repaint.
       
-      var res=this._setValueAt(indx_,new_val_);
+      var res=this._setValueAt(indx_,newVal_);
       
       if (res!==null)
       {
@@ -1581,7 +1752,7 @@ function initRangeBars(selector_,params_)
    return res;
 }
 
-//------- Inputs List -------//
+//------- Input fields List -------//
 class InputFieldsList
 {
    //This class allows to collect input fields (except buttons) from container_ to access them by keys and manipulate.
@@ -1597,14 +1768,18 @@ class InputFieldsList
    // {
    //    constructor(node_,row_,value_)
    //    {
-   //       this._inpFieldsList=new InputFieldsList(node_);            //Instantiate with default params (will collect all inputs into the node_).
-   //       this._inpFieldsList.inputs['col_name'].value=value_;  //Access input by its key.
-   //       this._inpFieldsList.rowIndex=row_;                    //Set row index for all inputs.
+   //       this._inpList=new InputFieldsList(node_);       //Instantiate with default params (will collect all inputs into the node_).
+   //       this._inpList.inputs['col_name'].value=value_;  //Access input by its key.
+   //       this._inpList.rowIndex=row_;                    //Set row index for all inputs.
    //    }
    // }
    
    constructor(container_,params_)
    {
+      //Set backreference to parent object (if needed):
+      this._parent=params_?.parent??null;
+      this._container=container_;
+      
       //Init params:
       this._regExp=params_?.regExp??this._regExp;
       this._matchIndexes=params_?.matchIndexes??this._matchIndexes;
@@ -1614,10 +1789,18 @@ class InputFieldsList
       let foundInputs=container_.querySelectorAll(params_?.selector??'input:not([type=button]):not([type=submit]):not([type=image]),select,textarea'); //Find all inputs except buttons.
       for (let input of foundInputs)
       {
-         let matches=this._regExp.exec(input.name);          //Get the input's key from its name
-         let key=matches?.[this._matchIndexes.key]??null;   //
-         if (key)                                           //
-            this.inputs[key]=input;                        // and store input to associative array.
+         let matches=this._regExp.exec(input.name);                              //Get the input's key from its name
+         let key=matches?.[this._matchIndexes.key]??undefined;                   //
+         if (key!==undefined)                                                    // and if key is ok,
+         {
+            if (input.type=='radio')
+            {
+               this.inputs[key]??=(params_?.decorator??decorateInputFieldVal)(new (params_?.RadioGroupClass??RadioGroup)(),params_?.valueProp);  //Create new radio group if not exists.
+               this.inputs[key].add(input);                                      //Add radio input to its group. NOTE: Make sure that all radios with the same keys has exactly equal names, because the RadioGroup.add() will reject all radios with the name different from the first one added.
+            }   
+            else
+               this.inputs[key]=(params_?.decorator??decorateInputFieldVal)(input,params_?.valueProp); // decorate the input field and store it to associative array.
+         }
          else
             console.warn('InputFieldsList: input\'s name doesn\'t match regExp',input,this._regExp);
       }
@@ -1649,6 +1832,8 @@ class InputFieldsList
    }
    
    //private props
+   _parent=null;
+   _container=null;
    _regExp=/^([a-z0-9_]+)\[([0-9]*)\]\[([a-z0-9_]+)\]/i;
    _matchIndexes={prefix:1,row:2,key:3};
    _replacement='$1[$2][$3]';
@@ -1854,7 +2039,7 @@ function buildNodes(struct_,collection_)
    return res;
 }
 
-function popupOpen(struct_)
+function popupOpen(struct_,parentNode_,collection_)
 {
    //Make popup and assigns to parent_ (or to document.body by default).
    var res=null;
@@ -1863,10 +2048,10 @@ function popupOpen(struct_)
    
    if (struct_)
    {
-      res=buildNodes(struct_);  //create new popup's DOM structure
+      res=buildNodes(struct_,collection_);                  //Create new popup's DOM structure
       if (res)
       {
-         document.body.appendChild(res);   //if DOM structure was built successfully, attach it to parent
+         (parentNode_??document.body)?.appendChild(res);    //If DOM structure was built successfully, attach it to parent
          res.classList.add('opened');
       }
    }
@@ -2083,8 +2268,8 @@ class DynamicFormItem extends DynamicListItem
    {
       super(parent_,params_);
       
-      let inputsListClass=params_.inputsListClass??InputFieldsList;
-      this._inpFieldsList=new inputsListClass(this._node,params_?.inputsListParams??null); //Get all form inputs within this item. NOTE: Pay attention that the inputsListClass may also grab input fields from the nested items.
+      let inputFieldsListClass=params_.inputFieldsListClass??InputFieldsList;
+      this._inpFieldsList=new inputFieldsListClass(this._node,params_?.inputFieldsListParams??null); //Get all form inputs within this item. NOTE: Pay attention that the inputsListClass may also grab input fields from the nested items.
    }
    
    //public props
@@ -2130,7 +2315,7 @@ class DynamicList extends DynamicListItem
       this._itemClass=params_.itemClass;
       this._itemClassParams=params_.itemClassParams??null;
       this._idProp=params_.idProp??'id';
-      console.log('DynamicList._setupNode',this._itemClass,params_);
+      this._minLength=params_.minLength??this._minLength;
       
       //Get the list items container node:
       if (params_.listNode)                                    //Directly defined in params.
@@ -2150,19 +2335,20 @@ class DynamicList extends DynamicListItem
       var first=params_.excludeBefore??0;
       var last=this._listNode.childElementCount-1-(params_.excludeAfter??0);
       if (last<(this._listNode.childElementCount-1))
-         this._appendixStart=this._listNode.children[last]; //A new list item nodes will be inserted before the first extra node (or to the list end).
+         this._appendixStart=this._listNode.children[last+1];  //A new list item nodes will be inserted before the first extra node (or to the list end).
       
       //Detect if the list is semidynamic:
-      this._isSemidynamic=(first<last);   //If this._listNode has initial (statically created) item nodes, it considered as semidynamic.
+      this._isSemidynamic=(first<=last);   //If this._listNode has initial (statically created) item nodes, it considered as semidynamic.
       
       //Semidynamic mode initialization:
-      //NOTE: Do not use DynamicListItem classes which relies on  In the semidynamic mode this case all new list items will be created from the prototype node, regardless to possible DynamicListItem expectations.
+      //NOTE: In the semidynamic mode all new list items will be created by clonning the prototype node. So do not use item classes which relies on dynamic node build and DynamicListItem._insidesCollection.
       if (this._isSemidynamic)
       {
          //Get a item's node prototype:
          let protoClassName=params_.protoClassName??'proto';
-         if (this._listNode.children[first].classList.has(protoClassName))             //Check if the first node in the list is a dedicated prototype node. NOTE: If the list [can] initially has no payload item nodes the dedicated prototype node is required (except params_.protoNodeStruct is defined).
+         if (this._listNode.children[first].classList.contains(protoClassName))        //Check if the first node in the list is a dedicated prototype node. NOTE: If the list [can] initially has no payload item nodes the dedicated prototype node is required (except params_.protoNodeStruct is defined).
          {                                                                             //If so, 
+            this._itemNodePrototype=this._listNode.children[first];                    //
             this._listNode.removeChild(this._itemNodePrototype);                       // remove it from list
             last--;                                                                    //
             this._itemNodePrototype.classList.remove(protoClassName);                  // and prepare for clonning.
@@ -2179,6 +2365,7 @@ class DynamicList extends DynamicListItem
    
    //private properties
     _items=[];                 //Array of the items, represented by Controller instances.
+    _minLength=0;              //Minimum number of items.
     _listNode=null;            //Container node for the items' nodes.
     _appendixStart=null;       //First extra node in this._node after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
     _isSemidynamic=false;      //If the semidynamic mode detected. Needed mostly for diagnostical purposes.
@@ -2187,6 +2374,12 @@ class DynamicList extends DynamicListItem
     _itemClassParams=null;     //Parameters for the _itemClass constructor.
    
    //public props
+   get minLength(){return this._minLength;}
+   set minLength(newVal_)
+   {
+      this._minLength=Math.max(0,newVal_);   //NOTE: Currently min length affects only remove() method, but don't cause automatical adding o fa new items if the current length is lesser than the minimum.
+   }
+   
    get isSemidynamic() {return this._isSemidynamic;} //Needed mostly for diagnostical purposes.
    
    get data()
@@ -2268,10 +2461,13 @@ class DynamicList extends DynamicListItem
       //Remove a single item by index or pointer.
       //It's a basic remove method also sutable for the cases when items has no IDs.
       
-      let index=(mixed_ instanceof DynamicListItem ? this._itemIndex(mixed_) : mixed_)
-      let removed=this._items.splice(index,1)[0];
-      if (removed)
-         this._listNode.removeChild(removed.node);
+      if (this._items.length>this._minLength)
+      {
+         let index=(mixed_ instanceof DynamicListItem ? this._itemIndex(mixed_) : mixed_)
+         let removed=this._items.splice(index,1)[0];
+         if (removed)
+            this._listNode.removeChild(removed.node);
+      }
    }
    
    removeBy(val_,prop_,single_)
@@ -2322,11 +2518,7 @@ class DynamicForm extends DynamicList
    //This class designed to handle forms based on DynamicList's principle.
    // It maintains indexing of form inputs into its items in order. This required for inputs named like "prefix[row_index][col_name]", because they can't be left without explicit indexing like simple "field_name[]'.
    //NOTE: Neither frontend, nor backednd are MUST NOT rely on the data rows indexes even it's not planned to remove items. For example may be a cases when inputs can be indexed not from 0.
-   constructor(parent_,params_,data_)
-   {
-      super(parent_,params_,data_);
-   }
-   
+
    add(mixed_)
    {
       super.add(mixed_);
@@ -2350,10 +2542,11 @@ class DynamicForm extends DynamicList
 class AsyncList extends DynamicList
 {
    //Implements an asyncronous loading of list items from server.
+   //TODO: This class needs testing since it extends new class DynamicList.
    
    constructor(parent_,params_)
    {
-      super(parent_,params_,null);
+      super(parent_,params_);
       
       //protected props
       this._btnNext=params_.btnNext||document.querySelector(params_.btnNextSelector||this._listNode.dataset.btnNextSelector);                      //Next page button.
@@ -2481,7 +2674,9 @@ function elementHorizontalScrollHandler(e_)
          e_.target.scrollLeft+=(delta.X);
          e_.target.scrollTop+=(delta.Y);
          
-         return cancelEvent(e_);
+         e_.preventDefault&&e_.preventDefault();
+         e_.stopPropagation&&e_.stopPropagation();
+         return false;
       }
    else
        return true;

@@ -27,8 +27,7 @@ class Feedback extends Shortcode
    public $form_class="";  //Form class attribute.
    public $default_h_level=3;
    //Email params:
-   protected $recipients_meta=null; //Name of user meta field contains a recipient emails.
-   protected $default_recipients_meta="feedback_recipients";
+   protected $recipients_meta_key="feedback_recipients"; //Name of user meta field contains a recipients emails. NOTE: See method get_recipients() to learn about recipients processing capabilities.
    
    public function __construct($name_="")
    {
@@ -54,8 +53,6 @@ class Feedback extends Shortcode
       $this->header=$params_["header"]??null;
       $this->h_level=$params_["h_level"]??$this->default_h_level;
       $this->form_class=$params_["form_class"]??$this->form_class;
-      
-      $this->recipients_meta=$params_["recipients_meta"]??$this->default_recipients_meta;
       
       $this->setup_tpl_pipe($this->email_tpl_pipe,$params_);
    }
@@ -257,7 +254,8 @@ class Feedback extends Shortcode
    public function handle_request_payload()
    {
       //This method is called at the handle_request() when the form is validated.
-      $recipients=get_option($this->recipients_meta,"");
+      
+      $recipients=$this->get_recipients();
       if ($recipients)
       {
          $subj=$this->{$this->email_tpl_pipe["subject_tpl"]}();
@@ -271,6 +269,13 @@ class Feedback extends Shortcode
       }
       else
          $this->response["errors"][]="Не удалось отправить письмо: на сайте не настроены адреса получателей.";
+   }
+   
+   protected function get_recipients()
+   {
+      //Misc method, allows to override the way to get feedback recipients. E.g. it may use JSON-encoded meta field and some key from request or any other solution.
+      
+      return get_option($this->recipients_meta_key,"");
    }
 }
 ?>
