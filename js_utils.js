@@ -632,14 +632,14 @@ class Scroller
          this._interval=parseInt(params_?.interval??this._root?.dataset?.interval??this._interval);
          
          //Init nodes:
-         //root node
+         // root node
          this._root.classList.remove('inactive');   //class "inactive" may be used to alter scroller view/behavior while it isn't initialized.
          
-         //scroling area
+         // scroling area,
          this._area=this._root.querySelector('.area');
          this._area.scroller=this;  //back referrence
          
-         //buttons
+         // buttons,
          var buttons=this._root.querySelectorAll('.button');
          for (var i=0;i<buttons.length;i++)
          {
@@ -650,11 +650,15 @@ class Scroller
                this._buttons.right=buttons[i];
          }
          
-         //content container that scrolls into scroling area
+         // content container that scrolls into scroling area.
          this._content=this._root.querySelector('.content');
          this.recalcContentSize();
                   
          //Attach event handlers:
+         window.addEventListener('resize',(e_)=>{this.recalcContentSize();}); //For the case if content depends on window size.
+         for (let img of this._content.querySelectorAll('img'))
+            img.addEventListener('load',(e_)=>{this.recalcContentSize();});   //For the case of lazy/late image loading. (Some images may be loaded lately, so content size calculation right at DOMContentLoaded may give incorrect results.)
+         
          for (var i=0;i<this._handle.length;i++)
          {
             switch (this._handle[i])
@@ -732,9 +736,9 @@ class Scroller
       
       let offset=toPixels(deltaX_,{subj:this._content,axis:'x'});
       //console.log('scroll by ',offset,'px (computed from ',deltaX_,') at ',this._root);
-      let conStyle=window.getComputedStyle(this._content);
-      let oldPos=(from_start_ ? 0 : -parseFloat(conStyle.marginLeft));
-      let maxPos=Math.max(0,parseFloat(conStyle.width)-this._area.clientWidth);
+      let contStyle=window.getComputedStyle(this._content);
+      let oldPos=(from_start_ ? 0 : -parseFloat(contStyle.marginLeft));
+      let maxPos=Math.max(0,parseFloat(contStyle.width)-this._area.clientWidth);
       let pos=oldPos+offset;
       
       if (this.cycled)
@@ -807,18 +811,18 @@ class Scroller
    
    updateButtons()
    {
-      let conStyle=window.getComputedStyle(this._content);
+      let contStyle=window.getComputedStyle(this._content);
       
       if (this._buttons.left)
       {
-         if (-parseFloat(conStyle.marginLeft)<=this.treshold)
+         if (-parseFloat(contStyle.marginLeft)<=this.treshold)
             this._buttons.left.classList.add('disabled');
          else
             this._buttons.left.classList.remove('disabled');
       }
       if (this._buttons.right)
       {
-         if ((parseFloat(conStyle.width)+parseFloat(conStyle.marginLeft)-this._area.clientWidth)<=this.treshold)
+         if ((parseFloat(contStyle.width)+parseFloat(contStyle.marginLeft)-this._area.clientWidth)<=this.treshold)
             this._buttons.right.classList.add('disabled');
          else
             this._buttons.right.classList.remove('disabled');
@@ -2206,7 +2210,8 @@ function dialogPopupStruct(link_,caption_,ok_btn_value_,ok_action_,cancel_btn_va
                                                               }
                                                            ]
                                              }
-                                          ]
+                                          ],
+                               onclick:function(e_){e_.stopPropagation();}
                             }
                          ],
               onclick:function(){popupsClose()},
