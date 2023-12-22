@@ -28,6 +28,7 @@ class Feedback extends Shortcode
    public $default_h_level=3;
    //Email params:
    protected $recipients_meta_key="feedback_recipients"; //Name of user meta field contains a recipients emails. NOTE: See method get_recipients() to learn about recipients processing capabilities.
+   protected $params_meta_key="feedback_params";         //Name of user meta field contains a mailing params.
    
    public function __construct($name_="")
    {
@@ -35,6 +36,10 @@ class Feedback extends Shortcode
       
       if ($this->identity_class===null)
          $this->identity_class="feedback_form";
+      
+      $params=$this->get_params();
+      if ($params["mailer"]=="wp_mail")
+         add_action("phpmailer_init",[$this,"phpmailer_init_action"]);
       
       add_action("init",[$this,"on_init"]);
       
@@ -65,6 +70,28 @@ class Feedback extends Shortcode
          header("Location: ".$_REQUEST["r"]);
          die();
       }
+   }
+   
+   public function phpmailer_init_action($phpmailer_)
+   {
+      $params=$this->get_params();
+      
+      $phpmailer_->IsSMTP();
+
+      $phpmailer_->CharSet   =$params["charset"  ]??"UTF-8";
+
+      $phpmailer_->Host      =$params["host"     ]??"";
+      $phpmailer_->Username  =$params["user"     ]??"";
+      $phpmailer_->Password  =$params["pwd"      ]??"";
+      $phpmailer_->SMTPAuth  =$params["auth"     ]??true;
+      $phpmailer_->Port=(int)($params["port"     ]??$phpmailer_->Port);
+      $phpmailer_->SMTPSecure=$params["secure"   ]??($phpmailer_->Port==465 ? "ssl" : $phpmailer_->SMTPSecure);
+ 
+      $phpmailer_->From      =$params["from"     ]??"no-reply@".$_SERVER["HTTP_HOST"];
+      $phpmailer_->FromName  =$params["from_name"]??"";
+
+      $phpmailer_->isHTML(($params["format"]??"html")=="html");
+      //var_dump($phpmailer_);
    }
    
    public function add_field(InputField $field_)
@@ -255,13 +282,26 @@ class Feedback extends Shortcode
    {
       //This method is called at the handle_request() when the form is validated.
       
+      $params=$this->get_params();
       $recipients=$this->get_recipients();
       if ($recipients)
       {
          $subj=$this->{$this->email_tpl_pipe["subject_tpl"]}();
          $text=$this->{$this->email_tpl_pipe["email_tpl"]}($subj);
          
-         $this->response["res"]=send_email($recipients,$subj,$text);
+         switch ($params["mailer"]??"send_email")
+         {
+            case "wp_mail":
+            {
+               $this->response["res"]=wp_mail($recipients,$subj,$text);
+               break;
+            }
+            case "send_email":
+            {
+               $this->response["res"]=send_email($recipients,$subj,$text);
+               break;
+            }
+         }
          if ($this->response["res"])
             $this->response["message"]="Письмо отправлено успешно.";
          else
@@ -269,6 +309,22 @@ class Feedback extends Shortcode
       }
       else
          $this->response["errors"][]="Не удалось отправить письмо: на сайте не настроены адреса получателей.";
+   }
+   
+   protected function get_params()
+   {
+      //Misc method, retrieving mailing params from WP site options.
+      //Options setup example (use in theme/functions.php):
+      //$theme_setting_section->add_field(new InputStruct(["key"=>"feedback_params","title"=>"Параметры","struct"=>[
+      //                                                                                                              "mailer"=>["label"=>"Функция:","input"=>["tagName"=>"select","childNodes"=>[["tagName"=>"option","textContent"=>"send_mail"],["tagName"=>"option","textContent"=>"wp_mail"],]]],
+      //                                                                                                              "host"=>["label"=>"Хост:"],
+      //                                                                                                              "user"=>["label"=>"Логин:"],
+      //                                                                                                              "pwd" =>["label"=>"Пароль:"],
+      //                                                                                                           ],"limit"=>1]));
+      
+      $opts=json_decode(get_option($this->params_meta_key,"null"),true);
+      $res=$opts[0]??[];      
+      return $res;
    }
    
    protected function get_recipients()

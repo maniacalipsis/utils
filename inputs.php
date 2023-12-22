@@ -235,21 +235,14 @@ class InputStruct extends InputJson
    public function render()
    {
       $container_id="extra_media_".$this->key;
-      $list_params=[
-                      "dataInputSelector"=>"input[type=hidden][name=".$this->key."]",
-                      "listNodeSelector"=>".struct_list",
-                      "limit"=>$this->limit,
-                      "itemClass"=>"StructForm",
-                      "itemClassParams"=>$this->struct,
-                      "node"=>null
-                   ];
       $struct_params_json=json_encode($this->struct,JSON_ENCODE_OPTIONS);
       ?>
       <DIV ID="<?=$container_id?>" CLASS="struct">
          <?=parent::render()?>
          <DIV CLASS="struct_list"></DIV>
+         <INPUT TYPE="button" CLASS="add" VALUE="+">
          <SCRIPT>
-            document.addEventListener('DOMContentLoaded',function(e_){let params={dataInputSelector:'input[type=hidden][name=<?=$this->key?>]',listNodeSelector:'.struct_list',limit:<?=(int)$this->limit?>,itemClass:StructForm,itemClassParams:<?=$struct_params_json?>,node:document.getElementById('<?=$container_id?>')}; new StructList(params);});
+            document.addEventListener('DOMContentLoaded',function(e_){let params={dataInputSelector:'input[type=hidden][name=<?=$this->key?>]',listNodeSelector:'.struct_list',btnAddSelector:'input[type=button].add',limit:<?=(int)$this->limit?>,itemClass:StructForm,itemClassParams:<?=$struct_params_json?>,node:document.getElementById('<?=$container_id?>')}; new StructList(params);});
          </SCRIPT>
       </DIV>
       <?php
@@ -275,6 +268,7 @@ class InputMedia extends InputJson
       <DIV ID="<?=$container_id?>" CLASS="media">
          <?=parent::render()?>
          <DIV CLASS="struct_list media"></DIV>
+         <INPUT TYPE="button" CLASS="add" VALUE="+">
          <SCRIPT>
             document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});
          </SCRIPT>

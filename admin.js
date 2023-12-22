@@ -9,11 +9,14 @@ class StructList extends DynamicForm
       {
          super(null,params_);
          
-         this._data_input=params_.dataInput??this.node.querySelector(params_.dataInputSelector);
-         this._data_input.form?.addEventListener('submit',()=>{this.updateSourceInput();});
-            //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
-            if (this._data_input.value)
-               this.data=JSON.parse(this._data_input.value);
+         this._inpData=params_.dataInput??this.node.querySelector(params_.dataInputSelector);
+         this._inpData.form?.addEventListener('submit',()=>{this.updateSourceInput();});
+         this._btnAdd=params_.btnAdd??this.node.querySelector(params_.btnAddSelector);
+         this._btnAdd?.addEventListener('click',(e_)=>{this.add({});});
+         
+         //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
+         if (this._inpData.value)
+            this.data=JSON.parse(this._inpData.value);
       }
       catch (ex)
       {
@@ -21,17 +24,18 @@ class StructList extends DynamicForm
       }
       finally
       {
-         this.add(); //+ one empty row.
+         if ((!this._btnAdd)&&(this._items.length==0))
+            this.add(); //+ one empty row.
       }
    }
    
-   _data_input=null;      //The input which hold the media files list
-   
+   _inpData=null;      //The input which hold the media files list
+   _btnAdd=null;
    //public methods
    updateSourceInput()
    {
-      this._data_input.value=JSON.stringify(this.data);
-      this._data_input.dispatchEvent(new Event('change',{cancelable:true}));
+      this._inpData.value=JSON.stringify(this.data);
+      this._inpData.dispatchEvent(new Event('change',{cancelable:true}));
    }
 }
 
