@@ -20,41 +20,9 @@ function printAjaxResponse(form_,ans_)
 
 function ajaxFormOnSubmit(e_)
 {
-   //TODO: the way how to callbacks, defined in form dataset, are called and also how they receives the form ptr seems ugly.
-   reqServer(
-               this.attributes.action.value,
-               new FormData(this),
-               ((ans_,xhr_)=>{if (this.dataset.onsuccess) window[this.dataset.onsuccess](ans_,xhr_,this/*form ptr*/); else printAjaxResponse(this,ans_);}),
-               ((xhr_)=>{if (this.dataset.onerror) window[this.dataset.onerror](xhr_,this/*form ptr*/); else {console.warn(xhr_); printAjaxResponse(this,{res:false,errors:['Отправка данных не удалась. Возможно нет подключения к Сети или ошибка на сервере.']});}}),
-               this.method,
-               this.enctype,
-            );
+   ajaxSendForm(e_.target)
+      .then((ans_,xhr_)=>{if (this.dataset.onsuccess) window[this.dataset.onsuccess](ans_,xhr_,this/*form ptr*/); else printAjaxResponse(this,ans_);})
+      .catch((xhr_)=>{if (this.dataset.onerror) window[this.dataset.onerror](xhr_,this/*form ptr*/); else {console.warn(xhr_); printAjaxResponse(this,{res:false,errors:['Отправка данных не удалась. Возможно нет подключения к Сети или ошибка на сервере.']});}});
    
    return cancelEvent(e_);
 }
-
-// function hashSpicy(s_,sp_)
-// {
-//    let res=null;
-//    
-//    if (s_!='')
-//    {
-//       if (typeof SHA256 !=='undefined')
-//       {
-//          for (i=0;i<2;i++)
-//             if ((i<1)||(sp[i]))
-//             {
-//                let len=Math.min(s_.length,s.length);
-//                let mix='';
-//                for (var i=0;i<len;i++)
-//                   mix+=p[i]+s_[i];
-//                mix+=(p.length>len) ? p.substring(len) : s_.substring(len);
-//                pwdInput.value=SHA256(mix);
-//             }
-//       }
-//    }
-//    else
-//       res='';
-//    
-//    return res;
-// }

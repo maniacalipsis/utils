@@ -40,7 +40,6 @@ class Feedback extends Shortcode
       $params=$this->get_params();
       if ($params["mailer"]=="wp_mail")
          add_action("phpmailer_init",[$this,"phpmailer_init_action"]);
-      
       add_action("init",[$this,"on_init"]);
       
       if (wp_doing_ajax())
@@ -99,6 +98,10 @@ class Feedback extends Shortcode
       //Add an input field to the form.
       
       $this->fields[$field_->key]=$field_;
+      
+      //Helps if forgot to set proper enctype in params:
+      if ($field_ instanceof InputFile)
+         $this->enctype="multipart/form-data";
    }
       
    protected function default_wrap_tpl()
@@ -293,12 +296,12 @@ class Feedback extends Shortcode
          {
             case "wp_mail":
             {
-               $this->response["res"]=wp_mail($recipients,$subj,$text);
+               $this->response["res"]=wp_mail(to:$recipients,subject:$subj,message:$text,attachments:$this->get_all_attachments($params["mailer"]));
                break;
             }
             case "send_email":
             {
-               $this->response["res"]=send_email($recipients,$subj,$text);
+               $this->response["res"]=send_email(recipients:$recipients,subject:$subj,text:$text,attachments:$this->get_all_attachments($params["mailer"]));
                break;
             }
          }
@@ -332,6 +335,17 @@ class Feedback extends Shortcode
       //Misc method, allows to override the way to get feedback recipients. E.g. it may use JSON-encoded meta field and some key from request or any other solution.
       
       return get_option($this->recipients_meta_key,"");
+   }
+   
+   protected function get_all_attachments(string $mailer):array
+   {
+      $res=[];
+      
+      foreach ($this->fields as $field)
+         if ($field instanceof InputFile)
+            $res=array_merge($res,$field->get_attachments($mailer));
+      
+      return $res;
    }
 }
 ?>

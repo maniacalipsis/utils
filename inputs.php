@@ -277,7 +277,7 @@ class InputMedia extends InputJson
    }
 }
 
-class InputSelect extends InputField
+class InputSelectRaw extends InputField
 {
    //TODO: This class actually can't support mulitple selection.
    public $variants=[];
@@ -295,29 +295,45 @@ class InputSelect extends InputField
    public function validate()
    {
       //Valid value must match the selection variants and, if required, must not be empty.
-      $this->errors=[];
       
-      $checks_cnt=2;
-      $checks_passed=0;
-      if (!$this->required||($this->value!=""))
-         $checks_passed++;
-      else
+      try
       {
-         if (!$this->group)
-            $this->errors[]="Заполните поле «".$this->title."»";
+         $res=false;
+         $this->errors=[];
+         
+         if ($this->attrs["multiple"]??false)
+         {
+            $has_opts=(count($this->value)>0);
+            if ($this->required&&!$has_opts)
+               throw new \RuntimeException("Заполните поле «".$this->title."»");
+            
+            if ($this->required&&$has_opts&&(count(array_intersect($this->value,array_keys($this->variants)))==0))
+               throw new \OutOfBoundsException("Ни одно из выбранных значений поля «".$this->title."» не соответствует списку");
+         }
+         else
+         {
+            if ($this->required&&($this->value==""))
+               throw new \RuntimeException("Заполните поле «".$this->title."»");
+               
+            if ($this->required&&$has_opts&&(($this->variants[$this->value]??null)===null))
+               throw new OutOfBoundsException("Значение поля «".$this->title."» не соответствует списку");
+         }
+         
+         $res=true;
+      }
+      catch (\TypeError|\RuntimeException $ex)
+      {
+         $this->errors[]=$ex->getMessage();
       }
       
-      if (key_exists($this->value,$this->variants))
-         $checks_passed++;
-      else
-         $this->errors[]="Значение поля «".$this->title."» не соответствует списку";
-      
-      return ($checks_passed==$checks_cnt);
+      return $res;
    }
    
    public function get_safe_value()
    {
-      return (key_exists($this->value,$this->variants) ? $this->value : $this->default);
+      //Reurns a key[s] of selected option[s].
+      
+      return ($this->attrs["multiple"]??false ? array_intersect($this->value??[],array_keys($this->variants)) : (key_exists($this->value,$this->variants) ? $this->value : $this->default));
    }
    
    public function render()
@@ -329,7 +345,38 @@ class InputSelect extends InputField
    }
 }
 
-class InputPostsSelect extends InputSelect
+class InputSelect extends InputSelectRaw
+{
+   public function get_safe_raw_value()
+   {
+      return parent::get_safe_value();
+   }
+   
+   public function get_safe_value()
+   {
+      //Returns a value[s] of $this->variants by selected key[s].
+      
+      $res="";
+      
+      $safe_keys=parent::get_safe_value();
+      
+      if ($this->attrs["multiple"]??false)
+      {
+         $sep=null;
+         foreach ($safe_keys as $key)
+         {
+            $res.=$sep.(is_array($this->variants[$key]??null) ? $this->variants[$key]["text"]??"" : $this->variants[$key]);
+            $sep??=", ";
+         }
+      }
+      else
+         $res=(is_array($this->variants[$safe_keys]??null) ? $this->variants[$safe_keys]["text"]??"" : $this->variants[$safe_keys]);
+      
+      return $res;
+   }
+}
+
+class InputPostsSelect extends InputSelectRaw
 {
    public $filter=[];
    
@@ -350,5 +397,86 @@ class InputPostsSelect extends InputSelect
    }
 }
 
+class InputFile extends InputField
+{
+   protected  string   $default_accept="image/png,image/jpeg,image/pjpeg,image/webp,image/heic,image/heif,image/gif,image/tiff,image/svg+xml,text/plain,text/rtf,text/x-markdown,application/pdf";
+   protected ?\Uploads $uploads=null;
+   protected  bool     $uploads_renamed=false;
+   
+   public function __construct(array $params_=[])
+   {
+      $params_["attrs"]["accept"]??=$this->default_accept;  //Disallow to accept anything by default.
+      parent::__construct($params_);
+      
+      $args=array_intersect_key($params_,["dest_folder","types_allowed","types_disallowed","names_allowed","names_disallowed","max_size","max_count","max_total_size","file_number","fname_format","fname_filter","dest_folder_permissions","files_permissions","require_permissions"]);
+      $args["types_allowed"]="/^(".str_replace([",","/"],["|","\\/"],$params_["attrs"]["accept"]).")$/i";
+      $this->uploads=new \Uploads(...$args);
+   }
+   
+   public function get_data_type()
+   {
+      //Returns compatible data type (in particular for the function register_meta()).
+      return "file";  //This is class-specific readonly value.
+   }
+   
+   public function validate()
+   {
+      //Uploads validation.
+      
+      $this->errors=[];
+      
+      foreach ($this->uploads->extract_info([$this->key])->validate()->validation_exceptions as $ex)
+         $this->errors[]="#".$ex->getCode().": ".$ex->getMessage();
+      
+      if (($this->required)&&(!$this->uploads->valid_info))
+         $this->errors[]="Заполните поле «".$this->title."»";
+      
+      return count($this->errors)==0;
+   }
+   
+   public function get_safe_value()
+   {
+      //Returns an uploads info, passed validation.
+      
+      $cnt=count($this->uploads->valid_info);
+      return sprintf(_n( '%s media file attached.', '%s media files attached.',$cnt),(string)$cnt);
+   }
+   
+   public function get_attachments(string $mailer="send_email"):array
+   {
+      if (!$this->uploads_renamed)
+         $this->uploads->rename_enumerated();
+      
+      $res=[];
+      
+      switch ($mailer)
+      {
+         case "wp_mail":
+         {
+            $res=[];
+            foreach ($this->uploads->valid_info as $row)
+               $res[$row["name"]]=$row["file"]->getPathname();
+            
+            break;
+         }
+         case "send_email":
+         {
+            $res=$this->uploads->valid_info;
+            
+            break;
+         }
+      }
+      
+      return $res;
+   }
+   
+   public function render()
+   {
+      $attrs=["type"=>"file","name"=>$this->key.($this->attrs["multiple"]??false ? "[]" : ""),"value"=>$this->value??$this->default]+$this->attrs;
+      ?>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
+      <?php
+   }
+}
 
 ?>

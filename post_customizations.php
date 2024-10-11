@@ -29,6 +29,28 @@ function custom_post_labels($plural_,$nominative_,$accusative_,$genitive_,$menu_
           ];
 }
 
+function custom_taxonomy_labels($plural_,$nominative_,$accusative_,$genitive_,$menu_="")
+{
+   $menu_=($menu_ ? $menu_ : $plural_);
+   return [
+            "name"              =>$plural_,
+            "singular_name"     =>$nominative_,
+            "add_new"           =>"Добавить $accusative_",
+            "add_new_item"      =>"Добавить $accusative_",
+            "edit_item"         =>"Редактировать $accusative_",
+            "update_item"       =>"Обновить $accusative_",
+            "new_item_name"     =>"Новая категория",
+            "view_item"         =>"Посмотреть $accusative_",
+            "search_items"      =>"Найти $accusative_",
+            "all_items"         =>"Все $plural_",
+            "not_found"         =>mb_ucfirst("$genitive_ не найдено"),
+            "parent_item"       =>"Parent $nominative_",
+            "parent_item_colon" =>"",
+            "menu_name"         =>$menu_,
+            "back_to_items"     => "← К списку",
+          ];
+}
+
 function register_custom_post($post_type_,$labels_,$params_=[])
 {
    $defaults=[
@@ -40,13 +62,31 @@ function register_custom_post($post_type_,$labels_,$params_=[])
                 "menu_position"     =>5,
                 "menu_icon"         =>"dashicons-format-aside",
                 "supports"          =>["title","editor","excerpt","page-attributes","thumbnail","custom-fields"],  //Full list of standard features: "title","editor","author","thumbnail","excerpt","trackbacks","custom-fields","comments","revisions","page-attributes","post-formats".
-                "taxonomies"        =>["category"],
                 //"query_var"=>true by WP default, that means it's equal to the $post_type_.
              ];
    $params_=array_extend($defaults,$params_);
    $params_["labels"]=$labels_;
    
    register_post_type($post_type_,$params_);
+}
+
+function register_custom_taxonomy($tax_type_,$object_types_,$labels_,$params_=[])
+{
+   $defaults=[
+                "label"            =>"",     //Defaults to $labels_["name"].
+                "description"      =>"",
+                "public"           =>true,
+                "hierarchical"     =>true,   //If true, will appear as checkboxees on the associated posts edit pages.
+                "rewrite"          =>true,
+                "capabilities"     =>[],
+                "meta_box_cb"      =>null,   //Metabox html. callback: `post_categories_meta_box` or `post_tags_meta_box`. false — metabox is off.
+                "show_admin_column"=>false,  //Autocreation if taxonomy column in the table of associated post type (since v3.5).
+                "show_in_rest"     =>true,   //Add to REST API (will appear on the associated posts edit pages).
+	          ];
+   $params_=array_extend($defaults,$params_);
+   $params_["labels"]=$labels_;
+   
+   register_taxonomy($tax_type_,$object_types_,$params_);
 }
 
 class MetaboxManager

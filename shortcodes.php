@@ -269,8 +269,8 @@ abstract class PostsPrefabShortcode extends DataListShortcode
    public const META_QUERY_GLUE=";";
    public const INCLUDE_GLUE=",";
    public const NAMEVAL_GLUE="=";
-   protected $filter_allowed=["post_type"=>null,"category"=>null,"category_name"=>null,"tag"=>null,"post_status"=>null,"post_parent"=>null,"orderby"=>null,"order"=>null,"numberposts"=>null,"exclude"=>null,"include"=>null,"meta_key"=>null,"meta_value"=>null,"meta_query"=>null];
-   protected $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null];
+   protected $filter_allowed=["post_type"=>null,"category"=>null,"category_name"=>null,"tag"=>null,"post_status"=>null,"post_parent"=>null,"orderby"=>null,"order"=>null,"numberposts"=>null,"exclude"=>null,"include"=>null,"meta_key"=>null,"meta_value"=>null,"meta_query"=>null,"tax_query"=>null];
+   protected $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null,"tax_query"=>null];
    
    //Rendering params, that can be redefined just at the backend:
    public $item_class="post";
@@ -296,12 +296,25 @@ abstract class PostsPrefabShortcode extends DataListShortcode
          $params_["numberposts"]=$numberposts;                       //
       
       //Parse meta query parameter:
-      $meta_query=$params_["meta_query"]??null;
-      if (($meta_query!==null)&&(!is_array($meta_query)))   //If "meta_query" is naturally passed as array (e.g. using $shortcode->do([...])) then let it be.
+      $params_["meta_query"]=self::parse_sub_query($params_["meta_query"]??null);
+      $params_["tax_query"]=self::parse_sub_query($params_["tax_query"]??null);
+      
+      $filter=array_extend($this->filter_defaults,array_intersect_key($params_,$this->filter_allowed));   //Filter params of the filter.
+      
+      return $filter;
+   }
+   
+   protected static function parse_sub_query($sub_query_)
+   {
+      //Helper method.
+      
+      $res=null;
+      
+      if (($sub_query_!==null)&&(!is_array($sub_query_)))   //If "meta_query" is naturally passed as array (e.g. using $shortcode->do([...])) then let it be.
       {
-         $params_["meta_query"]=[];
+         $res=[];
          
-         $pairs=explode(self::META_QUERY_GLUE,$meta_query);
+         $pairs=explode(self::META_QUERY_GLUE,$sub_query_);
          foreach ($pairs as $pair)
          {
             $name_val=explode(self::NAMEVAL_GLUE,$pair);
@@ -310,12 +323,11 @@ abstract class PostsPrefabShortcode extends DataListShortcode
             if (($val=="true")||($val=="false")) //Convert exact "true"/"false" to boolean.
                $val=to_bool($val);
             
-            $params_["meta_query"][]=["key"=>$name_val[0],"value"=>$val];
+            $res[]=["key"=>$name_val[0],"value"=>$val];
          }
       }
-      $filter=array_extend($this->filter_defaults,array_intersect_key($params_,$this->filter_allowed));   //Filter params of the filter.
       
-      return $filter;
+      return $res;
    }
    
    protected function get_data($params_)
