@@ -137,6 +137,23 @@ class InputText extends InputString
    }
 }
 
+class InputTrap extends InputString
+{
+   //Trap for spamer bots.
+   
+   public function validate()
+   {
+      //Validate a trap field.
+      
+      $this->errors=[];
+      
+      if ($this->value!="")
+         $this->errors[]="Не заполняйте поле «".$this->title."»";
+      
+      return count($this->errors)==0;
+   }
+}
+
 class InputRichText extends InputText
 {
    public function render()
