@@ -305,8 +305,16 @@ class InputSelectRaw extends InputField
       parent::__construct($params_);
       
       //Prepend an empty option:
+      $this->reset_variants();
+      $this->variants+=$this->variants;
+   }
+   
+   public function reset_variants()
+   {
+      //Empties the selection variants array and appends an empty option if defined.
+      
       if ($this->empty_option!==null)
-         $this->variants=[""=>$this->empty_option]+$this->variants;
+         $this->variants=[""=>$this->empty_option];
    }
    
    public function validate()

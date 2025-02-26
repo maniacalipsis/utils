@@ -26,6 +26,7 @@ class Feedback extends Shortcode
    public $header=null;    //Form header.
    public $form_class="";  //Form class attribute.
    public $default_h_level=3;
+   public $submit_btn_caption="Отправить";
    //Email params:
    protected $recipients_meta_key="feedback_recipients"; //Name of user meta field contains a recipients emails. NOTE: See method get_recipients() to learn about recipients processing capabilities.
    protected $params_meta_key="feedback_params";         //Name of user meta field contains a mailing params.
@@ -57,6 +58,7 @@ class Feedback extends Shortcode
       $this->header=$params_["header"]??null;
       $this->h_level=$params_["h_level"]??$this->default_h_level;
       $this->form_class=$params_["form_class"]??$this->form_class;
+      $this->submit_btn_caption=$params_["submit_btn_caption"]??$this->submit_btn_caption;
       
       $this->setup_tpl_pipe($this->email_tpl_pipe,$params_);
    }
@@ -177,7 +179,7 @@ class Feedback extends Shortcode
       ob_start();
       ?>
             <DIV CLASS="submission flex end x-end">
-               <INPUT TYPE="submit" VALUE="Отправить">
+               <INPUT TYPE="submit" VALUE="<?=__($this->submit_btn_caption)?>">
             </DIV>
             <DIV CLASS="result message"></DIV>
          
