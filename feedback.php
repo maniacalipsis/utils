@@ -196,7 +196,8 @@ class Feedback extends Shortcode
    {
       $res="";
       foreach ($this->fields as $field)
-         $res.=$field->title.": ".strip_tags($field->get_safe_value())."\n";
+         if (!($field instanceof InputTrap))
+            $res.=$field->title.": ".strip_tags($field->get_safe_value())."\n";
       
       return $res;
    }
@@ -212,9 +213,11 @@ class Feedback extends Shortcode
 </HEAD>
    <BODY>
       <TABLE>
-         <?php foreach($this->fields as $field): ?>
-         <TR><TH><?=$field->title?></TH><TD><?=$field->get_safe_value()?></TD></TR>
-         <?php endforeach; ?>
+         <?php foreach($this->fields as $field): 
+                  if (!($field instanceof InputTrap)):?>
+         <TR><TH><?=$field->title?> </TH><TD><?=$field->get_safe_value()?></TD></TR>
+         <?php    endif;
+               endforeach; ?>
       </TABLE>
    </BODY>
 </HTML><?php
