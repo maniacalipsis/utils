@@ -28,13 +28,16 @@ trait TMetaQueryHepler
    public const INCLUDE_GLUE=",";
    public const NAMEVAL_GLUE="=";
    
-   protected $filter_allowed=["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_str_arr","tax_query"=>"esc_str_arr"];
-   protected $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null,"tax_query"=>null];
+   protected  array $filter_allowed =["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","offset"=>"esc_int","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_str_arr","tax_query"=>"esc_str_arr"];
+   protected  array $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null,"tax_query"=>null];
+   protected ?array $filter=null;   //Current filter state. Use after self::prepare_filter().
    
-   protected function prepare_filter(array $params_,bool $escape_=false)
+   
+   protected function prepare_filter(array $params_,bool $escape_=false):array
    {
       //Cook the filter from the params_ and defaults.
       //This separate method allows a derived classes to interfere into the det_data() after the filter is ready.
+      //As a side effect, sets internal property $this->filter.
       
       //Get the posts filtering params:
       $numberposts=$params_["numberposts"]??$params_["limit"]??null; //Translate "limit" to "numberposts" as the last one isn't intuitive.
@@ -45,13 +48,13 @@ trait TMetaQueryHepler
       $params_["meta_query"]=self::parse_sub_query($params_["meta_query"]??null);
       $params_["tax_query"]=self::parse_sub_query($params_["tax_query"]??null);
       
-      $filter=array_intersect_key($params_,$this->filter_allowed);      //Filter params of the filter.
+      $this->filter=array_intersect_key($params_,$this->filter_allowed);      //Filter params of the filter.
       if ($escape_)
-         foreach ($filter as $key=>$val)
-            $filter[$key]=$this->{$this->filter_allowed[$key]}($val);
-      $filter=array_extend($this->filter_defaults,$filter);
+         foreach ($this->filter as $key=>$val)
+            $this->filter[$key]=$this->{$this->filter_allowed[$key]}($val);
+      $this->filter=array_extend($this->filter_defaults,$this->filter);
       
-      return $filter;
+      return $this->filter;
    }
    
    protected static function parse_sub_query($sub_query_)
@@ -406,9 +409,13 @@ abstract class PostsPrefabShortcode extends DataListShortcode
 
 abstract class AsyncPostsPrefabShortcode extends PostsPrefabShortcode
 {
-   protected $response=[]; //
-   protected $errors=[];   //List of messages about any kind of errors.
-   protected $default_count=25;
+   public $items_container_class="items"; //CSS-class for the list items container.
+   public $btn_load_class="load_more";    //CSS-class for the "Load More" button.
+   public $btn_load_caption="Load More";  //Caption for the "Load More" button.
+   
+   protected ?int   $rows_total=null;
+   protected  array $response=[];
+   protected  int   $default_count=25;
    
    public function __construct($name_="")
    {
@@ -421,32 +428,46 @@ abstract class AsyncPostsPrefabShortcode extends PostsPrefabShortcode
       }
    }
    
-   public function handle_request()
+   public function handle_request():void
    {
       //Handle AJAX request from the feedback form.
       // This method is a parallel of the Dhortcode::do().
       
-      $this->errors=[]; //Reset errors list.
-      $this->response=["res"=>false];
-      
       //Get data:
-      $this->get_data($_REQUEST,true);       //Get params from request and tell the self::prepare_filter() to escape'em.
-      $this->response["data"]=$this->data;
-      
-      //Report all errors to the client:
-      if ($this->errors)
-         $this->response["errors"]=$this->errors;
-      else
-         $this->response["res"]=true;
-      
-      //Finally, send a response:
-      echo json_encode($this->response,JSON_ENCODE_OPTIONS);
-      die();
+      try
+      {
+         $params=$_REQUEST;
+         if (isset($params["count"]))
+            $params["numberposts"]=$params["count"];  //Translate forntend's "count" back to the WP's "numberposts".
+         $this->get_data($params,true);               //Get params from request and tell the self::prepare_filter() to escape'em.
+         
+         $this->response=[
+                            "status"=>"ok",
+                            "data"=>$this->data,               //Method self::get_data() shall set props $this->data
+                            "rows_total"=>$this->rows_total,   // and $this->rows_total.
+                         ];
+      }
+      catch (Exception $ex)
+      {
+         $this->response["status"]="fail";
+         $this->response["errors"]=[$ex->getMessage()];
+      }
+      finally
+      {
+         //Finally, send a response:
+         echo json_encode($this->response,JSON_ENCODE_OPTIONS);
+         die();
+      }
    }
    
    protected function get_rendering_params($params_,$content_)
    {
       parent::get_rendering_params($params_,$content_);
+      
+      //Static block params:
+      $this->items_container_class=$params_["items_container_class"]??$this->items_container_class;
+      $this->btn_load_class       =$params_["btn_load_class"       ]??$this->btn_load_class       ;
+      $this->btn_load_caption     =$params_["btn_load_caption"     ]??$this->btn_load_caption     ;
       
       //Copy filter params to the list tag data attributes:
       $ajax_req_data=["action"=>$this->name,...array_intersect_key($params_,$this->filter_allowed)];
@@ -466,12 +487,13 @@ abstract class AsyncPostsPrefabShortcode extends PostsPrefabShortcode
       ob_start();
       ?>
       <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->list_class?> <?=$this->custom_class?>" <?=$this->attr_data?>>
-         <?php
-            foreach ($this->data as $item)
-               echo $this->{$this->tpl_pipe["item_tpl"]}($item);
-            
-            echo $this->empties_tpl(); //Pad the items with empty blocks to align the orphans in the flex grid.
-         ?>
+         <DIV CLASS="<?=$this->items_container_class?>">
+            <?php
+               foreach ($this->data as $item)
+                  echo $this->{$this->tpl_pipe["item_tpl"]}($item);
+            ?>
+         </DIV>
+         <BUTTON TYPE="button" CLASS="<?=$this->btn_load_class?>"><?=$this->btn_load_caption?></BUTTON>
       </DIV>
       <?php
       return ob_get_clean();
