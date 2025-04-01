@@ -154,6 +154,62 @@ class InputTrap extends InputString
    }
 }
 
+class InputCAPTCHA extends InputString
+{
+   protected string $fonts_dir="";
+   protected array  $options=[];
+   
+   public function renew_captcha()
+   {
+      $captcha_str=generate_captcha_str();
+      $_SESSION["CAPTCHA"]=$captcha_str;
+      return make_captcha_image($captcha_str,$this->fonts_dir,$this->options);
+   }
+   
+   public function render()
+   {
+      if (session_start())
+      {
+         ?>
+         <BUTTON TYPE="button" CLASS="captcha" TITLE="<?=_("Обновить картинку")?>"><IMG CLASS="captcha" SRC="data:image/png;base64,<?=base64_encode($this->renew_captcha())?>" ALT="CAPTCHA"></BUTTON>
+         <?php
+         parent::render();
+      }
+   }
+   
+   public function validate()
+   {
+      //Basic value validation.
+      //Return boolean true if the value is valid. If not, return boolean false and put error messages into $this->errors.
+      //Rules of validation:
+      // - The required field must be filled correctly. The optional field must be filled correctly or not filled at all.
+      // - If the field has alternatives, don't add "This field isn't filled" message individually, because such a thing should be generated for the whole group by the form's method validate(). However other specific errors should be reported.
+      
+      try
+      {
+         $res=false;
+         $this->errors=[];
+         
+         if (!session_start())
+            throw new \RuntimeException("Включите куки на сессию для прохождения каптчи.");
+         
+         if (($_SESSION["CAPTCHA"]??null)=="")
+            throw new \RuntimeException("Ошибка инициализации каптчи. Попробуйте ещё раз");
+            
+         if (!compare_captcha_str($_SESSION["CAPTCHA"],$this->value))
+            throw new \ValueError("Каптча введена неверно.");
+            
+         $res=true;
+      }
+      catch (\Error|\Exception $ex)
+      {
+         $this->errors[]=$ex->getMessage();
+      }
+      
+      return $res;
+   }
+}
+
 class InputRichText extends InputText
 {
    public function render()

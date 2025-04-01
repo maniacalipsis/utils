@@ -19,6 +19,7 @@ require_once(__DIR__."/post_customizations.php");  //Custom posts metaboxes.
 require_once(__DIR__."/theme_setup.php");          //Theme setup clases.
 require_once(__DIR__."/shortcodes.php");           //Set of the most commonly used shortcodes.
 require_once(__DIR__."/feedback.php");             //Feedback forms base classes.
+require_once(__DIR__."/captcha.php");              //Text captcha for feedback forms.
 
 function plugin_init()
 {
