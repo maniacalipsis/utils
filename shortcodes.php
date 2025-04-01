@@ -28,10 +28,10 @@ trait TMetaQueryHepler
    public const INCLUDE_GLUE=",";
    public const NAMEVAL_GLUE="=";
    
-   protected $filter_allowed=["post_type"=>null,"category"=>null,"category_name"=>null,"tag"=>null,"post_status"=>null,"post_parent"=>null,"orderby"=>null,"order"=>null,"numberposts"=>null,"exclude"=>null,"include"=>null,"meta_key"=>null,"meta_value"=>null,"meta_query"=>null,"tax_query"=>null];
+   protected $filter_allowed=["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_str_arr","tax_query"=>"esc_str_arr"];
    protected $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null,"tax_query"=>null];
    
-   protected function prepare_filter($params_)
+   protected function prepare_filter(array $params_,bool $escape_=false)
    {
       //Cook the filter from the params_ and defaults.
       //This separate method allows a derived classes to interfere into the det_data() after the filter is ready.
@@ -45,7 +45,11 @@ trait TMetaQueryHepler
       $params_["meta_query"]=self::parse_sub_query($params_["meta_query"]??null);
       $params_["tax_query"]=self::parse_sub_query($params_["tax_query"]??null);
       
-      $filter=array_extend($this->filter_defaults,array_intersect_key($params_,$this->filter_allowed));   //Filter params of the filter.
+      $filter=array_intersect_key($params_,$this->filter_allowed);      //Filter params of the filter.
+      if ($escape_)
+         foreach ($filter as $key=>$val)
+            $filter[$key]=$this->{$this->filter_allowed[$key]}($val);
+      $filter=array_extend($this->filter_defaults,$filter);
       
       return $filter;
    }
@@ -74,6 +78,44 @@ trait TMetaQueryHepler
       }
       
       return $res;
+   }
+   
+   protected function esc_int($val_):int
+   {
+      return (int)$val_;
+   }
+   
+   protected function esc_str($val_):string
+   {
+      return strip_tags($val_);
+   }
+   
+   protected function esc_int_arr($val_):array
+   {
+      $res=[];
+      if (is_array($val_))
+         foreach ($val_ as $k=>$v)
+            $res[$k]=(int)$v;
+      return $res;
+   }
+   
+   protected function esc_str_arr($val_):array
+   {
+      $res=[];
+      if (is_array($val_))
+         foreach ($val_ as $k=>$v)
+            $res[$k]=$this->esc_str($v);
+      return $res;
+   }
+   
+   protected function esc_post_status($val_):string
+   {
+      return "publish"; //Force selecting published posts when escaping request params.
+   }
+   
+   protected function esc_order($val_):string
+   {
+      return ["ASC"=>"ACC","DESC"=>"DESC","asc"=>"ACC","desc"=>"DESC"][$val_]??"ACS";
    }
 }
 
@@ -104,7 +146,7 @@ abstract class Shortcode
       add_shortcode($this->name,[$this,"do"]);
    }
    
-   public function do($params_="",$content_="")
+   public function do(array|string $params_="",$content_="")
    {
       //This method does this shortcode.
       
@@ -146,7 +188,7 @@ abstract class Shortcode
             $this->attr_data.=" ".strtoupper(str_replace("_","-",$key))."=\"".htmlspecialchars($val)."\"";  //    
    }
    
-   protected function get_data($params_)
+   protected function get_data(array $params_=[])
    {
       //Get and preformat the data. Set results to $this->data.
       //Abstract, overridable.
@@ -337,11 +379,11 @@ abstract class PostsPrefabShortcode extends DataListShortcode
       $this->image_size=$params_["image_size"]??$this->default_image_size;
    }
    
-   protected function get_data($params_)
+   protected function get_data(array $params_=[],bool $escape_=false)
    {
       //Get posts data.
       
-      $this->data=get_posts($this->prepare_filter($params_));
+      $this->data=get_posts($this->prepare_filter($params_,$escape_));
    }
    
    protected function get_link($post_)
@@ -359,6 +401,80 @@ abstract class PostsPrefabShortcode extends DataListShortcode
       //$size_ - [full|large|medium|thumbnail].
       
       return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_??$this->image_size));
+   }
+}
+
+abstract class AsyncPostsPrefabShortcode extends PostsPrefabShortcode
+{
+   protected $response=[]; //
+   protected $errors=[];   //List of messages about any kind of errors.
+   protected $default_count=25;
+   
+   public function __construct($name_="")
+   {
+      parent::__construct($name_);
+      
+      if (wp_doing_ajax())
+      {
+         add_action("wp_ajax_nopriv_".$this->name,[$this,"handle_request"]);
+         add_action("wp_ajax_".$this->name       ,[$this,"handle_request"]);
+      }
+   }
+   
+   public function handle_request()
+   {
+      //Handle AJAX request from the feedback form.
+      // This method is a parallel of the Dhortcode::do().
+      
+      $this->errors=[]; //Reset errors list.
+      $this->response=["res"=>false];
+      
+      //Get data:
+      $this->get_data($_REQUEST,true);       //Get params from request and tell the self::prepare_filter() to escape'em.
+      $this->response["data"]=$this->data;
+      
+      //Report all errors to the client:
+      if ($this->errors)
+         $this->response["errors"]=$this->errors;
+      else
+         $this->response["res"]=true;
+      
+      //Finally, send a response:
+      echo json_encode($this->response,JSON_ENCODE_OPTIONS);
+      die();
+   }
+   
+   protected function get_rendering_params($params_,$content_)
+   {
+      parent::get_rendering_params($params_,$content_);
+      
+      //Copy filter params to the list tag data attributes:
+      $ajax_req_data=["action"=>$this->name,...array_intersect_key($params_,$this->filter_allowed)];
+      if (isset($ajax_req_data["numberposts"]))
+      {
+         $ajax_req_data["count"]=$ajax_req_data["numberposts"];   //Translate WP's "numberposts" to "count" for compatibility with js_utils.js functions.
+         unset($ajax_req_data["numberposts"]);
+      }
+      
+      $this->attr_data.=" DATA-FILTER=\"".htmlspecialchars(json_encode($ajax_req_data,JSON_ENCODE_OPTIONS))."\"";
+   }
+   
+   protected function default_list_tpl()
+   {
+      //Render the simple list.
+      
+      ob_start();
+      ?>
+      <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->list_class?> <?=$this->custom_class?>" <?=$this->attr_data?>>
+         <?php
+            foreach ($this->data as $item)
+               echo $this->{$this->tpl_pipe["item_tpl"]}($item);
+            
+            echo $this->empties_tpl(); //Pad the items with empty blocks to align the orphans in the flex grid.
+         ?>
+      </DIV>
+      <?php
+      return ob_get_clean();
    }
 }
 
@@ -392,7 +508,7 @@ class MapShortcode extends Shortcode
       $this->map_data_meta=$params_["map_data_meta"]??$this->default_map_data_meta;
    }
    
-   protected function get_data($params_)
+   protected function get_data(array $params_=[])
    {
       $this->data=json_decode(get_option($this->map_data_meta,"[]"),true);
    }
