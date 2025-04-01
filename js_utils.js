@@ -1,5 +1,5 @@
 /*==================================*/
-/* The Pattern Engine Version 4     */
+/* The Pattern Engine Version 4.2   */
 /* Copyright: FSG a.k.a ManiaC      */
 /* Contact: imroot@maniacalipsis.ru */
 /* License: GNU GPL v3              */
@@ -18,6 +18,8 @@
 /* You should have received a copy of the GNU General Public License along with The Pattern Engine.          */
 /* If not, see http://www.gnu.org/licenses/.                                                                 */
 /*===========================================================================================================*/
+
+//NOTE: This file is respective to The Pattern Engine commit 30c09a82a2e20cfe89492d9b46321433a46325e7 (HEAD -> oop_new_select), except the "export" keywords are removed.
 
 //--------------------- JS localization ---------------------//
 class LC
@@ -49,7 +51,7 @@ class LC
       return str.replaceAll(/\[\[([0-9a-z_]+)\]\]/gi,(m0_,m1_)=>{return args_[m1_]??''});
    }
    
-   //private props
+   //protected props
    static locales={};
 }
 
@@ -67,121 +69,123 @@ function cancelEvent(e_)
    return false;
 }
 
-class EventDispatcher
+function decorateToEventTarget(obj_)
 {
-   //Helper class for implementing an EventTarget interface.
+   //Makes an object implementing the EventTarget interface.
+   //Arguments:
+   // obj_ - object that want or wanted to be an EventTarget.
+   //Return value:
+   // Returns the object that was passed as argument.
+   //NOTE: Alongside with the EventTarget methods, this function defines property _eventListeners. A decorated object must not have its own property with such a name and must not access it by itself.
    //Usage:
    // SomeClass
    // {
    //    constrictor()
    //    {
-   //       this._evtDispatcher=new EventDispatcher(this);
-   //    }
-   //
-   //    _evtDispatcher=null;
-   //
-   //    addEventListener(type_,listener_,options_)
-   //    {
-   //       this._evtDispatcher.addEventListener(type_,listener_,options_);
-   //    }
-   //
-   //    removeEventListener(type_,listener_,options_)
-   //    {
-   //       this._evtDispatcher.removeEventListener(type_,listener_,options_);
-   //    }
-   //
-   //    dispatchEvent(event_)
-   //    {
-   //       this._evtDispatcher.dispatchEvent(event_);
+   //       decorateToEventTarget(this);
    //    }
    // }
+   
+   Object.defineProperties(obj_,
+                           {
+                              _eventListeners:{value:new Map(),enumerable:false,writable:false},
+                              addEventListener   :{
+                                                     value:function(type_,listener_,options_)
+                                                           {
+                                                              if (!this._eventListeners.has(type_))
+                                                                 this._eventListeners.set(type_,[]);
 
-   constructor(owner_)
-   {
-      this._listeners=new Map();
-   }
-
-   //private props
-   _listeners=null;   //Event handlers map.
-
-   //public methods
-   addEventListener(type_,listener_,options_)
-   {
-      if (!this._listeners.has(type_))
-         this._listeners.set(type_,[]);
-
-      let listenersQueue=this._listeners.get(type_);
-      if (listenersQueue)
-      {
-         this.removeEventListener(type_,listener_,options_);
-         listenersQueue.push({fn:listener_,opts:{...options_}});
-      }
-   }
-
-   removeEventListener(type_,listener_,options_)
-   {
-      let listenersQueue=this._listeners.get(type_);
-      if (listenersQueue)
-         for (let i in listenersQueue)
-            if ((listenersQueue[i].fn==listener_)&&
-                (listenersQueue[i].opts.capture==listener_.capture)&&
-                (listenersQueue[i].opts.once==listener_.once)&&
-                (listenersQueue[i].opts.passive==listener_.passive)&&
-                (listenersQueue[i].opts.signal==listener_.signal))
-            {
-               listenersQueue.splice(i,1);
-               break;
-            }
-   }
-
-   dispatchEvent(event_)
-   {
-      let listenersQueue=this._listeners.get(event_.type);
-      if (listenersQueue)
-      {
-         //Call event listeners:
-         let indexesToRemove=[];
-         for (let [i,listener] of listenersQueue.entries())
-         {
-            let handlingContinues=(listener.fn(event_)??true)||listener.opts.passive;
-            if (listener.opts.once)
-               indexesToRemove.push(i);
-            if (!handlingContinues)
-               break;
-         }
-
-         //Remove oncely-calling listeners:
-         let shift=0;
-         for (let i of indexesToRemove)
-         {
-            listenersQueue.splice(i-shift,1);
-            shift--;
-         }
-      }
-
-      return true;
-   }
+                                                              let listenersQueue=this._eventListeners.get(type_);
+                                                              if (listenersQueue)
+                                                              {
+                                                                 this.removeEventListener(type_,listener_,options_);
+                                                                 listenersQueue.push({fn:listener_,opts:{...options_}});
+                                                              }
+                                                           },
+                                                     enumerable:true,
+                                                     writable:false,
+                                                  },
+                              removeEventListener:{
+                                                     value:function(type_,listener_,options_)
+                                                           {
+                                                              let listenersQueue=this._eventListeners.get(type_);
+                                                              if (listenersQueue)
+                                                                 for (let i in listenersQueue)
+                                                                    if ((listenersQueue[i].fn==listener_)&&
+                                                                        (listenersQueue[i].opts.capture==listener_.capture)&&
+                                                                        (listenersQueue[i].opts.once==listener_.once)&&
+                                                                        (listenersQueue[i].opts.passive==listener_.passive)&&
+                                                                        (listenersQueue[i].opts.signal==listener_.signal))
+                                                                    {
+                                                                       listenersQueue.splice(i,1);
+                                                                       break;
+                                                                    }
+                                                           },
+                                                     enumerable:true,
+                                                     writable:false,
+                                                  },
+                              dispatchEvent      :{
+                                                     value:function(event_)
+                                                           {
+                                                              let listenersQueue=this._eventListeners.get(event_.type);
+                                                              if (listenersQueue)
+                                                              {
+                                                                 //Call event listeners:
+                                                                 let indexesToRemove=[];
+                                                                 for (let [i,listener] of listenersQueue.entries())
+                                                                 {
+                                                                    let handlingContinues=(listener.fn(event_)??true)||listener.opts.passive;
+                                                                    if (listener.opts.once)
+                                                                       indexesToRemove.push(i);
+                                                                    if (!handlingContinues)
+                                                                       break;
+                                                                 }
+                                                              
+                                                                 //Remove oncely-calling listeners:
+                                                                 let shift=0;
+                                                                 for (let i of indexesToRemove)
+                                                                 {
+                                                                    listenersQueue.splice(i-shift,1);
+                                                                    shift--;
+                                                                 }
+                                                              }
+                                                              
+                                                              //Bubble event:
+                                                              if (event_.bubbles)
+                                                                 (this._parent??this.parent)?.dispatchEvent(event_);
+                                                              
+                                                              return !(event_.cancelable&&event_.defaultPrevented);
+                                                           },
+                                                     enumerable:true,
+                                                     writable:false,
+                                                  },
+                           });
+   return obj_;
 }
 
 class EventListenersMap extends Map
 {
-   //Helps to manage an event listeners, which should be priodically attached and detached.
+   //Helps to manage an event listeners, which should be priodically attached to and detached from somewhere.
    
-   constrictor()
+   constructor(entries_)
    {
-      //NOTE: This class accepts no initial entries at construction.
+      super();
+      
+      if (entries_)
+         for (let entry of entries_)
+            this.set(...entry);
    }
    
-   //private props
+   //protected props
    _autoinc=0;
    
    //public methods
-   set(key_,node_,type_,func_,options_)
+   set(key_,target_,type_,func_,options_)
    {
       //Appends/replaces an event listener.
       //Arguments:
       // key_ - string, allows future access to the listener. Optional, if null|undefined then listener will be mapped to the some autoincremental index.
-      // node_ - Node, where to attach listener.
+      // target_ - Object, where to attach listener. Shall implements EventTarget interface.
       // type_ - string, event type, a 1st argument of the Node.addEventListener().
       // func_ - listener function, a 2nd argument of the Node.addEventListener().
       // options_ - listener options, a 3rd argument of the Node.addEventListener().
@@ -189,7 +193,7 @@ class EventListenersMap extends Map
       key_??=this._autoinc++;
       
       this.detach(key_);   //To prevent a listeners leak, force detach previous listener, mapped to this key.
-      let descr={node:node_,type:type_,func:func_,options:options_,attached:false};
+      let descr={target:target_,type:type_,func:func_,options:options_,attached:false};
       
       return super.set(key_,descr);
    }
@@ -209,6 +213,18 @@ class EventListenersMap extends Map
       return super.delete(key_);
    }
    
+   modify(what_,props_)
+   {
+      if (what_ instanceof Array)      //Allows to apply the same modifications to several listeners.
+         for (let key of what_)
+            this._modify(key,props_);  
+      else if (what_=='*')             //Apply the same modifications to all listeners. Require to pass a wildcard explicitly.
+         for (let key of this.keys())
+            this._modify(key,props_);  
+      else if (what_!=undefined)       //Apply modifications to specific listener.
+         this._modify(what_,props_);
+   }
+   
    clear()
    {
       //Detaches and removes all the listeners.
@@ -217,23 +233,29 @@ class EventListenersMap extends Map
       super.clear();
    }
    
-   attach(key_)
+   attach(what_)
    {
       //Attach listener[s] in this map.
       
-      if (key_!=undefined)
-         this._attachListener(super.get(key_));
+      if (what_ instanceof Array)
+         for (let key of what_)
+            this._attachListener(super.get(key));  
+      else if (what_!=undefined)
+         this._attachListener(super.get(what_));
       else
          for (let descr of super.values())
             this._attachListener(descr);
    }
    
-   detach(key_)
+   detach(what_)
    {
       //Detaches listener[s] in this map.
       
-      if (key_!=undefined)
-         this._detachListener(super.get(key_));
+      if (what_ instanceof Array)
+         for (let key of what_)
+            this._detachListener(super.get(key));  
+      else if (what_!=undefined)
+         this._detachListener(super.get(what_));
       else
          for (let descr of super.values())
             this._detachListener(descr);
@@ -276,12 +298,12 @@ class EventListenersMap extends Map
       return null;
    }
    
-   //private methods
+   //protected methods
    _attachListener(descr_)
    {
       if (descr_&&(!descr_.attached))
       {
-         descr_.node.addEventListener(descr_.type,descr_.func,descr_.options);
+         descr_.target.addEventListener(descr_.type,descr_.func,descr_.options);
          descr_.attached=true;
       }
    }
@@ -290,8 +312,23 @@ class EventListenersMap extends Map
    {
       if (descr_?.attached)
       {
-         descr_.node.removeEventListener(descr_.type,descr_.func,descr_.options);
+         descr_.target.removeEventListener(descr_.type,descr_.func,descr_.options);
          descr_.attached=false;
+      }
+   }
+   
+   _modify(key_,props_)
+   {
+      let descr=super.get(key_);
+      if (!descr)
+         console.error('Event descriptor not found at EventListenersMap.modify()',this,key);
+      if (descr?.attached)
+         console.error('Event descriptor is currently attached and can\'t be modified',this,descr);
+      if (descr&&(!descr.attached))
+      {
+         for (let k in props_)
+            if ((k!='attached')&&(descr[k]!==undefined))
+               descr[k]=props_[k];
       }
    }
 }
@@ -513,7 +550,7 @@ class ShortcutsList
    get shortcut(){return this._shortcut;} //Matched shortcut. 
    get isEmpty(){for (let k in this.list) if ((this.list[k]?.length??0)>0) return false; return true;} //Helps to detect whether at least one shortcut is configured or not.
    
-   //private props
+   //protected props
    _action=null;     //Matched action.
    _shortcut=null;   //Matched shortcut. 
    _shortcutCmps={   //Map of the Event.type values and the own event comparison methods.
@@ -558,7 +595,7 @@ class ShortcutsList
       return res;
    }
    
-   //private methods
+   //protected methods
    static _shortcutCmpKey(e_,sh_)
    {
       //Compares keyboard events against shortcut.
@@ -605,6 +642,111 @@ class ShortcutsList
 }
 
 //--------------------- Input elements extention ---------------------//
+function decorateExistingProp(object_,propName_,getter_,setter_)
+{
+   //Decorates an existing property of an object.
+   //Arguments:
+   // object_   - property owner.
+   // propName_ - name of property to be decorated. NOTE: If object_ has no the named property, function will fail.
+   // getter_   - getter function. It receive value from original getter and return a decorated value. Optional.
+   // setter_   - setter function, It receive assigning value and returns undecorated value for original getter. Optional.
+   //Usage:
+   // decorateExistingProp(document.querySelector('input[type=number]'),'value',function(origVal_){return parseFloat(origVal_);},function(newVal_){return (Math.round(newVal_*100)/100).toString();}); //This will turn value of the numeric input into a float type, rounded on assignment.
+   
+   let propOwner=object_;
+   let descr=null;
+   do
+   {
+      descr=Object.getOwnPropertyDescriptor(propOwner,propName_);
+      propOwner=propOwner.__proto__;
+   }
+   while ((!descr)&&propOwner);
+   
+   let orig_getter=descr.get;
+   let orig_setter=descr.set;
+   if (getter_)
+      descr.get=function (){return getter_.call(this,orig_getter.call(this));};
+   if (setter_)
+      descr.set=function (newVal_){orig_setter.call(this,setter_.call(this,newVal_));};
+   Object.defineProperty(object_,propName_,descr);
+}
+
+function decorateInputFieldName(inpField_)
+{
+   Object.defineProperty(inpField_,'keySeq',{get(){return this._keySeq??=new InpNameKeySeq(this.name);},set(newVal_){this._keySeq=newVal_; this.name=this._keySeq.toString();},enumerable:true,writable:true});
+}
+
+function decorateInputFieldVal(inpField_,propName_)
+{
+   //This is an almost decorator of the HTMLInputElements.
+   //It allows to uniformly access the fields value in a sae manner as it would be with form data on a server-side or with JSON data in the response.
+   
+   propName_??='valueAsMixed';
+   
+   let getter;
+   let setter;
+   
+   switch (inpField_.type)
+   {
+      case 'number':
+      {
+         getter=function (){return ((this.value=='')||(this.value==null) ? null : ((this.step??1)==1 ? parseInt(this.value) : parseFloat(this.value)));};   //NOTE: If field value is empty, returns NULL.
+         setter=function (newVal_){this.value=((newVal_==null)||(newVal_=='') ? '' : ((this.step??1)==1 ? parseInt(newVal_??0) : parseFloat(newVal_??0)));};
+         inpField_.addEventListener('keypress',(e_)=>{if ((['0','1','2','3','4','5','6','7','8','9','e','-','+','.',','].indexOf(e_.key)<0)&&(!(e_.ctrlKey||e_.altKey))) {return cancelEvent(e_);}});
+         break;
+      }
+      case 'checkbox':
+      {
+         getter=function (){return this.checked;};
+         setter=function (newVal_){this.checked=toBool(newVal_??false);};
+         break;
+      }
+      case 'file':
+      {
+         getter=function (){return this.files;};
+         setter=function (newVal_){if (newVal_ instanceof FileList) this.files=newVal_;};
+         break;
+      }
+      case 'select-multiple':
+      {
+         getter=function ()
+                {
+                   let isInt=this.dataset.optType=='int';
+                   let res=[];
+                   for (let opt of this.options)
+                      if (opt.selected)
+                         res.push(isInt ? parseInt(opt.value) : opt.value);
+                   return res;
+                };
+         setter=function (newVal_)
+                {
+                   if (newVal_ instanceof Array)      //Main usage case: select options whoose values are represented in the array.
+                      for (let opt of this.options)
+                         opt.selected=(newVal_.indexOf(opt.value)>=0);  //NOTE: options' attribute "selected" may not change in browser's inspector.
+                   else if (newVal_==null)            //Reset unification. NOTE: However getter will return an empty array anyway.
+                      for (let opt of this.options)
+                         opt.selected=false;
+                   else
+                   {
+                      console.warn('A scalar value was assigned to the multiselect.valueAsMixed.');
+                      console.trace(this,newVal_);
+                   }
+                };
+         break;
+      }
+      case 'select-one':   //NOTE: There is no any difference beetween [de]selecting option of select-one field and assigning a value. (if options' attribute "selected" doesn't changes in browser's inspector, it don't anyway.)
+      default:
+      {
+         getter=function (){return (this.dataset.optType=='int' ? parseInt(this.value) : this.value);};
+         setter=function (newVal_){this.value=newVal_;};
+      }
+   }
+   
+   Object.defineProperty(inpField_,propName_,{configurable:true,enumerable:true,get:getter,set:setter});
+   
+   return inpField_;
+}
+
 function decorateCheckbox(checkbox_)
 {
    //Decorate checkbox checked and disabled setters to make checkbox repainted when it changed by code:
@@ -637,7 +779,7 @@ function initCheckboxes(params_)
    //Usage: 
    // Wrap each checkbox with <LABEL> and write some css to make it looks like a checkbox you want.
    
-   var checkboxes=(params_?.container??document).querySelectorAll((params_?.containerSelector ? params_.containerSelector+' ' : '')+(params_?.selector??'label.checkbox input[type=checkbox]'));
+   var checkboxes=(params_?.container??document).querySelectorAll((params_?.selectorContainer ? params_.selectorContainer+' ' : '')+(params_?.selector??'label.checkbox input[type=checkbox]'));
    for (let checkbox of checkboxes)
       decorateCheckbox(checkbox);        //TODO: Find how to detect already decorated checkboxes.
 }
@@ -677,18 +819,17 @@ function decorateRadio(radio_)
 class RadioGroup extends Map
 {
    //This class allows to work with the group of radios as with a single input fueld.
-   //TODO: M.b. this class should consume radioRepaint() and initRadios().
    
-   constructor(entries_)
+   constructor(radios_)
    {
       super();
-      this._evtDispatcher=new EventDispatcher(this);
+      decorateToEventTarget(this);
       this._evtMap=new EventListenersMap();
       
       //NOTE: Don't forget that this.set() rejects the radios which names doesn't match the first one added.
-      if (entries_)
-         for (let [key,radio] of entries_)
-            this.set(radio,key);
+      if (radios_)
+         for (let radio of radios_)
+            this.set(radio);
       
       this.addEventListener('change',(e_)=>{for (let radio of this.values()) radio.checked=radio.checked;});
    }
@@ -705,7 +846,7 @@ class RadioGroup extends Map
    {
       //Return the radios name. (All radios in the group must have the same name.)
       
-      return this.values().next().value?.name;
+      return this._name;
    }
    set name(newVal_)
    {
@@ -713,8 +854,9 @@ class RadioGroup extends Map
       
       for (let radio of this.values())
          radio.name=newVal_;
+      this._name=newVal_;
       
-      this.onRename?.();
+      this.dispatchEvent(new CustomEvent('renamed',{detail:{target:this}}));
    }
    
    get value()
@@ -770,86 +912,48 @@ class RadioGroup extends Map
    get required(){return this._required; /*TODO: this is a draft.*/}
    set required(newVal_){this._required=newVal_; /*TODO: this is a draft.*/}
    
-   //private props
+   //protected props
+   _name=null;
    _required=false;
-   _evtDispatcher=null;
    _evtMap=null;
    
    //public methods
-   add(radio_)
+   set(radio_)
    {
-      //Appends radio to the map, using its value as key.
-      
-      return this.set(radio_.value,radio_);
-   }
-   
-   set(key_,radio_)
-   {
-      //Appends radio to the map with explicit key.
+      //Appends radio to the map.
       //NOTE: As the radios in the group must have exactly equal names, this method rejects the radios which names doesn't match the first one added.
       
-      if (((radio_ instanceof HTMLInputElement)&&(radio_.type=='radio'))&& //Type check, //TODO: test type check on <radio>
-          ((this.size==0)||(radio_.name==this.name)))                      // same name check.
-      {
-         super.set(key_,radio_);
-         this._evtMap.set(key_,radio_,'click',(e_)=>{this.dispatchEvent(new Event('change'));});
-         this._evtMap.attach(key_);
-      }
+      if (!((radio_ instanceof HTMLInputElement)&&(radio_.type=='radio')))
+         throw new TypeError(LC.get('Unexpected value'),{cause:{subject:this,arg:'radio_',val:radio_,expected:'HTMLInputElement of type radio'}});
       
-      return this;
-   }
-   
-   remove(what_)
-   {
-      //Variative version of delete().
-      //Arguments:
-      // what_ - int|string|radio. Radio or its key to remove from map.
+      if (this.size==0)
+         this.name=radio_.name;
       
-      return this.delete(what_ instanceof Object ? this.keyOf(what_) : what_);
+      if (this.name!=radio_.name)
+         throw new RangeError(LC.get('Unexpected value'),{cause:{subject:this,arg:'radio_',val:radio_,expected:'radio_.name==\''+this.name+'\''}});
+         
+      super.set(radio_.value,decorateRadio(radio_));
+      this._evtMap.set(radio_.value,radio_,'click',(e_)=>{this.dispatchEvent(new Event('change'));});
    }
    
    delete(key_)
    {
       let res=false;
       
-      if (this.has(key_))
-      {
-         this._evtMap.detach(key_);
-         res=super.delete(key_);
-      }
+      this._evtMap.delete(key_);
+      res=super.delete(key_);
+      
+      if (this.size==0)
+         this.name=null;
       
       return res;
    }
    
-   keyOf(val_)
+   clear()
    {
-      //Finds key of the given radio.
-      
-      let res=null;
-      
-      for (let [key,val] of this)
-         if (val===val_)
-         {
-            res=key;
-            break;
-         }
-      
-      return res;
-   }
-   
-   addEventListener(type_,listener_,options_)
-   {
-      this._evtDispatcher.addEventListener(type_,listener_,options_);
-   }
-   
-   removeEventListener(type_,listener_,options_)
-   {
-      this._evtDispatcher.removeEventListener(type_,listener_,options_);
-   }
-   
-   dispatchEvent(event_)
-   {
-      this._evtDispatcher.dispatchEvent(event_);
+      this._evtMap.clear();
+      res=super.clear();
+      this.name=null;
    }
 }
 
@@ -859,11 +963,11 @@ function initRadios(params_)
    //Usage:
    // Refer description of the initCheckboxes() as it's the same in an essence.
    // The only difference in that the radios with the same name are coupled but the automatically unchecking radios doesn't receive any event and thus they should be handled from the checked one.
-   //TODO: There is an unresolved conflict with the InputFieldsList().
+   //TODO: Check for conflicts with the InputFieldsMap().
    
    let groups=new Map();
    
-   var radios=(params_?.container??document).querySelectorAll((params_?.containerSelector ? params_.containerSelector+' ' : '')+(params_?.selector??'.radio>input[type=radio]'));
+   var radios=(params_?.container??document).querySelectorAll((params_?.selectorContainer ? params_.selectorContainer+' ' : '')+(params_?.selector??'.radio>input[type=radio]'));
    for (let radio of radios)
    {
       decorateRadio(radio);
@@ -882,7 +986,7 @@ class RangeBar
    {
       if (node_)
       {
-         //private props
+         //protected props
          this.__commitedVals=null;   //Temporary copy of values used to recalc original positions of indirectly moved sliders.
          this.__isVolatile=false;    //True while dragging of sliders.
          
@@ -1320,105 +1424,6 @@ function initRangeBars(selector_,params_)
    return res;
 }
 
-function decorateExistingProp(object_,propName_,getter_,setter_)
-{
-   //Decorates an existing property of an object.
-   //Arguments:
-   // object_   - property owner.
-   // propName_ - name of property to be decorated. NOTE: If object_ has no the named property, function will fail.
-   // getter_   - getter function. It receive value from original getter and return a decorated value. Optional.
-   // setter_   - setter function, It receive assigning value and returns undecorated value for original getter. Optional.
-   //Usage:
-   // decorateExistingProp(document.querySelector('input[type=number]'),'value',function(origVal_){return parseFloat(origVal_);},function(newVal_){return (Math.round(newVal_*100)/100).toString();}); //This will turn value of the numeric input into a float type, rounded on assignment.
-   
-   let propOwner=object_;
-   let descr=null;
-   do
-   {
-      descr=Object.getOwnPropertyDescriptor(propOwner,propName_);
-      propOwner=propOwner.__proto__;
-   }
-   while ((!descr)&&propOwner);
-   
-   let orig_getter=descr.get;
-   let orig_setter=descr.set;
-   if (getter_)
-      descr.get=function (){return getter_.call(this,orig_getter.call(this));};
-   if (setter_)
-      descr.set=function (newVal_){orig_setter.call(this,setter_.call(this,newVal_));};
-   Object.defineProperty(object_,propName_,descr);
-}
-
-function decorateInputFieldVal(inpField_,propName_)
-{
-   //This is an almost decorator of the HTMLInputElements.
-   //It allows to uniformly access the fields value in a sae manner as it would be with form data on a server-side or with JSON data in the response.
-   
-   propName_??='valueAsMixed';
-   
-   let getter;
-   let setter;
-   
-   switch (inpField_.type)
-   {
-      case 'number':
-      {
-         getter=function (){return ((this.value=='')||(this.value==null) ? null : ((this.step??1)==1 ? parseInt(this.value) : parseFloat(this.value)));};   //NOTE: If field value is empty, returns NULL.
-         setter=function (newVal_){this.value=((newVal_==null)||(newVal_=='') ? '' : ((this.step??1)==1 ? parseInt(newVal_??0) : parseFloat(newVal_??0)));};
-         inpField_.addEventListener('keypress',(e_)=>{if ((['0','1','2','3','4','5','6','7','8','9','e','-','+','.',','].indexOf(e_.key)<0)&&(!(e_.ctrlKey||e_.altKey))) {return cancelEvent(e_);}});
-         break;
-      }
-      case 'checkbox':
-      {
-         getter=function (){return this.checked;};
-         setter=function (newVal_){this.checked=toBool(newVal_??false);};
-         break;
-      }
-      case 'file':
-      {
-         getter=function (){return this.files;};
-         setter=function (newVal_){if (newVal_ instanceof FileList) this.files=newVal_;};
-         break;
-      }
-      case 'select-multiple':
-      {
-         getter=function ()
-                {
-                   let res=[];
-                   for (let opt of this.options)
-                      if (opt.selected)
-                         res.push(opt.value);
-                   return res;
-                };
-         setter=function (newVal_)
-                {
-                   if (newVal_ instanceof Array)      //Main usage case: select options whoose values are represented in the array.
-                      for (let opt of this.options)
-                         opt.selected=(newVal_.indexOf(opt.value)>=0);  //NOTE: options' attribute "selected" may not change in browser's inspector.
-                   else if (newVal_==null)            //Reset unification. NOTE: However getter will return an empty array anyway.
-                      for (let opt of this.options)
-                         opt.selected=false;
-                   else
-                   {
-                      console.warn('A scalar value was assigned to the multiselect.valueAsMixed.');
-                      console.trace(this,newVal_);
-                   }
-                };
-         break;
-      }
-      case 'select-one':   //NOTE: There is no any difference beetween [de]selecting option of select-one field and assigning a value. (if options' attribute "selected" doesn't changes in browser's inspector, it don't anyway.)
-      default:
-      {
-         getter=function (){return this.value;};
-         setter=function (newVal_){this.value=newVal_;};
-      }
-   }
-   
-   Object.defineProperty(inpField_,propName_,{configurable:true,enumerable:true,get:getter,set:setter});
-   
-   return inpField_;
-}
-
 function filterSelectOptions(selectInp_,callback_,postprocess_)
 {
    let enabledOpts=[];
@@ -1441,247 +1446,6 @@ function filterSelectOptions(selectInp_,callback_,postprocess_)
    postprocess_?.call(this,selectInp_,enabledOpts,selectedOpts);
 }
 
-//--------------------- Input complexes ---------------------//
-class InputFieldsList extends Map
-{
-   //This class allows to collect input fields (except buttons) from container_ to access them by keys and manipulate.
-   
-   constructor(container_,params_)
-   {
-      //Arguments:
-      // parent_ - parent instance of DynamicForm. Optional.
-      // params_ - object, initialization parameters.
-      // Parameters:
-      //    selector - CSS-selector to find input fields. Optional. NOTE: The default selector doesn't takes into account a nested containers. If you need so, write a custom selector that will do.
-      //    regExp - RegExp to match a key parts of input's name: a row and a key.
-      //    matchIndexes - Indexes of the name key parts in regExp matches. Format: {row:<index>,key:<index>}.
-      //    replacement - A string for replaceing of the input's name key parts.
-      //    namesWarning - boolean, whether to issue console warning when input field with a name that doesn't match the regExp is found. Optional, default false.
-      //    NOTE: All of regExp, matchIndexes and replacement are optional, but pay attention to keep'em in sync.
-      //Usage:
-      //Default parameters are disigned for inputs named like 'prefix[0][col_name]' or 'prefix[0][col_name][sub_prop]' or 'prefix[][col_name]'.
-      //In this example regExp matches will be ['[0][col_name]','0','col_name'], so matchIndexes.row=1, matchIndexes.key==1 and replacement string is conform 0th match.
-      // someClass
-      // {
-      //    constructor(node_,row_,value_)
-      //    {
-      //       this._inpList=new InputFieldsList(node_);       //Instantiate with default params (will collect all inputs into the node_).
-      //       this._inpList.inputs['col_name'].value=value_;  //Access input by its key.
-      //       this._inpList.rowIndex=row_;                    //Set row index for all inputs.
-      //    }
-      // }
-      
-      super();
-      
-      //Set backreference to parent object (if needed):
-      this._parent=params_?.parent??null;
-      this._container=container_;
-      
-      //Init params:
-      this._regExp=params_?.regExp??this._regExp;
-      this._matchIndexes=params_?.matchIndexes??this._matchIndexes;
-      this._replacement=params_?.replacement??this._replacement;
-      
-      //Find inputs:
-      let foundInputs=container_.querySelectorAll(params_?.selector??'input,select,textarea');  //Find all inputs except buttons.
-      for (let input of foundInputs)
-      {
-         let matches=this._regExp.exec(input.name);                              //Get the input's key from its name
-         let key=matches?.[this._matchIndexes.key]??undefined;                   //
-         if (key!==undefined)                                                    // and if key is ok,
-         {
-            if (input.type=='radio')
-            {
-               if (!this.has(key))
-                  super.set(key,(params_?.decorator??decorateInputFieldVal)(new (params_?.radioGroupClass??RadioGroup)(),params_?.valueProp));  //Create new radio group if not exists.
-               this.get(key).add(input);                                         //Add radio input to its group. NOTE: Make sure that all radios with the same keys has exactly equal names, because the RadioGroup.add() will reject all radios with the name different from the first one added.
-            }
-            else
-               super.set(key,(params_?.decorator??decorateInputFieldVal)(input,params_?.valueProp)); // decorate the input field and store it to associative array.
-         }
-         else if (params_?.namesWarning)
-         {
-            console.warn('InputFieldsList: input\'s name doesn\'t match regExp');
-            console.trace(input,this._regExp);
-         }
-      }
-   }
-   
-   //public props
-   get parent(){return this._parent;}
-   
-   get rowIndex()
-   {
-      //Get first input and exam its row index:
-      let res=null;
-      
-      if (this._matchIndexes.row!=null)
-         for (let inp of this.values())
-         {
-            let matches=this._regExp.exec(inp.name);
-            res=matches?.[this._matchIndexes.row]??''; //If row index isn't set (input is named like "prefix[][col_name]")
-            res=(res!='' ? parseInt(res) : null);      // then return null. Else don't forget to convert a numeric string to int.
-            break;
-         }
-      
-      return res;
-   }
-   set rowIndex(newVal_)
-   {
-      //Replace row index for all inputs:
-      let replacement=this._replacement.replace('$'+this._matchIndexes.row,newVal_); //Insert a new value into replacement string, e.g. '[$1][$2]' --> '[8][$1]'.
-      for (let inp of this.values())
-         inp.name=inp.name.replace(this._regExp,replacement);
-   }
-   
-   //private props
-   _parent=null;
-   _container=null;
-   _regExp=/^([a-z0-9_]+)\[([0-9]*)\]\[([a-z0-9_]+)\]/i;
-   _matchIndexes={prefix:1,row:2,key:3};
-   _replacement='$1[$2][$3]';
-   
-   //public methods
-   set()
-   {
-      console.warn('InputFieldsList is currently readonly');
-      console.trace();
-   }
-   
-   clear()
-   {
-      console.warn('InputFieldsList is currently readonly');
-      console.trace();
-   }
-   
-   delete()
-   {
-      console.warn('InputFieldsList is currently readonly');
-      console.trace();
-   }
-
-   
-   //private methods
-   _addInp_default(inp_)
-   {
-      //TODO
-   }
-   
-   _addInp_radio(inp_)
-   {
-      //TODO
-   }
-}
-
-class SortingController
-{
-   constructor(params_)
-   {
-      this._root=params_?.container??(params_?.containerSelector ? document.querySelector(params_.containerSelector) : null);
-      if (this._root)
-      {
-         //Get sorting data source:
-         this._cookieKey=params_?.cookieKey??this._root.dataset?.sortingCookie??this._cookieKey;
-         this._cookiePath=params_?.cookiePath??this._cookiePath;
-         this.onChange=params_.onChange;
-         
-         //Init buttons:
-         let buttons=params_?.buttons??this._root.querySelectorAll(params_?.buttonsSelector??'.sort_btn');   //Find buttons into container.
-         for (let btn of buttons)
-            if ((btn.dataset.key!='')&&(/^(ASC|DESC)$/i.test(btn.dataset.order)))   //Buttons must has correct DATA-KEY and DATA-ORDER attributes.
-            {
-               btn.dataset.order=btn.dataset.order.toUpperCase();       //Normalize order's char case.
-               this._buttons[btn.dataset.key]??={ASC:null,DESC:null};   //Cache buttons by key and order 
-               this._buttons[btn.dataset.key][btn.dataset.order]=btn;   // for easy access.
-               
-               btn.addEventListener('click',(e_)=>{this.toggle_sorting(e_.target.dataset.key,e_.target.dataset.order,e_.ctrlKey);});   //NOTE: If click with the Ctrl key pressed, then new sorting will be appended to existing ones, else the previous sortings will be discarded.
-               btn.classList.toggle(this._selClassName,this.sortings[btn.dataset.key]==btn.dataset.order); //Init button state: set button selected if its order match corresponding sorting.
-            }
-      }
-   }
-   
-   //public props
-   get sortings()
-   {
-      try
-      {
-         this._sortings??=JSON.parse(getCookie(this._cookieKey)??'{}'); //NOTE: JSON.parse(null) doesn't rise exception, while JSON.parse(undefined) and JSON.parse('') does.
-      }
-      catch (err)
-      {
-         this._sortings={};
-      }
-      finally
-      {
-         return this._sortings;
-      }
-   }
-   set sortings(newVal_)
-   {
-      this._sortings=newVal_;
-      
-      let cookieVal=(this._sortings&&(Object.keys(this._sortings).length) ? JSON.stringify(this._sortings) : '');  //If sortings is empty, the cookie will be unset.
-      setCookie(this._cookieKey,cookieVal,31,this._cookiePath);
-      console.log('set sortings',this._cookieKey,this._sortings);
-   }
-   
-   //private props
-   _root=null;
-   _buttons={};
-   _selClassName='sel';
-   _cookieKey='sort';
-   _cookiePath=document.location.pathname;
-   _sortings=null;
-   
-   //public methods
-   toggle_sorting(key_,order_,append_)
-   {
-      //Toggle sorting.
-      // If there is only one sorting it will be simply toggled. The same if append_ is set.
-      // If there are many sortings, they will be replaced with the key_+order_, unless append_ is set.
-      
-      if ((this.sortings[key_]==order_)&&(append_||(Object.keys(this.sortings).length==1)))
-         order_='';
-      this.set_sorting(key_,order_,append_);
-   }
-   
-   set_sorting(key_,order_,append_)
-   {
-      //Set sorting by the key_ to the order_.
-      // If order_
-      // If key_ already exists, its order will be updated with new value. By the way, if append_==false then all previous sortings will be discarded.
-      // If key_ doesn't exists and append_==true, it will be appended to the end of existing sortings.
-      
-      if (this._buttons[key_]&&/^(ASC|DESC)?$/i.test(order_))   //First, check is key_ and order_ are valid (as this method may be called manually).
-      {
-         if (!append_)
-            this.discard_sortings()
-         
-         let sortings=this.sortings;
-         if (order_!='')
-            sortings[key_]=order_;
-         else
-            delete sortings[key_];
-         
-         this._buttons[key_].ASC.classList.toggle(this._selClassName,order_=='ASC');
-         this._buttons[key_].DESC.classList.toggle(this._selClassName,order_=='DESC');
-         
-         this.sortings=sortings;
-         this.onChange?.();
-      }
-   }
-   
-   discard_sortings()
-   {
-      this.sortings={};
-      for (const key in this._buttons)
-      {
-         this._buttons[key].ASC.classList.remove(this._selClassName);
-         this._buttons[key].DESC.classList.remove(this._selClassName);
-      }
-   }
-}
-
 //--------------------- Dynamic DOM ---------------------//
 function buildNodes(struct_,collection_)
 {
@@ -1691,17 +1455,17 @@ function buildNodes(struct_,collection_)
    //          1) struct_ is an object - in this case the tag Node will be created. The object properties will be transfered to the node as described below:
    //             tagName - is only required property necessary to create a node itself. It should be a valid tag name.
    //             _collectAs - string, a key to add the node into collection_.
-   //             childNodes - an array of child struct_s. It allows to create a nodes hieracy.
+   //             childNodes - an array of child struct_s. It allows to create a nodes hierarchy.
    //             style - object, associative array of css attributes, which will be copied to the node.style.
    //             dataset - object, associative array of attributes,  which will be copied to the node.dataset.
    //             Any other attributes will be copied to the node directly.
-   //          2) strict_ is a string - the TextNode will be created from its value.
+   //          2) struct_ is a string - the TextNode will be created from its value.
    //          3) struct_ is a Node instance - such a node will be directly attached to the branch as it is. NOTE: Make sure that you will not append the same node into the different branches this way. 
    //             This feature may be useful if you need to create a branch with the some nodes provided by another class, method or something else.
    // collection_ - object, associative array for the node pointers. After creation of a DOM branch, it can be needed to access some nodes directly.
-   //             To do this you need to make 2 steps: 1st - set the keys using the _collectAs property to the strict_ of the nodes you want, 2-nd - make an [empty] object-type variable and pass it as argument here. The results will be into it.
+   //             To do this you need to make 2 steps: 1st - set the keys using the _collectAs property to the struct_ of the nodes you want, 2-nd - make an [empty] object-type variable and pass it as argument here. The results will be into it.
    
-   var res;
+   let res;
    if (struct_ instanceof Array)
    {
       res=document.createDocumentFragment();
@@ -1767,7 +1531,8 @@ function buildNodes(struct_,collection_)
                case 'allowfullscreen':    //iframe          \
                case 'autofocus':          //inputs          |
                case 'checked':            //checkbox,radio  |
-               case 'disabled':           //                > boolean
+               case 'disabled':           //                |
+               case 'inert':              //                > boolean
                case 'multiple':           //                |
                case 'readonly':           //                |
                case 'required':           //                |
@@ -1777,18 +1542,25 @@ function buildNodes(struct_,collection_)
                      res.setAttribute([prop],true);
                   break;
                }
+               case 'hidden':
+               {
+                  if (struct_[prop]=='until-found')
+                     res.setAttribute([prop],'until-found');
+                  else if (struct_[prop])
+                     res.setAttribute([prop],'hidden');
+               }
                case 'style':
                {
                   if (typeof struct_[prop] == 'string')  //The "instanceof String" operator has little use here.
                      res.setAttribute([prop],struct_[prop]);
                   else
-                     for (var st in struct_[prop])
+                     for (let st in struct_[prop])
                         res[prop][st]=struct_[prop][st];
                   break;
                }
                case 'dataset':
                {
-                  for (var key in struct_[prop])
+                  for (let key in struct_[prop])
                      res[prop][key]=struct_[prop][key];
                   break;
                }
@@ -1813,504 +1585,1120 @@ function buildNodes(struct_,collection_)
    return res;
 }
 
-function dialogOpen(struct_,parentNode_,collection_)
+function popupOpen(struct_,parentNode_,collection_)
 {
    //Make popup and assigns to parent_ (or to document.body by default).
-   
    var res=null;
+   
+   popupsClose();   //close previously opened popups.
    
    if (struct_)
    {
-      let collection_={};
       res=buildNodes(struct_,collection_);                  //Create new popup's DOM structure
       if (res)
       {
-         collection_.btn_close.addEventListener('click',(e_)=>{res.close(); res.parentNode.removeChild(res); return cancelEvent(e_);});   //Close dialog by close button.
-         collection_.title    .addEventListener('click',(e_)=>{e_.stopPropagation();});         //Prevent close when the dialog title
-         collection_.container.addEventListener('click',(e_)=>{e_.stopPropagation();});         // or some content elemants is clicked.
-         res.addEventListener('click',(e_)=>{res.close(); res.parentNode.removeChild(res);});   //Close dialog by click on the dialod element itself (this includes the area around).
-         res.addEventListener('wheel',(e_)=>{e_.stopPropagation();});      //Prevent page scrolling
-         res.addEventListener('scroll',(e_)=>{return cancelEvent(e_);});   // under the dialog shown.                         
-         //NOTE: Dialog can be closed by Esc key as default browser behaviour.
-         
-         (parentNode_??document.body)?.appendChild(res);    //If DOM structure was built successfully, attach it to the parent.
-         res.showModal();
+         (parentNode_??document.body)?.appendChild(res);    //If DOM structure was built successfully, attach it to parent
+         res.classList.add('opened');
       }
    }
    
    return res;
 }
 
-function dialogsClose()
+function popupsClose()
 {
-   //Closes all dialogs (generrally - one).
+   //Closes all popups (generrally - one), placed into parent_.
+   let res=null;
    
-   for (let dialog of document.querySelectorAll('dialog'))
-   {
-      dialog.close();
-      dialog.parentNode.removeChild(dialog);
-   }
+   let oldPopups=document.body.querySelectorAll('.popup');
+   if (oldPopups)
+      for (let i=0;i<oldPopups.length;i++)
+      {
+         oldPopups[i].classList.remove('opened');
+         if (!oldPopups[i].classList.contains('static'))
+         {
+            //Get fading duration:
+            let maxTrDur=getTransitionDuration(oldPopups[i]);
+            //Remove popup:
+            if (maxTrDur>0)
+               window.setTimeout(function(){document.body.removeChild(oldPopups[i]);},maxTrDur);
+            else
+               document.body.removeChild(oldPopups[i]);
+         }
+      }
+   
+   return res;
 }
 
-//--- Common popup structures ---//
-function baseDialogStruct(caption_,childNodes_,params_)
+//--- Common dialog structures ---//
+function basePopupStruct(caption_,childNodes_,params_)
 {
    var res={
-              tagName:'dialog',
-              className:'window '+(params_?.windowClassName??''),
+              tagName:'div',
+              className:'popup '+(params_?.rootClassName??''),
               childNodes:[
                             {
                                tagName:'div',
-                               className:'title',
+                               className:'window '+(params_?.windowClassName??''),
                                childNodes:[
-                                             {tagName:'span',className:'caption',innerHTML:caption_??''},
-                                             {tagName:'div',className:'button close',_collectAs:'btn_close'},
+                                             {
+                                                tagName:'div',
+                                                className:'title',
+                                                childNodes:[
+                                                              {tagName:'span',innerHTML:caption_??''},
+                                                              {tagName:'div',className:'button close',onclick:params_?.closeCallback??function(e_){popupsClose()}},
+                                                           ]
+                                             },
+                                             {
+                                                tagName:'div',
+                                                className:'container',
+                                                childNodes:childNodes_,
+                                             }
                                           ],
-                               _collectAs:'title',
-                            },
-                            {
-                               tagName:'div',
-                               className:'container',
-                               childNodes:childNodes_,
-                               _collectAs:'container',
+                               onclick:function(e_){e_.stopPropagation();},
                             }
                          ],
+              onclick:params_?.closeCallback??function(){popupsClose()},
+              onwheel:function(e_){e_.stopPropagation();},
+              onscroll:function(e_){return cancelEvent(e_);}
            };
    
    return res;
 }
 
-function imageDialogStruct(link_,caption_,params_) //makes structure of window for displaying of enlarged image
+function imagePopupStruct(link_,caption_) //makes structure of window for displaying of enlarged image
 {
    var res={
-              tagName:'dialog',
-              className:'window'+(params_?.windowClassName??''),
+              tagName:'div',
+              className:'popup',
               childNodes:[
                             {
                                tagName:'div',
-                               className:'title',
+                               className:'window',
                                childNodes:[
-                                             {tagName:'span',className:'caption',innerHTML:caption_??''},
-                                             {tagName:'div',className:'button close',onclick:function(){popupsClose()}},
+                                             {
+                                                tagName:'div',
+                                                className:'title',
+                                                childNodes:[
+                                                              {tagName:'span',innerHTML:caption_??''},
+                                                              {tagName:'div',className:'button close',onclick:function(){popupsClose()}},
+                                                           ]
+                                             },
+                                             {
+                                                tagName:'div',
+                                                className:'container image',
+                                                childNodes:[
+                                                               {
+                                                                  tagName:'img',
+                                                                  src:link_
+                                                               }
+                                                           ]
+                                             }
                                           ]
-                            },
-                            {
-                               tagName:'div',
-                               className:'container image',
-                               childNodes:[
-                                              {
-                                                 tagName:'img',
-                                                 src:link_,
-                                                 _collectAs:'image',
-                                              }
-                                          ],
-                               _collectAs:'container',
                             }
                          ],
+              onclick:function(){popupsClose()},
            };
    
    return res;
 }
 
-//--------------------- Dynamic loading ---------------------//
-class DynamicListItem
+//--------------------- Dynamic trees and lists ---------------------//
+class TreeNode extends Map
 {
-   //Interface for classes that controls behavior of the DOM nodes into DynamicList container.
+   //Basic class for tree items.
    
-   constructor(parent_,params_)
-   {
-      //Abstract.
-      //Arguments:
-      // parent_ - parent instance of DynamicList, which allows to build a trees.
-      // params_ - object, initialization parameters.
-      // Parameters:
-      //    node - Node, Main DOM node of the item. Optional, see params_.nodeStruct as alternative.
-      //    nodeStruct - object, a declarative structure of the item node, used to create it dynamically. See function buildNodes() for details. Optional, used if params_.node isn't set.
-      
-      this._parent=parent_;
-      
-      //Initialize list item's DOM node:
-      //NOTE: params_.node may be set by DynamicList in semidynamic mode which is triggered on if the DynamicList founds a statically created item nodes.
-      this._node=params_.node??buildNodes(params_.nodeStruct,this._insidesCollection); //Attach to statically created DOM node or build a new one dynamically.
-   }
-   
-   //public properties
-   get parent(){return this._parent;}
-   set parent(newVal_){console.warn('Attempt to assign value to DynamicListItem.parent that is readonly in default implementation.'); console.trace();}
-   
-   get node()
-   {
-      //Readonly. This property is required by DynamicList to access the list item's node.
-      return this._node;
-   }
-   
-   get data()
-   {
-      //Abstract. This getter may has no implementation if there is no need to return the data to the parent. E.g. if the item just displays something.
-      console.warn('Using of abstract getter DynamicListItem.data');
-      console.trace();
-   }
-   set data(data_)
-   {
-      //Abstract. Implementation should apply this new data_ to the instance.
-      console.warn('Using of abstract setter DynamicListItem.data');
-      console.trace();
-   }
-   
-   //private properties
-   _parent=null;
-   _node=null;
-   _insidesCollection={}; //This property is dedicated for dynamic this._node creation. See this._setupNode() and function buildNodes() for details.
-}
-
-class DynamicFormItem extends DynamicListItem
-{
-   //This class implements a form-specific features.
-   // Use this class with the class DynamicForm.
-   
-   constructor(parent_,params_)
+   constructor(params_)
    {
       //Arguments:
-      // parent_ - parent instance of DynamicForm. Optional.
-      // params_ - object, initialization parameters.
+      // params_ - object. Arbitrary parameters required by specific class to construct and init itself.
       // Parameters:
-      //    node, nodeStruct - inherited from DynamicListItem.
-      //    inputFieldsListClass - Input fields controller class, descending from or compatible with InputFieldsList. Optional, default is InputFieldsList.
-      //    inputFieldsListParams - See class InputFieldsList.constructor().
+      //    key - int|string. Initial key, typically given by the parent when it creates a child. A specific descendant classes may require it for proper initialization. Therefore a parent shall be awared of requirements of its direct children.
+      //    parent - TreeNode. Initial reference to the parent. A specific descendant classes may require it for proper initialization (including whole TreeNode.keySeq). 
+      //           Design specs: 
+      //            - The params_ is local to the constrictor by default. Any descendant class shall manage'em by itself, but it's encouraged to save a particular parameters, that it will need all instance lifetime, rather than to save params_ in a whole.
+      //            - TODO: initial key and parent: 
       
-      super(parent_,params_);
+      super();
       
-      let inputFieldsListClass=params_.inputFieldsListClass??InputFieldsList;
-      this._inpFieldsList=new inputFieldsListClass(this._node,params_?.inputFieldsListParams??null); //Get all form inputs within this item. NOTE: Pay attention that the inputsListClass may also grab input fields from the nested items.
+      decorateToEventTarget(this);
+      
+      this._childEvtMaps=new Map();
+      this._parentEvtMap=new EventListenersMap();
+      
+      //Prepare listeners that shall be attached to the parent:
+      this._parentEvtMap.set('branchchange',null,'branchchange',(e_)=>{this.dispatchEvent(e_);},{passive:true});  //Pull down these events from the parent. This will distribute them to whole branch.
+      
+      //Set listeners on this:
+      this.addEventListener('attached',
+                            (e_)=>{
+                                     //This handler shall be not overridable.
+                                     this._parentEvtMap.modify('*',{target:this.#parent});
+                                     this._parentEvtMap.attach();
+                                     this.dispatchEvent(new CustomEvent('branchchange',{detail:{target:this,event:e_}}));  //Emit additional event that will be pulled down by children and therefore distributed within the branch.
+                                  },
+                            {passive:true});
+      this.addEventListener('detached',
+                            (e_)=>{
+                                     //This handler shall be not overridable.
+                                     this._parentEvtMap.detach();
+                                     this.dispatchEvent(new CustomEvent('branchchange',{detail:{target:this,event:e_}}));  //Emit additional event that will be pulled down by children and therefore distributed within the branch.
+                                  },
+                            {passive:true});
+      this.addEventListener('keychange',(e_)=>{this.dispatchEvent(new CustomEvent('branchchange',{detail:{target:this,event:e_}}));},{passive:true}); //Emit additional event that will be pulled down by children and therefore distributed within the branch.
+      
+      this.addEventListener('branchchange',(e_)=>{this.#nameCache=null; this.#keySeqCache=null;},{passive:true});
    }
    
    //public props
-   get rowIndex()
+   get key(){return this.#key;}
+   set key(newVal_)
    {
-      //Get data row ordinal index. See InputFieldsList.rowIndex.
-      return this._inpFieldsList.rowIndex;
-   }
-   set rowIndex(newVal_)
-   {
-      //Set data row ordinal index. See InputFieldsList.rowIndex.
-      this._inpFieldsList.rowIndex=newVal_;
+      if (this.#key!==newVal_)   //All methods can rely on the fact that literally nothing will happen, if assign the same value. All classes that overrides this method must carry on this behavior.
+      {
+         if (this.dispatchEvent(new CustomEvent('beforekeychange',{detail:{target:this,newVal:newVal_},cancelable:true}))!==false)  //Child key can not be changed without notifying its parent and receiving permission from it.
+         {
+            this.#key=newVal_;
+            this.dispatchEvent(new CustomEvent('keychange',{detail:newVal_}));
+         }
+      }
    }
    
-   get data()
+   get parent(){return this.#parent;}
+   set parent(newVal_)
    {
-      let res={};
-      for (let [key,inp] of this._inpFieldsList)
-         res[key]=inp.valueAsMixed;
-      return res;
+      if (this.#parent!==newVal_)   //All methods can rely on the fact that literally nothing will happen, if assign the same value. All classes that overrides this method must carry on this behavior.
+      {
+         if (this.dispatchEvent(new CustomEvent('beforeparentchange',{detail:{target:this,newVal:newVal_},cancelable:true,bubbling:false}))!==false)  //This property can not be changed without notifying the parent and receiving permission from it.
+            this.#parent=newVal_;
+         //NOTE: It's a parent that has to dispatch the 'attached' and 'detached' events. The main reason is that the parent could provide a specific details with those events. However, this setter can emit additional events that triggers an actions aside the handling of 'attached' and 'detached'.
+      }
    }
-   set data(data_)
-   {
-      for (let [key,inp] of this._inpFieldsList)
-         inp.valueAsMixed=data_[key]??inp.valueAsMixed;
-   }
+   
+   get name(){return this.#nameCache??=(this.#parent ? this.#parent?.name+'['+this.#key+']' : this.#key);}
+   
+   get keySeq(){return this.#keySeqCache??=Object.freeze(this.#parent ? [...this.#parent.keySeq,this.#key] : [this.#key]);}
+   
+   //protected props
+   _childEvtMaps=null;  //This map contains an EventListenersMap for each child in this. It used to retain the event listeners that parent attaches to a child when allocates it and shall detach when deletes it.
+   _parentEvtMap=null;        //General-purpose map, that the item can use to retain an event listeners it shall temporary attach to any objects it has listen to.
+   _elements={};        //Storage for the references to all HTMLElement[s] the class needs at hand.
    
    //private props
-   _inpFieldsList=null; //Instance of InputFieldsList.
-}
-
-class DynamicList extends DynamicListItem
-{
-   //Manager of the dynamic lists.
-   // Its works with statically and dynamically initialized lists and trees.
-   
-   constructor(parent_,params_)
-   {
-      //Arguments:
-      // parent_ - parent instance of DynamicList, which allows to build a trees.
-      // params_ - object, initialization parameters.
-      // Parameters:
-      //    node, nodeStruct - inherited from DynamicListItem.
-      //    itemClass - JS Class of the list items. Has to implement the DynamicListItem. Mandatory.
-      //    itemClassParams - object, initialization parameters for the itemClass. Optional.
-      //    listNode - Container node for the items' nodes. Optional, may be altered with params_.listNodeSelector or this._node. See this._setupNode() at "Get the list items container node".
-      //    listNodeSelector - CSS-selector to get the list node from this.node.
-      //    minLength - a minimal (undeletable) amount of items in the list. Note that DynamicList.constrictor() doesn't initially pads the list to the minLength. If such functionality is desired, implement it in descendants.
-      // Semidynamic mode parameters: 
-      //    protoClassName - the special css class that marks a dedicated item node should be used as item's node prototype. Such node will be extracted from the list node and the protoClassName will be removed from its classList. Conditionally optional. See this._setupNode() at "Semidynamic mode initialization".
-      //    excludeBefore - number of the prefix _listNode children that aren't a list items. It may be e.g. row[s] with table header that mightn't be placed outside the node_.
-      //    excludeAfter - number of the postfix _listNode children.
-      //       NOTE: non-element nodes (like text nodes and comments) aren't counted at all. Thus meaningful text nodes mightn't be placed inside the node_, but on the other hand whitespaces will makes no harm to the list operationing.
-      //    idProp - the default name of the item's data property which serves as unique identifier. Optional.
-      
-      super(parent_,params_);
-      
-      this._itemClass=params_.itemClass;
-      this._itemClassParams=params_.itemClassParams??null;
-      this._idProp=params_.idProp??this._idProp;
-      this._minLength=params_.minLength??this._minLength;
-      
-      //Get the list items container node:
-      if (params_.listNode)                                    //Directly defined in params.
-         this._listNode=params_.listNode;
-      else if (this._insidesCollection['listNode'])            //Get from inner elements collection, defined at dynamic _node creation. (See DynamicFormItem._setupNode().)
-         this._listNode=this._insidesCollection['listNode'];
-      else if (params_.listNodeSelector)                       //Get from this._node by CSS-selector.
-         this._listNode=this._node.querySelector(params_.listNodeSelector);
-      else                                                     //In a trivial cases, this._node and this._listNode is the same node. (E.g. in simple standalone lists).
-         this._listNode=this._node;
-      
-      //Init list:
-      // If the list is statically created on the backend, this._listNode can contain item nodes needs to be initialized with a DynamicListItem class.
-      // Also list may contain a non-item extra nodes.
-      
-      //Exclude elements that aren't a list items (e.g. table head and foot rows):
-      var first=params_.excludeBefore??0;
-      var last=this._listNode.childElementCount-1-(params_.excludeAfter??0);
-      if (last<(this._listNode.childElementCount-1))
-         this._firstAppendixNode=this._listNode.children[last+1]; //A new list item nodes will be inserted before the first extra node (or to the list end).
-      
-      //Detect if the list is semidynamic:
-      this._isSemidynamic=(first<=last);   //If this._listNode has initial (statically created) item nodes, it considered as semidynamic.
-      
-      //Semidynamic mode initialization:
-      //NOTE: In the semidynamic mode all new list items will be created by clonning the prototype node. So do not use item classes which relies on dynamic node build and DynamicListItem._insidesCollection.
-      if (this._isSemidynamic)
-      {
-         //Get a item's node prototype:
-         let protoClassName=params_.protoClassName??'proto';
-         if (this._listNode.children[first].classList.contains(protoClassName))        //Check if the first node in the list is a dedicated prototype node. NOTE: If the list [can] initially has no payload item nodes the dedicated prototype node is required (except params_.protoNodeStruct is defined).
-         {                                                                             //If so, 
-            this._itemNodePrototype=this._listNode.children[first];                    //
-            this._listNode.removeChild(this._itemNodePrototype);                       // remove it from list
-            last--;                                                                    //
-            this._itemNodePrototype.classList.remove(protoClassName);                  // and prepare for clonning.
-         }                                                                             //
-         else                                                                          //If  not so,
-            this._itemNodePrototype=this._listNode.children[first].cloneNode(true);    // clone a common list item node.
-      
-         //Init statically created list node children:
-         for (var i=first;i<=last;i++)
-            this._items.push(this._createItem(this._listNode.children[i]));   //Create new DynamicListItem instance for the statically created list node child.
-      }
-   }
-   
-   //private properties
-   _items=[];                 //Array of the items, represented by Controller instances.
-   _minLength=0;              //Minimum number of items.
-   _listNode=null;            //Container node for the items' nodes.
-   _firstAppendixNode=null;       //First extra node in this._node after the actual items. All new item nodes will be inserted before it (or to the end of list if it's null).
-   _isSemidynamic=false;      //If the semidynamic mode detected. Needed mostly for diagnostical purposes.
-   _itemNodePrototype=null;   //Prototype node for creating a new items. Set only if this._isSemidynamic is true.
-   _itemClass=null;           //JS Class of the list items. Has to implement the DynamicListItem.
-   _itemClassParams=null;     //Parameters for the _itemClass constructor.
-   _idProp='id';              //Name of the item's data property, which can be used to identify the item.
-   
-   //public props
-   get minLength(){return this._minLength;}
-   set minLength(newVal_)
-   {
-      this._minLength=Math.max(0,newVal_);   //NOTE: Currently min length affects only remove() method, but don't cause automatical adding o fa new items if the current length is lesser than the minimum.
-   }
-   
-   get isSemidynamic() {return this._isSemidynamic;} //Needed mostly for diagnostical purposes.
-   
-   get data()
-   {
-      //Collect all item's data into array.
-      
-      let res=[];
-      
-      for (let item of this._items)
-         res.push(item.data);
-      
-      return res;
-   }
-   set data(data_)
-   {
-      //Replace whole list with the new data.
-      
-      this.clear();
-      for (let itemData of data_)
-         this.add(itemData);
-   }
-   
-   get length(){return this._items.length;}
+   #key=null;
+   #parent=null;
+   #nameCache=null;
+   #keySeqCache=null;
    
    //public methods
-   add(mixed_)
+   set(newChild_)
    {
-      //Appends a new list item or item data.
+      //Appends a new child. If a new child is already a child of this, this one does nothing.
       
-      let newItem=this._createItem(mixed_);
-      if (newItem)
+      this._validateChild(newChild_);  //This method throws an error if given child is not supported.
+      
+      let existingChild=super.get(newChild_.key);
+      if (existingChild!==newChild_)
       {
-         this._items.push(newItem);
-         this._listNode.insertBefore(newItem.node,this._firstAppendixNode);  //NOTE: If there are no extra (non list item) elements in the list container, i.e. _firstAppendixNode is null, then insertBefore() will insert a new item to the end, as needed.
-      }
-      
-      return newItem;
-   }
-   
-   replaceBy(itemData_,prop_)
-   {
-      //Update an existing item with id equal to itemData_.id or create a new one.
-      
-      prop_??=this._idProp;
-      
-      let found=false;
-      for (let item of this._items)
-         if (item.data[prop_]==itemData_[prop_])
-         {
-            item.data=itemData_;
-            found=true;
-            break;
-         }
-      if (!found)
-         this.add(itemData_);
-   }
-   
-   remove(mixed_)
-   {
-      //Remove a single item by index or pointer.
-      //It's a basic remove method also sutable for the cases when items has no IDs.
-      
-      if (this._items.length>this._minLength)
-      {
-         let index=(mixed_ instanceof DynamicListItem ? this.indexOf(mixed_) : mixed_)
-         let removed=this._items.splice(index,1)[0];
-         if (removed)
-            this._listNode.removeChild(removed.node);
+         //Remove existing:
+         if (existingChild)
+            this.delete(existingChild);
+         
+         newChild_.dispatchEvent(new CustomEvent('beforeattach',{detail:{target:newChild_,to:this}}));
+         this._allocChild(newChild_);  //NOTE: This method throws an arrors.
+         newChild_.dispatchEvent(new CustomEvent('attached',{detail:{target:newChild_}}));
+         
+         this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,attached:[newChild_]}}));
       }
    }
    
-   removeBy(val_,prop_,single_)
+   delete(which_)
    {
-      //Removes an item[s] by value of its/their data property. 
-      //NOTE: Allows to remove multiple items.
+      //Deletes a child specified by the key or by itself.
       
-      prop_??=this._idProp;
+      let res=false;
       
-      for (let i in this._items)
-         if (this._items[i].data[prop_]==val_)
-         {
-            this.remove(i);
-            if (single_)
-               break;
-         }
-   }
-   
-   splice(start_,deleteCount_,...mixeds_)
-   {
-      //Replaces portion of items.
-      //Arguments:
-      // start_ - start index
-      // deleteCount_ - number of items to delete.
-      // ...mixeds_ - data rows or instances of DynamicListItem to insert.
+      let child=this._getOwnChild(which_);
+      if (child)
+      {
+         child.dispatchEvent(new CustomEvent('beforedetach',{detail:{target:child}})); //Let a new child prepare to attaching.
+         this._removeChild(child);
+         child.dispatchEvent(new CustomEvent('detached',{detail:{target:child}}));
+         
+         this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,detached:[child]}}));
+         res=true;
+      }
       
-      //Create new items from mixed sources:
-      let items=[];
-      let newItem;
-      for (let mixed of mixeds_)
-         if (newItem=this._createItem(mixed))
-            items.push(newItem);
-      //Replace old items with a new ones:
-      let removedItems=this._items.splice(start_,deleteCount_,...items);
-      //Remove old item nodes from the DOM:
-      for (let item of removedItems)
-         this._listNode.removeChild(item.node);
-      // and insert new ones' nodes:
-      let insBeforeItem=this._listNode.childNodes[start_]??this._firstAppendixNode;
-      for (newItem of items)
-         this._listNode.insertBefore(newItem.node,insBeforeItem);
-      
-      return removedItems;
+      return res;
    }
    
    clear()
    {
-      //Remove all items from the list.
+      let removedChildren=[];
+      for (let child of this.values())
+      {
+         child.dispatchEvent(new CustomEvent('beforedetach',{detail:{target:child}})); //Let a new child prepare to attaching.
+         removedChildren.push(this._removeChild(child));
+         child.dispatchEvent(new CustomEvent('detached',{detail:{target:child}}));
+      }
       
-      for (var item of this._items)
-         this._listNode.removeChild(item.node);
-      this._items=[];
+      this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,detached:removedChildren}}));
    }
    
-   indexOf(item_)
+   keyOf(which_)
    {
-      //Returns item index by pointer.
-      
-      var index=null;
-      
-      for (let i in this._items)
-         if (this._items[i]==item_)
-         {
-            index=i;
-            break;
-         }
-      
-      return index;
-   }
-   
-   //private methods
-   _createItem(mixed_)
-   {
-      //Unifies creation of a list item from the argument of the union type.
+      //Returns a key associated with the given argument.
+      //Arguments:
+      // which_ - int|string|TreeNode.
+      //Return value:
+      // If which_ is int|string then it recognized as a key. If a child with this key exists this key is returned, otherwise null is returned.
+      // If which_ is instance of TreeNode and it is a child of this, its key is returned, otherwise null is returned.
       
       let res=null;
       
-      if (mixed_ instanceof DynamicListItem)       //Use an item that was created outside of this list.
-         res=this._prepareForeignItem(mixed_);
-      else if (mixed_ instanceof Element)          //Create an item from the Element (typically, a child of this._listNode).
-         res=new this._itemClass(this,{...this._itemClassParams,node:mixed_});
-      else if (mixed_!=null)                       //Create an item, treating mixed_ as data.
+      if ((typeof which_ ==='string')||(typeof which_ ==='number'))
+         res=(this.has(which_) ? which_ :null);
+      else if (which_ instanceof TreeNode)
+         for (let [key,child] in this) //TODO: Test all conditions that can lead to inconsistency beetween the key and the child.key (an errors, in particular)
+            if (child===which_)        //      and then decide is it enough reliable to replace this cycle with
+            {                          //      res=(this.has(which_.key) ? which_ : null);
+               res=key;
+               break;
+            }
+      
+      return res;
+   }
+   
+   findParent(what_)
+   {
+      let res=this.parent;             //If what_ is not defined, returns own parent.
+      
+      if (typeof what_==='function')   //Find a closest parent by callback.
+         while (res&&!what_(res))
+            res=res.parent;
+      else if (what_!==undefined)      //Find a closest parent by key.
+         while (res&&(res.key!=what_))
+            res=res.parent;
+      
+      return res;
+   }
+   
+   nextKeyOf(key_)
+   {
+      let keys=Array.from(this.keys());
+      let keyIndx=keys.indexOf(key_);
+      return (keyIndx>=0 ? keys[keyIndx+1]??null : null);
+   }
+   
+   nextSiblingOf(child_)
+   {
+      let childrenArr=Array.from(this.values());
+      let childIndx=childrenArr.indexOf(child_);
+      return (childIndx>=0 ? childrenArr[childIndx+1]??null : null);
+   }
+   
+   getFromBranch(keySeq_)
+   {
+      //Helps to get an element from depths of the current element branch with capability to grow this branch if needed.
+      //Arguments:
+      // keySeq_ - Array. Sequence of child keys that specifies a path to the wanted indirect child.
+      
+      let res=(keySeq_?.length>0 ? this : null);
+      
+      for (let key of keySeq_)
+         if (res instanceof TreeNode)
+         {
+            res=res.get(key);
+            if (res==null)
+               break;
+         }
+      
+      return res;
+   }
+   
+   setIntoBranch(targetLoc_,item_,midItemClass_,midItemClassParams_)
+   {
+      //Helps to set an element deep into the current element branch with capability to grow this branch if needed.
+      //Arguments:
+      // targetLoc_ - Array. Location of an item into this branch where the item_ shall be allocated. Note that it doesn't include the item_.key, which is differs from the TreeNode.getFromBranch() argument.
+      // item_ - TreeNode. An item to allocate.
+      // midItemClass_ - class|null. A class that will be used to create a missing nodes 
+      // midItemClassParams_ - parameters for the midItemClass_.
+      //NOTE: this method is intentionally not recursive, therefore the midItemClass_ and its oarams will be provided to each creating subitem directly.
+      
+      let currItem=this;
+      for (let key of targetLoc_)
       {
-         if (this._itemNodePrototype)
-            res=new this._itemClass(this,{...this._itemClassParams,node:this._itemNodePrototype.cloneNode(true)});
-         else
-            res=new this._itemClass(this,this._itemClassParams);
+         if (!currItem.has(key)&&midItemClass_) //Dynamically grow the branch if the class for middle items is given.
+         {
+            let midItem=new midItemClass_(midItemClassParams_);
+            midItem.key=key;
+            currItem.set(midItem); //NOTE: An error could be thrown here if the midItem is not suitable for the currItem.
+         }
          
-         res.data=mixed_;
+         let nextItem=currItem.get(key);
+         if (!nextItem)
+            throw new Error(LC.get('Target item was not found (or was not created) in the branch'),{cause:{subject:this,object:currItem}});
+         currItem=nextItem;
+      }
+      currItem.set(item_);
+   }
+   
+   recursiveIterator()
+   {
+      //Returns an iterator that allows to iterate all the input fields including that belongs to the child naps.
+      
+      let thisIt=this.values();   //Initially, iterator stack contains this map iterator. Here, "this" belongs to the TreeNode that owns this method.
+      return {
+                _itStack:[thisIt],
+                _relKeySeq:[this.key],
+                [Symbol.iterator]()
+                {
+                   return this;
+                },
+                next:function()
+                     {
+                        let res=this._itStack[this._itStack.length-1]?.next();      //Get the next IteratorResult form the top iterator in the stack.
+                        
+                        if ((!res.done)&&(res.value instanceof TreeNode))           //If the element in the currect IteratorResult is a child TreeNode,
+                        {
+                           this._itStack.push(res.value.values());                  // then put its iterator into the stack
+                           //res=this.next();                                         // and dive.
+                        }
+                        else if ((res.done)&&(this._itStack.length>1))              //If the current iterator is done,
+                        {
+                           this._itStack.pop();                                     // then remove it form the stack
+                           res=this.next();                                         // and continue with previous level.
+                        }
+                        
+                        return res;
+                     }
+             };
+   }
+   
+   //protected methods
+   static _decorateObjectToTreeLeaf(obj_)
+   {
+      //Makes an arbitrary object compartible with the TreeNode.
+      // Unfortunatelly this feature doesn't make a fully-featured TreeNode, therefore it shall be used only by a certain classes, that want to use specific objects as their direct children which can only be a tree leafs.
+      
+      Object.defineProperties(obj_,
+                              {
+                                 _parentEvtMap:{
+                                                   value:new EventListenersMap([['branchchange',null,'branchchange',(e_)=>{obj_.dispatchEvent(e_);},{passive:true}]]),
+                                                   enumerable:false,
+                                                   configurable:false,
+                                                   writable:false,
+                                               },
+                                 _key   :{value:null,enumerable:true,configurable:true,writable:true},
+                                 key    :{
+                                            enumerable:true,
+                                            configurable:false,
+                                            get(){return this._key;},
+                                            set(newVal_)
+                                            {
+                                               //This is a copy of the TreeNode.key setter.
+                                               if (this._key!==newVal_)
+                                               {
+                                                  if (this.dispatchEvent(new CustomEvent('beforekeychange',{detail:{target:this,newVal:newVal_},cancelable:true,bubbling:false}))!==false)
+                                                  {
+                                                     this._key=newVal_;
+                                                     this.dispatchEvent(new CustomEvent('keychange',{detail:newVal_}));
+                                                  }
+                                               }
+                                            },
+                                         },
+                                 _parent:{value:null,enumerable:true,configurable:false,writable:true},
+                                 parent :{
+                                            enumerable:true,
+                                            configurable:true,
+                                            get(){return this._parent;},
+                                            set(newVal_)
+                                            {
+                                               //This is a copy of the TreeNode.parent setter.
+                                               if (this._parent!==newVal_)
+                                               {
+                                                  if (this.dispatchEvent(new CustomEvent('beforeparentchange',{detail:{target:this,newVal:newVal_},cancelable:true,bubbling:false}))!==false)
+                                                     this._parent=newVal_;
+                                               }
+                                            },
+                                         },
+                              });
+      if (!obj_.dispatchEvent)
+         decorateToEventTarget(obj_);
+      
+      obj_.addEventListener('attached',
+                            function(e_)
+                            {
+                               //This handler shall be not overridable.
+                               this._parentEvtMap.modify('*',{target:this._parent});
+                               this._parentEvtMap.attach();
+                               this.dispatchEvent(new CustomEvent('branchchange',{detail:{target:this,event:e_}}));
+                            },
+                            {passive:true});
+      obj_.addEventListener('detached',
+                            function(e_)
+                            {
+                               //This handler shall be not overridable.
+                               this._parentEvtMap.detach();
+                               this.dispatchEvent(new CustomEvent('branchchange',{detail:{target:this,event:e_}}));
+                            },
+                            {passive:true});
+   }
+   
+   _validateChild(newChild_)
+   {
+      //Verifies wherhter a child type is supported by the current TreeNode [sub]class.
+      // This is a helper method that allow to override restrictions on allocated children.
+      // Shall throw an error if given child is not supported.
+      // Shall not restrict children by the values of their variable properties (except it's thoughtfuly designed).
+      //IMPORTANT NOTE: Most of important TreeNode methods are designed to autodetect whether a certain argument is a key or a child. Therefore strings and numbers can't be a children of the TreeNode.
+      
+      if (!(newChild_ instanceof TreeNode))
+         throw new TypeError(LC.get('Unexpected value'),{cause:{subject:this,arg:'newChild_',val:newChild_,expected:'instance of TreeNode'}});
+   }
+   
+   _getOwnChild(which_)
+   {
+      //Helper method. Returns a child of this if which_ is a key of own child or if own child itself. If neither of this returns null.
+      
+      let res=null;
+      
+      if ((typeof which_ ==='string')||(typeof which_ ==='number'))
+         res=this.get(which_);
+      else
+      {
+         res=this.get(which_.key);
+         if (res!==which_)
+            res=null;
       }
       
       return res;
    }
    
-   _prepareForeignItem(item_)
+   _allocChild(newChild_)
    {
-      //Prepares an item that was created outside to be added to this list.
-      //NOTE: 
+      //Helper method, includes all necessary actions for allocation a single child excluding almost all checks and events emitting.
+      //Designed to use in batch modifications.
       
-      item_.parent=this;
+      newChild_.parent=this;
+      if (newChild_.parent!==this)
+         throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:newChild_,prop:'parent',newVal:this}}); //If the parent wasn't assigned, it can mean that this item is currently owned by another parent.
       
-      return item_;
+      super.set(newChild_.key,newChild_);
+      
+      //Atach listeners:
+      let evtMap=new EventListenersMap();
+      this._childEvtMaps.set(newChild_.key,evtMap);
+      evtMap.set('beforekeychange',newChild_,'beforekeychange',(e_)=>{return this._onBeforeChildKeyChange(e_);}); //Descending classes can define their own behavior on a child key change.
+      evtMap.set('beforeparentchange',newChild_,'beforeparentchange',(e_)=>{return cancelEvent(e_);});            //Parent can be modified only by a certain methods like TreeNode.set() or TreeNode.delete().
+      evtMap.attach();
+      
+      return newChild_;
+   }
+   
+   _removeChild(child_)
+   {
+      //Helper method, includes all necessary actions for removing a single child excluding almost all checks and events emitting.
+      //Designed to use in batch modifications.
+      
+      this._childEvtMaps.get(child_.key)?.detach();  //Detach all event listeners ever attached to the child.
+      super.delete(child_.key);
+      this._childEvtMaps.delete(child_.key);
+      child_.parent=null;
+      
+      return child_;
+   }
+   
+   _onBeforeChildKeyChange(e_)
+   {
+      return cancelEvent(e_); //Forbid the child to change its key while it's attached, to prevent keys inconsistency.
+   }
+   
+   _setToMap(key_,child_)
+   {
+      //Provides a low-level access to this map for indirect subclasses.
+      super.set(key_,child_);
+   }
+   
+   _clearMap()
+   {
+      super.clear();
    }
 }
 
-class DynamicForm extends DynamicList
+class TreeDataNode extends TreeNode
 {
-   //This class designed to handle forms based on DynamicList's principle.
-   // It maintains indexing of form inputs into its items in order. This required for inputs named like "prefix[row_index][col_name]", because they can't be left without explicit indexing like simple "field_name[]'.
-   //NOTE: Neither frontend, nor backednd are MUST NOT rely on the data rows indexes even it's not planned to remove items. For example may be a cases when inputs can be indexed not from 0.
-   //Constructor arguments:
-   // parent_ - parent instance of DynamicList, which allows to build trees. NOTE: Currently nesting of DynamicForm[s] isn't supported.
-   // params_ - object, all the same arguments as DynamicList.
-   
-   add(mixed_)
+   //public props
+   get data()
    {
-      let newItem=super.add(mixed_);
-      this._reindexItems();   //It's posible just to get row index of previous item and increment, but full reindex is more reliable because it's the same for both add() and remove() methods.
-      return newItem;
+      let res=null;
+      
+      if (this.size==0)
+         res=this._data;
+      else
+      {
+         res={};
+         for (let [key,child] of this)
+            if (child.hasOwnProperty('data'))   //TreeDataNode automatically detects, which of its children supports a data.
+               res[key]=child.data;
+      }
+      
+      return res;
+   }
+   set data(newVal_)
+   {
+      //Assign values only to existing children. To modify children list by given data, use the DataList.
+      
+      if (this.size==0)
+         this._data=newVal_;
+      else
+      {
+         for (let [key,child] of this)
+            if (newVal_[key]!==undefined)
+            {
+               if (child.hasOwnProperty('data'))   //TreeDataNode automatically detects, which of its children supports a data.
+                  child.data=newVal_[key];
+               else
+                  console.warn(LC.get('Attempt to assign a data to the child node that has no data property'),child);
+            }
+            else
+               console.warn(LC.get('Attempt to assign a data to not existing child node at key "[[0]]"',key));
+      }
    }
    
-   remove(mixed_)
+   //protected props
+   _data=undefined;
+}
+
+class DataList extends TreeDataNode
+{
+   //Base class for 
+   
+   constructor(params_)
    {
-      super.remove(mixed_);
-      this._reindexItems();
+      super(params_);
+      
+      this._itemClass      =params_?.itemClass      ??this._itemClass;
+      this._itemClassParams=params_?.itemClassParams??this._itemClassParams;
    }
    
-   _reindexItems()
+   //public props
+   get data()
    {
-      for (let i in this._items)
-         this._items[i].rowIndex=i;
+      let res=[]; //Unlike the TreeDataNode, this class returns array.
+      
+      for (let [indx,child] of this)
+         res[indx]=child.data; //Direct children of TreeDataNode shall has the data property (its actual class doesn't matter).
+      
+      return res;
+   }
+   set data(newVal_)
+   {
+      let indx=0;
+      for (let val of newVal_)
+      {
+         if (indx>=this.size)
+         {
+            let child=this._createNewChild();
+            child.key=indx;
+            this.set(child);
+         }
+         
+         this.get(indx).data=val;
+         
+         indx++;
+      }
+      while (this.size>indx)
+         this.delete(this.size-1);
+   }
+   
+   //protected props
+   _itemClass=null;        //Class used to create list children. Has to implement the TreeDataNode.
+   _itemClassParams=null;  //Parameters for the _itemClass constructor.
+   
+   //public methods
+   set(newChild_)
+   {
+      //Sets a new list item.
+      //Arguments:
+      // newChild_ - TreeDataNode.
+      
+      this._validateChild(newChild_);  //This method throws an error if given child is not supported.
+      
+      let existingChild=super.get(newChild_.key);
+      if (existingChild!==newChild_)
+      {
+         newChild_.dispatchEvent(new CustomEvent('beforeattach',{detail:{target:newChild_,to:this}}));   //Let a new child to prepare for attaching.
+         
+         //Verify new child key:
+         if (isNaN(newChild_.key)||(newChild_.key<0))
+            throw new RangeError(LC.get('Value is out of range'),{subject:this,arg:'newChild_.key',val:newChild_.key,expected:'not negative int'});   //Negative index is prohibited and throws an error. To prepend the list use this.splice().
+         newChild_.key=Math.min(newChild_.key,this.size);                                                                                             //On the other hand, a greater values are silently bound to this.size.
+         if (newChild_.key>this.size)                                                                                                                 //Verify that correct value was assigned.
+            throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:newChild,prop:'key',newVal:indx}});                       //
+         
+         //Remove existing:
+         if (existingChild)
+            this.delete(existingChild);
+         
+         this._allocChild(newChild_);  //NOTE: This method throws an arrors.
+         newChild_.dispatchEvent(new CustomEvent('attached',{detail:{target:newChild_}}));
+         
+         this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,attached:[newChild_]}}));
+      }
+      
+      super.set(newChild_);
+   }
+   
+   delete(which_)
+   {
+      //Deletes a child specified by the key or by itself.
+      
+      let res=false;
+      
+      let child=this._getOwnChild(which_);
+      if (child)
+      {
+         this.splice(child.key,1);
+         res=true;
+      }
+      
+      return res;
+   }
+   
+   splice(start_,deleteCount_,...newChildren_)
+   {
+      //Changes children by removing or replacing existing ones and/or adding new ones.
+      // Threats children as array, i.e. all children keys are changed to integer ordinal numbers.
+      //NOTE: While splice() in process, such methods like keyOf(), nextKeyOf(), nextSiblingOf(child_), etc. are unreliable because the map is in the "unclean" state.
+      
+      //Stash existsing children and reset map:
+      let itemsArr  =Array.from(this.values());
+      let evtMapsArr=Array.from(this._childEvtMaps.values());
+      this._clearMap();
+      this._childEvtMaps.clear();
+      
+      //Normalize start and count according to the Array.splice() specification:
+      if ((-itemsArr.length<=start_)&&(start_<0))
+         start_=Math.max(0,start_+itemsArr.length);
+      if (deleteCount_==undefined)
+         deleteCount_=itemsArr.length-start_;
+      else if (deleteCount_<0)
+         deleteCount_=0;
+      let delEnd=start_+deleteCount_;
+      
+      //Splice:
+      let deletedChildren=[];
+      let attachedChildren=[];
+      let failedChildren=[];
+      // Restore starting items to the map:
+      let indx=0; //A new index for the items.
+      while (indx<start_)
+      {
+         this._setToMap(indx,itemsArr[indx]);
+         this._childEvtMaps.set(indx,evtMapsArr[indx]);
+         indx++;
+      }
+      
+      // Delete those shall be deleted:
+      for (let i=indx;i<delEnd;i++) //The new index doesn't grow.
+      {
+         itemsArr[i].dispatchEvent(new CustomEvent('beforedetach',{detail:{target:itemsArr[i]}})); //Notify child that it being deleted. Child can execute some optional actions at this stage.
+         
+         evtMapsArr[i].detach();
+         itemsArr[i].parent=null;
+         deletedChildren.push(itemsArr[i]);
+         
+         itemsArr[i].dispatchEvent(new CustomEvent('detached',{detail:{target:itemsArr[i]}}));  //Notify child that it is deleted. Child shall execute mandatory actions on detach, e.g. remove its box from the parent one.
+      }
+         
+      // Insert new:
+      for (let newChild of newChildren_)
+         try
+         {
+            newChild.dispatchEvent(new CustomEvent('beforeattach',{detail:{target:newChild,to:this}}));  //Let a new child to prepare for attaching.
+            
+            newChild.key=indx;
+            if (newChild.key!=indx)    //Verify that correct value was assigned.
+               throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:newChild,prop:'key',newVal:indx}});
+            
+            this._allocChild(newChild);
+            indx++;
+            attachedChildren.push(newChild);
+            
+            newChild.dispatchEvent(new CustomEvent('attached',{detail:{target:newChild,before:itemsArr[delEnd]}}));  //NOTE: New child nodes must use event detail.before instead of this.nextSiblingOf().
+         }
+         catch (err)
+         {
+            console.error(err,err.cause);
+            failedChildren.push(newChild);
+         }
+      
+      // Realloc trailing items to the map:
+      for (let i=delEnd;i<itemsArr.length;i++)
+         try
+         {
+            evtMapsArr[i].detach();
+            
+            itemsArr[i].key=indx;
+            if (itemsArr[i].key!=indx)    //Verify that correct value was assigned.
+               throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:itemsArr[i],prop:'key',newVal:indx}});
+               
+            this._setToMap(indx,itemsArr[i]);
+            this._childEvtMaps.set(indx,evtMapsArr[i]);
+            
+            evtMapsArr[i].attach();
+            
+            indx++;
+         }
+         catch (err)
+         {
+            console.error(err,err.cause);
+            //Fire a faulty item:
+            evtMapsArr[i].detach();
+            failedChildren.push(itemsArr[i]);
+            itemsArr[i].dispatchEvent(new CustomEvent('detached',{detail:{target:itemsArr[i],error:err}}));
+         }
+      
+      this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,method:'splice',detached:deletedChildren,attached:attachedChildren,failed:failedChildren}}));   //NOTE: Failed ones can be either new or old.
+      
+      return deletedChildren;
+   }
+   
+   spliceData(start_,deleteCount_,...newData_)
+   {
+      let newChildren=[];
+      for (let val of newData_)
+      {
+         let newChild=this._createNewChild();
+         newChild.data=val;
+         newChildren.push(newChild);
+      }
+      
+      let res=[];
+      for (let deletedChild of this.splice(start_,deleteCount_,...newChildren))
+         res.push(deletedChild.data);
+      
+      return res;
+   }
+   
+   fwind(deleteCount_,newChildren_)
+   {
+      //Deletes a portion of children fron the beginning and appends a new ones to the end.
+      //Arguments:
+      // deleteCount_ - number of children to remove from the beginning.
+      // newChildren_ - new children to append.
+      
+      //Stash existsing children and reset map:
+      let itemsArr  =Array.from(this.values());
+      let evtMapsArr=Array.from(this._childEvtMaps.values());
+      this._clearMap();
+      this._childEvtMaps.clear();
+      
+      let deletedChildren=[];
+      let attachedChildren=[];
+      let failedChildren=[];
+      
+      //Delete children from the beginning:
+      for (let i=0;i<deleteCount_;i++)
+      {
+         itemsArr[i].dispatchEvent(new CustomEvent('beforedetach',{detail:{target:itemsArr[i]}})); //Notify child that it being deleted. Child can execute some optional actions at this stage.
+         
+         evtMapsArr[i].detach();
+         itemsArr[i].parent=null;
+         deletedChildren.push(itemsArr[i]);
+         
+         itemsArr[i].dispatchEvent(new CustomEvent('detached',{detail:{target:itemsArr[i]}}));  //Notify child that it is deleted. Child shall execute mandatory actions on detach, e.g. remove its box from the parent one.
+      }
+      
+      let indx=0;
+      //Realloc mid items to the map:
+      for (let i=deleteCount_;i<itemsArr.length;i++)
+         try
+         {
+            evtMapsArr[i].detach();
+            
+            itemsArr[i].key=indx;
+            if (itemsArr[i].key!=indx)    //Verify that correct value was assigned.
+               throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:itemsArr[i],prop:'key',newVal:indx}});
+               
+            this._setToMap(indx,itemsArr[i]);
+            this._childEvtMaps.set(indx,evtMapsArr[i]);
+            
+            evtMapsArr[i].attach();
+            
+            indx++;
+         }
+         catch (err)
+         {
+            console.error(err,err.cause);
+            //Fire a faulty item:
+            evtMapsArr[i].detach();
+            failedChildren.push(itemsArr[i]);
+            itemsArr[i].dispatchEvent(new CustomEvent('detached',{detail:{target:itemsArr[i],error:err}}));
+         }
+      
+      //Append new:
+      for (let newChild of newChildren_)
+         try
+         {
+            newChild.dispatchEvent(new CustomEvent('beforeattach',{detail:{target:newChild,to:this}}));  //Let a new child to prepare for attaching.
+            
+            newChild.key=indx;
+            if (newChild.key!=indx)    //Verify that correct value was assigned.
+               throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:newChild,prop:'key',newVal:indx}});
+            
+            this._allocChild(newChild);
+            indx++;
+            attachedChildren.push(newChild);
+            
+            newChild.dispatchEvent(new CustomEvent('attached',{detail:{target:newChild,before:null}}));  //NOTE: New child nodes must use event detail.before instead of this.nextSiblingOf().
+         }
+         catch (err)
+         {
+            console.error(err,err.cause);
+            failedChildren.push(newChild);
+         }
+      
+      this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,method:'fwind',detached:deletedChildren,attached:attachedChildren,failed:failedChildren}}));   //NOTE: Failed ones can be either new or old.
+      
+      return deletedChildren;
+   }
+   
+   rewind(newChildren_,deleteCount_)
+   {
+      //Deletes a portion of children fron the end and inserts a new ones to the beginning.
+      //Arguments:
+      // newChildren_ - new children to prepend.
+      // deleteCount_ - number of children to remove from the end.
+      
+      //Stash existsing children and reset map:
+      let itemsArr  =Array.from(this.values());
+      let evtMapsArr=Array.from(this._childEvtMaps.values());
+      this._clearMap();
+      this._childEvtMaps.clear();
+      
+      let deletedChildren=[];
+      let attachedChildren=[];
+      let failedChildren=[];
+      
+      let indx=0;
+      //Prepend new:
+      for (let newChild of newChildren_)
+         try
+         {
+            newChild.dispatchEvent(new CustomEvent('beforeattach',{detail:{target:newChild,to:this}}));  //Let a new child to prepare for attaching.
+            
+            newChild.key=indx;
+            if (newChild.key!=indx)    //Verify that correct value was assigned.
+               throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:newChild,prop:'key',newVal:indx}});
+            
+            this._allocChild(newChild);
+            indx++;
+            attachedChildren.push(newChild);
+            
+            newChild.dispatchEvent(new CustomEvent('attached',{detail:{target:newChild,before:itemsArr[0]}}));  //NOTE: New child nodes must use event detail.before instead of this.nextSiblingOf().
+         }
+         catch (err)
+         {
+            console.error(err,err.cause);
+            failedChildren.push(newChild);
+         }
+      
+      //Realloc mid items to the map:
+      for (let i=0;i<itemsArr.length-deleteCount_;i++)
+         try
+         {
+            evtMapsArr[i].detach();
+            
+            itemsArr[i].key=indx;
+            if (itemsArr[i].key!=indx)    //Verify that correct value was assigned.
+               throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:itemsArr[i],prop:'key',newVal:indx}});
+               
+            this._setToMap(indx,itemsArr[i]);
+            this._childEvtMaps.set(indx,evtMapsArr[i]);
+            
+            evtMapsArr[i].attach();
+            
+            indx++;
+         }
+         catch (err)
+         {
+            console.error(err,err.cause);
+            //Fire a faulty item:
+            evtMapsArr[i].detach();
+            failedChildren.push(itemsArr[i]);
+            itemsArr[i].dispatchEvent(new CustomEvent('detached',{detail:{target:itemsArr[i],error:err}}));
+         }
+      
+      //Delete children from the beginning:
+      for (let i=itemsArr.length-deleteCount_;i<itemsArr.length;i++)
+      {
+         itemsArr[i].dispatchEvent(new CustomEvent('beforedetach',{detail:{target:itemsArr[i]}})); //Notify child that it being deleted. Child can execute some optional actions at this stage.
+         
+         evtMapsArr[i].detach();
+         itemsArr[i].parent=null;
+         deletedChildren.push(itemsArr[i]);
+         
+         itemsArr[i].dispatchEvent(new CustomEvent('detached',{detail:{target:itemsArr[i]}}));  //Notify child that it is deleted. Child shall execute mandatory actions on detach, e.g. remove its box from the parent one.
+      }
+      
+      this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,method:'rewind',detached:deletedChildren,attached:attachedChildren,failed:failedChildren}}));   //NOTE: Failed ones can be either new or old.
+      
+      return deletedChildren;
+   }
+   
+   fwindData(deleteCount_,newData_)
+   {
+      let newChildren=[];
+      for (let val of newData_)
+      {
+         let newChild=this._createNewChild();
+         newChild.data=val;
+         newChildren.push(newChild);
+      }
+      
+      let res=[];
+      for (let deletedChild of this.fwind(deleteCount_,newChildren))
+         res.push(deletedChild.data);
+      
+      return res;
+   }
+   
+   rewindData(newData_,deleteCount_)
+   {
+      let newChildren=[];
+      for (let val of newData_)
+      {
+         let newChild=this._createNewChild();
+         newChild.data=val;
+         newChildren.push(newChild);
+      }
+      
+      let res=[];
+      for (let deletedChild of this.rewind(newChildren,deleteCount_))
+         res.push(deletedChild.data);
+      
+      return res;
+   }
+   
+   pad(newSize_)
+   {
+      let attachedChildren=[];
+      for (let i=this.size;i<newSize_;i++)
+         try
+         {
+            let newChild=this._createNewChild();
+            
+            newChild.dispatchEvent(new CustomEvent('beforeattach',{detail:{target:newChild,to:this}}));  //Let a new child to prepare for attaching.
+            
+            newChild.key=this.size;
+            if (newChild.key!=this.size)    //Verify that correct value was assigned.
+               throw new Error(LC.get('Unable to change property'),{cause:{subject:this,object:newChild,prop:'key',newVal:indx}});
+            
+            this._allocChild(newChild);
+            attachedChildren.push(newChild);
+            
+            newChild.dispatchEvent(new CustomEvent('attached',{detail:{target:newChild}}));
+         }
+         catch (err)
+         {
+            console.error(err,err.cause);
+         }
+      
+      this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,attached:attachedChildren}}));
+   }
+   
+   slice(start_,end_)
+   {
+      return Array.from(this.values()).slice(start_,end_);
+   }
+   
+   sliceData(start_,end_)
+   {
+      let res=[];
+      for (let child of Array.from(this.values()).slice(start_,end_))
+         res.push(child.data);
+      return res;
+   }
+   
+   //protected methods
+   _createNewChild(paramsOverride_)
+   {
+      return new this._itemClass({...this._itemClassParams,...(paramsOverride_??{})});
+   }
+   
+   _validateChild(newChild_)
+   {
+      //Verifies wherhter a child type is supported by the current TreeNode [sub]class.
+      // For details see the TreeNode._validateChild().
+      
+      if (!(newChild_ instanceof TreeDataNode))
+         throw new TypeError(LC.get('Unexpected value'),{cause:{subject:this,arg:'newChild_',val:newChild_,expected:'instance of TreeDataNode'}});
    }
 }
 
-class AsyncList extends DynamicList
+class DynamicHTMLList extends DataList
+{
+   //A prefab for dynamic lists.
+   
+   constructor(params_)
+   {
+      super(params_);
+      
+      //Init static HTML elements:
+      if (params_?.boxMain)
+         this._elements.boxMain=params_?.boxMain;
+      if (this._elements.boxMain)
+      {
+         this._elements.boxItems=this._elements.boxMain?.querySelector(params_.selectorBoxItems??'.items:not(:scope .items .items)');
+         
+         //Find a statically defined list element prototype:
+         this._boxItemProto=this._elements.boxItems?.querySelector(':scope>.item.proto');
+         if (this._boxItemProto)
+         {
+            this._elements.boxItems.removeChild(this._boxItemProto);
+            this._boxItemProto.classList.remove('proto');
+         }
+      }
+   }
+   
+   //public props
+   get boxMain(){return this._elements.boxMain;}
+   
+   get boxItems(){return this._elements.boxItems;}
+   
+   //protected props
+   _boxItemProto=null;  //Statically defined boxMain prototype for creating a new children.
+   
+   //protected methods
+   _createNewChild(paramsOverride_)
+   {
+      if (!paramsOverride_?.boxMain&&this._boxItemProto)
+         paramsOverride_={boxMain:this._boxItemProto.cloneNode(true),...(paramsOverride_??{})};
+      
+      return super._createNewChild(paramsOverride_);
+   }
+   
+   _initListFromStaticItems()
+   {
+      //Helper method. Init list from the statically defined list elements.
+      
+      for (let itemBox of this._elements.boxItems.children)
+         try
+         {
+            let newChild=this._createNewChild({boxMain:itemBox});
+            this.set(newChild);
+         }
+         catch (err)
+         {
+            console.error(err);
+         }
+   }
+}
+
+class AsyncList extends DynamicHTMLList
 {
    //Implements an asyncronous loading of list items from server.
    //Events:
@@ -2321,149 +2709,146 @@ class AsyncList extends DynamicList
    // 'reloaded' - fires after the 'load', when the first portion of data was loaded and items added to the list. CustomEvent.detail={list:<this list>,rowsLoaded:<number of rows/items actually loaded>}.
    // 'loadedlast' - like the 'loaded', but fires once the pagesTotal was reached or was detected that there is no more data to load. CustomEvent.detail={list:<this list>,rowsLoaded:<number of rows/items actually loaded>}.
 
-   constructor(parent_,params_)
+   constructor(params_)
    {
-      super(parent_,params_);
+      super(params_);
 
       this._url        =params_?.url        ??this._url;
       this._rowsPerPage=params_?.rowsPerPage??this._rowsPerPage;
       this._reqOptions =params_?.reqOptions ??this._reqOptions;
-      this._maxPages   =params_?.maxPages   ??this._maxPages;
-
-      this._evtDispatcher=new EventDispatcher(this);
+      this._maxRows    =params_?.maxRows    ??this._maxRows;
    }
 
    //public props
-   get rowsPerPage    (){return this._rowsPerPage;}
-   get firstPage      (){return this._firstPage;}
-   get lastPage       (){return this._lastPage;}
-   get highestPageNum (){return this._highestPageNum;}
-   get pagesTotal     (){return this._pagesTotal;}
-   get length         (){return this._items.length;}
+   get rowsPerPage   (){return this._rowsPerPage;}
+   get firstRow      (){return this._firstRow;}
+   get lastRow       (){return this._lastRow;}
+   get rowsTotal     (){return this._rowsTotal;}
+   get isLoading     (){return this._isLoading;}
 
-   //private props
+   //protected props
    _url=window.location.pathname;   //URL of the page to send request.
-   _rowsPerPage=25;                 //Number of rows per page. NOTE: This value is required if this._maxPages is defined.
    _reqOptions=['GET'];             //The remaining three arguments of the function reqServer(url_,data_,method_,enctype_,responseType_).
-   _maxPages=null;                  //Limit of the pages kept in list simultaneously. If NULL, there is no limit.
-   _firstPage=0;                    //The page number of the start of currently loaded fragment.
-   _lastPage=0;                     //The page number of the end of currently loaded fragment.
-   _highestPageNum=0;               //Highest number of the page ever loaded since last clear().
-   _pagesTotal=null;                //Total number of the pages available. Retrieved from server answer or autodeteted.
-   _loadLocked=false;               //Prevents loading avalanche on frequently fired events.
-   _evtDispatcher=null;             //EventDispatcher instance.
+   _rowsPerPage=25;                 //Number of rows requested from server.
+   _maxSize=null;                   //Limit of the rows kept in list simultaneously. If NULL, there is no limit.
+   _firstRow=-1;                    //Offset of the currently loaded data fragment.
+   _lastRow=-1;                     //Offset of the last row in the currently loaded data fragment.
+   _rowsTotal=undefined;            //Total number of the pages available. Retrieved from server answer or autodetected.
+   _isLoading=false;                //Prevents loading avalanche on frequently fired events.
 
    //public methods
-   loadPageNext()
+   loadNext(onResolve_,onReject_)
    {
-      //Loads data for the next page and appends items to the end of the list.
-
-      if ((!this._loadLocked)&&((this._pagesTotal===null)||(this._lastPage<this._pagesTotal)))
-      {
-         this._loadLocked=true;
-         reqServer(this._url,this.makeReqData(this._lastPage+1),...this._reqOptions).then((ans_)=>{if (this.checkAns(ans_)) this.appendFromAns(ans_); this._loadLocked=false;},(xhr_)=>{console.error(xhr_); this._loadLocked=false;});
-
-         this.dispatchEvent(new CustomEvent('load',{detail:{list:this,isNew:this._lastPage==this._highestPageNum}}));
-         if (this._highestPageNum==0)
-            this.dispatchEvent(new CustomEvent('reload',{detail:{list:this}}));
-      }
+      return new Promise((onResolve_,onReject_)=>{
+                                                    let count=Math.min(this._rowsPerPage,Math.max(0,(this._rowsTotal??Infinity)-(this._lastRow+1))); //Count number of rows to load, accounting how many rows remains to the end.
+                                                    if (count>0)
+                                                       this._load({offset:this._lastRow+1,count:count},onResolve_,onReject_);
+                                                    else
+                                                       onReject_(null);
+                                                 });
    }
-
-   loadPageBack()
+   
+   loadPrev(onResolve_,onReject_)
    {
-      //Loads data for the page previously unloaded and appends items to the beginning of the list.
-
-      if ((!this._loadLocked)&&(this._firstPage>1))
-      {
-         this._loadLocked=true;
-         reqServer(this._url,this.makeReqData(this._firstPage-1),...this._reqOptions).then((ans_)=>{if (this.checkAns(ans_)) this.prependFromAns(ans_); this._loadLocked=false;},(xhr_)=>{console.error(xhr_); this._loadLocked=false;});
-
-         this.dispatchEvent(new CustomEvent('load',{detail:{list:this,isNew:false}}));
-      }
+      return new Promise((onResolve_,onReject_)=>{
+                                                    let count=Math.min(this._rowsPerPage,Math.max(0,this._firstRow)); //Count number of rows to load, accounting how many rows remains to the start.
+                                                    if (count>0)
+                                                       this._load({offset:this._firstRow-count,count:count},onResolve_,onReject_);
+                                                    else
+                                                       onReject_(null);
+                                                 });
    }
-
-   appendFromAns(ans_)
-   {
-      //Appends data page to the end.
-
-      //Calc the loaded pages range:
-      let prevLastPage=this._lastPage;
-      let prevHighestPageNum=this._highestPageNum;
-      this._lastPage=ans_.page??(this._lastPage+(ans_.data.length>0));  //If the ans contains no current page number, then compute it.
-      if ((this._lastPage>0)&&(this._firstPage==0))
-         this._firstPage=1;
-      this._pagesTotal=ans_.pages_total??(this._lastPage==prevLastPage ? this._lastPage : null);   //If the ans contains no total number of pages, then compute it.
-      this._highestPageNum=Math.max(this._highestPageNum,this._lastPage);
-
-      //Unload pages from the start, if max number of pages exceeded:
-      let pagesExceeded;
-      if ((this._maxPages>0)&&((pagesExceeded=this._lastPage+1-this._firstPage-this._maxPages)>0))
-      {
-         this.splice(0,pagesExceeded*this._rowsPerPage);
-         this._firstPage+=pagesExceeded;  //Shift the first page index on number of unloaded pages.
-      }
-
-      //Append curently loaded page:
-      this.splice(this._items.length,0,...ans_.data);
-
-      this.dispatchEvent(new CustomEvent('loaded',{detail:{list:this,rowsLoaded:ans_.data.length,isNew:(prevHighestPageNum<this._highestPageNum)}}));
-      if ((prevHighestPageNum==0)&&(this._highestPageNum>=0))
-         this.dispatchEvent(new CustomEvent('reloaded',{detail:{list:this,rowsLoaded:ans_.data.length}}));
-      if ((this._pagesTotal!==null)&&(prevHighestPageNum<this._pagesTotal)&&(this._lastPage==this._pagesTotal))   //1st cond: _pagesTotal is defined; 2nd cond: the last page wasn't loaded before; 3rd cond: the last page is currently loaded.
-         this.dispatchEvent(new CustomEvent('loadedlast',{detail:{list:this,rowsLoaded:ans_.data.length}}));
-   }
-
-   prependFromAns(ans_)
-   {
-      //Prepends previously unloaded data page to the beginning.
-
-      //Calc the loaded pages range:
-      this._firstPage=ans_.page??Math.max(1,this._firstPage-(ans_.data.length>0));  //If the ans contains no current page number, then compute it.
-
-      //Unload pages from the start, if max number of pages exceeded:
-      let pagesExceeded;
-      if ((this._maxPages>0)&&((pagesExceeded=this._lastPage+1-this._firstPage-this._maxPages)>0))
-      {
-         this.splice(this._items.length-1-pagesExceeded*this._rowsPerPage,pagesExceeded*this._rowsPerPage);
-         this._lastPage-=pagesExceeded;  //Unshift the last page index on number of unloaded pages.
-      }
-
-      //Append curently loaded page:
-      this.splice(0,0,...ans_.data);
-      console.log(this._firstPage,this._lastPage,this._lastPage+1-this._firstPage);
-
-      this.dispatchEvent(new CustomEvent('loaded',{detail:{list:this,rowsLoaded:ans_.data.length,isNew:false}}));
-   }
-
-   makeReqData(page_)
+   
+   //protected methods
+   _makeReq(limit_)
    {
       //Overridable abstraction for making request data.
 
-      return {rows_per_page:this._rowsPerPage,page:page_};
+      return limit_;
+   }
+   
+   _load(limit_,onResolve_,onReject_)
+   {
+      //A common routine that starts loading of a data portion.
+      //Arguments:
+      // limit_ - object. Format: {offset:<int>,count:<int>}.
+      // onResolve_ - function. A promise callback.
+      // onReject_ - function. A promise callback.
+
+      if (!this._isLoading)
+      {
+         if (this.dispatchEvent(new CustomEvent('loadstart',{detail:{target:this},cancelable:true,bubbles:true})))
+         {
+            this._isLoading=true;
+            let req=this._makeReq(limit_);
+            reqServer(this._url,req,...this._reqOptions).then((ans_)=>{
+                                                                         try
+                                                                         {
+                                                                            let payload=this._getAnsPayload(ans_);
+                                                                            let updates=this._updateDataFragment(payload,limit_);
+                                                                            this._isLoading=false;
+                                                                            this.dispatchEvent(new CustomEvent('loaded',{detail:{target:this,updates:updates},bubbles:true}));
+                                                                            onResolve_(updates);
+                                                                         }
+                                                                         catch (err)
+                                                                         {
+                                                                            this._isLoading=false;
+                                                                            this.dispatchEvent(new CustomEvent('loadfailed',{detail:{target:this,ans:ans_},bubbles:true}));
+                                                                            onReject_(err);
+                                                                         }
+                                                                      })
+                                                        .catch((xhr_)=>{
+                                                                          this._isLoading=false;
+                                                                          this.dispatchEvent(new CustomEvent('loadfailed',{detail:{target:this,xhr:xhr_},bubbles:true}));
+                                                                          onReject_(xhr_);
+                                                                       });
+         }
+         else
+            new CustomEvent('loadaborted',{detail:{target:this},bubbles:true});
+      }
+   }
+   
+   _getAnsPayload(ans_)
+   {
+      //Checks if the server answer is correct and returns answer payload.
+      // If answer check fails, throws an error. This can appear if server reported an error or answer contains no data or data is recognized as invalid (e.g. format mismatch).
+      // This method could be overriden to implement a custom checks or to map the answer properties.
+      //Arguments:
+      // ans_ - object. Server answer. (See reqServer() onResolve_ callback argument.).
+      //Return value:
+      // Object that contains the loaded portion of data and number of total rows available (optional). 
+      
+      if (ans_.status!='ok')
+         throw new Error(LC.get('Request failed'),{cause:ans_});
+      if (!ans_.data)
+         throw new Error(LC.get('Answer has no data.'),{cause:ans_});
+      if (!(ans_.data instanceof Array))
+         throw new TypeError(LC.get('Answer has incorrect format.'),{cause:ans_});
+      
+      return {data:ans_.data,rowsTotal:ans_.rows_total};
    }
 
-   checkAns(ans_)
+   _updateDataFragment(payload_,limit_)
    {
-      //Check if server answer is correct.
-      let res=false;
-      try
+      //Arguments:
+      // payload_ - Object. Format: {data:[<Loaded portion of data>,rowsTotal:<int|undefined>]}. 
+      // limit_ - object. The limit_ argument of this._load().
+      
+      let deleteCount=Math.max(0,this.size+payload_.data.length-(this._maxSize??Infinity));
+      if (limit_.offset>this._lastRow) //Append.
       {
-         if (ans_.status!='ok')
-            throw new Error(LC.get('Request failed'));
-         if (!ans_.data)
-            throw new Error(LC.get('Answer has no data.'));
-         if (!(ans_.data instanceof Array))
-            throw new Error(LC.get('Answer has incorrect format.'));
-
-         res=true;
+         this.fwindData(deleteCount,payload_.data);
+         this._firstRow=(this._firstRow<0 ? limit_.offset : this._firstRow+deleteCount);
+         this._lastRow=limit_.offset+payload_.data.length-1;
+         
+         this._rowsTotal=payload_.rowsTotal??this._rowsTotal??(payload_.data.length<limit_.count??0 ? this._lastRow+1+payload_.data.length : undefined);   //Get the number of total rows available from the answer payload or try to autodetect by the length of loaded data portion.
       }
-      catch (err)
+      else if ((limit_.offset+limit_.count)<=this._firstRow) //Prepend.
       {
-         console.warn(err.message);
-         console.trace(ans_);
-         this.dispatchEvent(new CustomEvent('anserror',{detail:{ans:ans_,err:err}}));
+         this.rewindData(payload_.data,deleteCount);
+         this._firstRow=limit_.offset;
+         this._lastRow-=deleteCount;
       }
-      return res;
    }
 
    clear()
@@ -2473,25 +2858,321 @@ class AsyncList extends DynamicList
       super.clear();
 
       //Reset state:
-      this._pagesTotal=null;
-      this._firstPage=0;
-      this._lastPage=0;
-      this._highestPageNum=0;
+      this._rowsTotal=undefined;
+      this._firstRow=-1;
+      this._lastRow=-1;
    }
+}
 
-   addEventListener(type_,listener_,options_)
+//--------------------- Input complexes ---------------------//
+class InputFieldsMap extends TreeDataNode
+{
+   //This class wraps the TreeDataNode, implementing a routine of collecting and decoration of input fields, located in the given container.
+   
+   constructor(params_)
    {
-      this._evtDispatcher.addEventListener(type_,listener_,options_);
+      //Arguments:
+      // params_.container - HTMLElement. Container with tha input fields.
+      // params_ - Array. Configuration parameters:
+      //   Parameters:
+      //    radioGroupClass - class. Custom class for radio button groups. Optional, default is RadioGroup.
+      //    midItemClass - class. Custom class used to create a middle nodes between this one and the input field (if the input field relative key sequence is longer than one element). Optional, default is this class.
+      //    midItemClassParams - Parameters for the midItemClass. Optional, default is null.
+      
+      super(params_);
+      
+      this._radioGroupClass   =params_?.radioGroupClass   ??this._radioGroupClass   ;
+      this._midItemClass      =params_?.midItemClass      ??this._midItemClass      ;
+      this._midItemClassParams=params_?.midItemClassParams??this._midItemClassParams;
    }
-
-   removeEventListener(type_,listener_,options_)
+   
+   //public props
+   get data()
    {
-      this._evtDispatcher.removeEventListener(type_,listener_,options_);
+      let res={};
+      
+      for (let [key,child] of this)
+         if (child instanceof TreeDataNode)
+            res[key]=child.data;
+         else
+            res[key]=child.valueAsMixed;
+      
+      return res;
    }
-
-   dispatchEvent(event_)
+   set data(newVal_)
    {
-      this._evtDispatcher.dispatchEvent(event_);
+      for (let [key,child] of this)
+         if (newVal_[key]!==undefined)
+         {
+            if (child instanceof TreeDataNode)
+               child.data=newVal_[key];
+            else
+               child.valueAsMixed=newVal_[key];
+         }
+   }
+   
+   get valueAsMixed(){return this.data;}
+   set valueAsMixed(newVal_){this.data=newVal_;}
+   
+   //protected props
+   _radioGroupClass=RadioGroup;
+   _midItemClass=InputFieldsMap;
+   _midItemClassParams=null;
+   
+   //public methods
+   inputFieldsRecursive(callbackFilter_)
+   {
+      //Returns an iterator that allows to iterate all the input fields including that belongs to the child naps.
+      
+      let thisIt=this.values();   //Initially, iterator stack contains this map iterator. Here, "this" belongs to the TreeNode that owns this method.
+      return {
+                _itStack:[thisIt],
+                _relKeySeq:[this.key],
+                [Symbol.iterator]()
+                {
+                   return this;
+                },
+                next:function()
+                     {
+                        let res=this._itStack[this._itStack.length-1]?.next();   //Get the next IteratorResult form the top iterator in the stack.
+                        
+                        if (!res.done)
+                        {
+                           if (callbackFilter_&&!callbackFilter_(res.value))     //If filter callback is defined and returned false
+                              res=this.next();                                   // then skip current element and continue.
+                           else if (res.value instanceof TreeNode)               //If the element in the currect IteratorResult is a child TreeNode,
+                           {                                                     //
+                              this._itStack.push(res.value.values());            // then put its iterator into the stack
+                              res=this.next();                                   // and dive.
+                           }
+                        }
+                        else if (this._itStack.length>1)                         //If the current iterator is done,
+                        {                                                        //
+                           this._itStack.pop();                                  // then remove it form the stack
+                           res=this.next();                                      // and continue with previous level.
+                        }
+                        
+                        return res;
+                     }
+             };
+   }
+   
+   //protected methods
+   _loadInputFields(box_,selectorInpFields_,cmnKeySeq_)
+   {
+      //Selects an input fields from the given container and allocates them into this map.
+      
+      for (let inpField of box_?.querySelectorAll(selectorInpFields_??'input,select,textarea')??[])
+         try
+         {
+            if (inpField.name=='')
+            {
+               this._processNonameInputField(inpField);
+               continue;
+            }
+            
+            let relKeySeq=null;
+            if (inpField.type=='radio')
+            {
+               relKeySeq=this._getRelKeySeq(splitInpFieldName(inpField.name),cmnKeySeq_,0);
+               let radiogroup=this.getFromBranch(relKeySeq);
+               if (radiogroup instanceof RadioGroup)
+                  radiogroup.add(inpField);
+               else
+               {
+                  inpField=new this._radioGroupClass([inpField]);
+                  relKeySeq=relKeySeq.slice(0,-1);
+               }
+            }
+            else
+            {
+               this._decorateInputField(inpField);
+               relKeySeq=this._getRelKeySeq(inpField.keySeq,cmnKeySeq_,-1);
+            }
+            
+            if (!relKeySeq)
+               throw new Error(LC.get('Incorrect input name')+' '+inpField.name);
+            
+            this.setIntoBranch(relKeySeq,inpField,this._midItemClass,this._midItemClassParams);
+         }
+         catch (err)
+         {
+            console.error(err);
+         }
+   }
+   
+   _processNonameInputField(inpField_)
+   {
+      //This method allows to customize processing of the noname input fields which may be intended for some auxiliary purposes and needs proper initialization.
+      // Also, this method can adopt such input field. To do this it shall make input field compartible with InputFieldsMap and set it into this map by itself.
+      
+      console.warn('Noname input field was rejected',inpField_);
+   }
+   
+   _getRelKeySeq(keySeq_,cmnKeySeq_,end_)
+   {
+      //Helper method. Extracts a relative key sequence from the given input field using cmnKeySeq_ argument of a variable type.
+      
+      if (typeof cmnKeySeq_ ==='number')
+         return keySeq_?.slice(cmnKeySeq_,end_);
+      else if (cmnKeySeq_ instanceof Array)
+         return arrayRelativeSlice(cmnKeySeq_,keySeq_,end_);
+      else
+         return keySeq_;
+   }
+   
+   _decorateInputField(inpField_)
+   {
+      //Constructor helper method. Prepares an input field for setting into this map.
+      
+      TreeNode._decorateObjectToTreeLeaf(inpField_);
+      Object.defineProperties(inpField_,
+                              {
+                                 _key:{enumerable:false,configurable:true,get(){return this.keySeq[this.keySeq.length-1];}},
+                                 _keySeqCache:{value:null,enumerable:false,configurable:true,writable:true},
+                                 keySeq:{
+                                           enumerable:true,
+                                           configurable:true,
+                                           get(){return this._keySeqCache??=Object.freeze(splitInpFieldName(this.name,this.hasAttribute('multiple')));},
+                                           set(newVal_){this.name=inputNameFromKeySeq(this.keySeq.toSpliced(0,this.keySeq.length-1,...newVal_.slice(0,-1)),this.hasAttribute('multiple')); this._keySeqCache=newVal_;},
+                                        },
+                              });
+      decorateExistingProp(inpField_,'name',null,function(newVal_){this._keySeqCache=null; return newVal_;});   //Extend the name setter.
+      
+      inpField_.addEventListener('branchchange',
+                                 function(e_)
+                                 {
+                                    //Replaces a fragment of this key sequence, counting from the last but one element toward to the start, with the parent key sequence.
+                                    //Called in context of an input field.
+                                    // If the parent node is not attached to the whole branch, this operation doesn't cut the input field name.
+                                    // If the branch is longer than this input field key sequence, it will be extended up to te parent branch, preserving the trailing key.
+                                    if ((e_.detail?.event?.detail?.target!==this)&&((e_.detail?.event?.type=='keychange')||(e_.detail?.event?.type=='attached'))) //TODO: W/o (e_.detail?.event?.detail?.target!==this) this resets all indexes in the key seq to 0, so this logic must be verified.
+                                       this.keySeq=this.keySeq.toSpliced(-this.parent.keySeq.length-1,Math.min(this.parent.keySeq.length,this.keySeq.length-1),...this.parent.keySeq);
+                                 },
+                                 {passive:true});
+      
+      return inpField_;
+   }
+   
+   _validateChild(newChild_)
+   {
+      //Verifies wherhter a child type is supported by the current TreeNode [sub]class.
+      // For details see the TreeNode._validateChild().
+      
+      if (!((newChild_ instanceof TreeDataNode)||(newChild_ instanceof HTMLInputElement)||(newChild_ instanceof HTMLTextAreaElement)||(newChild_ instanceof HTMLSelectElement)))
+         throw new Error(LC.get('Unexpected value'),{cause:{subject:this,arg:'newChild_',val:newChild_,expected:'instance of TreeDataNode or HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement'}});
+      
+      if (((newChild_ instanceof HTMLInputElement)||(newChild_ instanceof HTMLTextAreaElement)||(newChild_ instanceof HTMLSelectElement))&&!newChild_.hasOwnProperty('key'))
+         throw new Error(LC.get('Unexpected value'),{cause:{subject:this,arg:'newChild_',val:newChild_,expected:'input field that is extended with the property "key"'}});
+   }
+}
+
+class SortingController
+{
+   constructor(params_)
+   {
+      this._root=params_?.container??(params_?.selectorContainer ? document.querySelector(params_.selectorContainer) : null);
+      if (this._root)
+      {
+         //Get sorting data source:
+         this._cookieKey=params_?.cookieKey??this._cookieKey;
+         this._cookiePath=params_?.cookiePath??this._cookiePath;
+         this.onChange=params_.onChange;
+         
+         //Init buttons:
+         let buttons=params_?.buttons??this._root.querySelectorAll(params_?.buttonsSelector??'.sort_btn');   //Find buttons into container.
+         for (let btn of buttons)
+            if ((btn.dataset.key!='')&&(/^(ASC|DESC)$/i.test(btn.dataset.order)))   //Buttons must has correct DATA-KEY and DATA-ORDER attributes.
+            {
+               btn.dataset.order=btn.dataset.order.toUpperCase();       //Normalize order's char case.
+               this._buttons[btn.dataset.key]??={ASC:null,DESC:null};   //Cache buttons by key and order 
+               this._buttons[btn.dataset.key][btn.dataset.order]=btn;   // for easy access.
+               
+               btn.addEventListener('click',(e_)=>{this.toggle_sorting(e_.target.dataset.key,e_.target.dataset.order,e_.ctrlKey);});   //NOTE: If click with the Ctrl key pressed, then new sorting will be appended to existing ones, else the previous sortings will be discarded.
+               btn.classList.toggle(this._selClassName,this.sortings[btn.dataset.key]==btn.dataset.order); //Init button state: set button selected if its order match corresponding sorting.
+            }
+      }
+   }
+   
+   //public props
+   get sortings()
+   {
+      try
+      {
+         this._sortings??=JSON.parse(getCookie(this._cookieKey)??'{}'); //NOTE: JSON.parse(null) doesn't rise exception, while JSON.parse(undefined) and JSON.parse('') does.
+      }
+      catch (err)
+      {
+         this._sortings={};
+      }
+      finally
+      {
+         return this._sortings;
+      }
+   }
+   set sortings(newVal_)
+   {
+      this._sortings=newVal_;
+      
+      let cookieVal=(this._sortings&&(Object.keys(this._sortings).length) ? JSON.stringify(this._sortings) : '');  //If sortings is empty, the cookie will be unset.
+      setCookie(this._cookieKey,cookieVal,31,this._cookiePath);
+      console.log('set sortings',this._cookieKey,this._sortings);
+   }
+   
+   //protected props
+   _root=null;
+   _buttons={};
+   _selClassName='sel';
+   _cookieKey='sort';
+   _cookiePath=document.location.pathname;
+   _sortings=null;
+   
+   //public methods
+   toggle_sorting(key_,order_,append_)
+   {
+      //Toggle sorting.
+      // If there is only one sorting it will be simply toggled. The same if append_ is set.
+      // If there are many sortings, they will be replaced with the key_+order_, unless append_ is set.
+      
+      if ((this.sortings[key_]==order_)&&(append_||(Object.keys(this.sortings).length==1)))
+         order_='';
+      this.set_sorting(key_,order_,append_);
+   }
+   
+   set_sorting(key_,order_,append_)
+   {
+      //Set sorting by the key_ to the order_.
+      // If order_
+      // If key_ already exists, its order will be updated with new value. By the way, if append_==false then all previous sortings will be discarded.
+      // If key_ doesn't exists and append_==true, it will be appended to the end of existing sortings.
+      
+      if (this._buttons[key_]&&/^(ASC|DESC)?$/i.test(order_))   //First, check is key_ and order_ are valid (as this method may be called manually).
+      {
+         if (!append_)
+            this.discard_sortings()
+         
+         let sortings=this.sortings;
+         if (order_!='')
+            sortings[key_]=order_;
+         else
+            delete sortings[key_];
+         
+         this._buttons[key_].ASC.classList.toggle(this._selClassName,order_=='ASC');
+         this._buttons[key_].DESC.classList.toggle(this._selClassName,order_=='DESC');
+         
+         this.sortings=sortings;
+         this.onChange?.();
+      }
+   }
+   
+   discard_sortings()
+   {
+      this.sortings={};
+      for (const key in this._buttons)
+      {
+         this._buttons[key].ASC.classList.remove(this._selClassName);
+         this._buttons[key].DESC.classList.remove(this._selClassName);
+      }
    }
 }
 
@@ -2500,7 +3181,7 @@ class AsyncList extends DynamicList
 function Spoiler(node_)
 {
    //TODO: Rewrite as a class.
-   //private properties
+   //protected props
    this.node=null;
    this.buttons=[];
    
@@ -2554,10 +3235,10 @@ class TabsController
    //Params:
    // tabs - array of the tabs themselves. Useful if you already has them.
    // container - container of the tabs. Without the "tabsSelector" param, all container's children will become the tabs.
-   // containerSelector - a css-selector to get the tabs' container.
-   // tabsSelector - css-selector, used to get the tabs. If "container" or "containerSelector" is defined, the tabs will be searched into this container (and if container will not be found, the tabs will not too), otherwise the tabs will be searched into the entire document.
+   // selectorContainer - a css-selector to get the tabs' container.
+   // tabsSelector - css-selector, used to get the tabs. If "container" or "selectorContainer" is defined, the tabs will be searched into this container (and if container will not be found, the tabs will not too), otherwise the tabs will be searched into the entire document.
    // NOTE: Requirement diagram of params above:
-   //    tabs|((container|containerSelector)[,tabsSelector])|tabsSelector.
+   //    tabs|((container|selectorContainer)[,tabsSelector])|tabsSelector.
    // selClassName - a class will be added to classList of the selected tab. Optional, default is 'sel'.
    // switchCmpCallback - callback that will be assigned to aponymous public property.
    //Properties:
@@ -2572,14 +3253,14 @@ class TabsController
       this.switchCmpCallback=params_.switchCmpCallback??this.switchCmpCallback;
       this.allowOutOfRange=params_.allowOutOfRange??this.allowOutOfRange;
 
-      this._evtDispatcher=new EventDispatcher(this);
+      decorateToEventTarget(this);
 
       //Construct:
       if (params_.tabs)                                                                                                             //At 1st, check if the tabs are given directly.
          this._tabs=Array.from(params_.tabs);
-      else if (params_.container||params_.containerSelector)                                                                        //At 2nd: get container with the tabs into it.
+      else if (params_.container||params_.selectorContainer)                                                                        //At 2nd: get container with the tabs into it.
       {
-         let container=params_.container??(params_.containerSelector ? document.querySelector(params_.containerSelector) : null);   // If container isn't given directly, then try to find it by selector.
+         let container=params_.container??(params_.selectorContainer ? document.querySelector(params_.selectorContainer) : null);   // If container isn't given directly, then try to find it by selector.
          this._tabs=Array.from(params_.tabsSelector ? container?.querySelectorAll(params_.tabsSelector) : container?.children);     // If the tabsSelector isn't set, then get all children of the container.
       }
       else
@@ -2623,12 +3304,11 @@ class TabsController
    allowOutOfRange=false;  //Allows to set currIndex out of tab indexes range (which deselects all tabs). If false, the currIndex will be forced to the tab indexes range.
    switchCmpCallback=(somewhat_,tab_)=>{return tab_.classList.contains(somewhat_);};   //A default tabs matching function. See method switchTo() for details.
 
-   //private props
+   //protected props
    _tabs=[];               //Tab nodes array.
    _currIndex=null;        //Index of selected tab. Is null if no one tab selected.
    _selClassName='sel';    //Class will be assigned to selected switch and tab and removed from the other ones.
-   _evtDispatcher=null;    //Events dispatcher.
-
+   
    //public methods
    switchToTab(tab_)
    {
@@ -2647,21 +3327,6 @@ class TabsController
       callback_??=this.switchCmpCallback;
 
       this.currIndex=this._tabs.findIndex((tab_)=>callback_(somewhat_,tab_));
-   }
-
-   addEventListener(type_,listener_,options_)
-   {
-      this._evtDispatcher.addEventListener(type_,listener_,options_);
-   }
-
-   removeEventListener(type_,listener_,options_)
-   {
-      this._evtDispatcher.removeEventListener(type_,listener_,options_);
-   }
-
-   dispatchEvent(event_)
-   {
-      this._evtDispatcher.dispatchEvent(event_);
    }
 }
 
@@ -2687,22 +3352,22 @@ class TabBox extends TabsController
    // buttons - array of the buttons themselves. Useful if you already has them. A called "buttons" may be actually any kind of the HTMLElement.
    // generateButtons - sub params, which sets up the dynamic generatiion of the tab-buttons from the tabs.
    //    callback - function that create a button's HTMLElement from the tab. Optional, by default the button will be a simple DIV with class name 'tab_btn' and content equal to the tab's DATA-CAPTION attribute (w/o DATA-CAPTION the tab-buttons will be empty, that however can make a sense).
-   //    container - container, where the generated buttons will be placed. Optional if the "generateButtons.containerSelector" is set.
-   //    containerSelector - css-selector, used to get the buttons container. Optional if the "generateButtons.container" is set.
+   //    container - container, where the generated buttons will be placed. Optional if the "generateButtons.selectorContainer" is set.
+   //    selectorContainer - css-selector, used to get the buttons container. Optional if the "generateButtons.container" is set.
    // container - the main tabbox container itself. It should contain both of the buttons and the tabs.
-   // containerSelector - css-selector, used to get the tabbox container.
-   // tabsSelector - same as eponymous TabsController's param. If "container" or "containerSelector" is set, it becomes '.tab' by default.
-   // buttonsSelector - same as the tabsSelector, but for the buttons. If "container" or "containerSelector" is set, it becomes '.tab_btn' by default.
+   // selectorContainer - css-selector, used to get the tabbox container.
+   // tabsSelector - same as eponymous TabsController's param. If "container" or "selectorContainer" is set, it becomes '.tab' by default.
+   // buttonsSelector - same as the tabsSelector, but for the buttons. If "container" or "selectorContainer" is set, it becomes '.tab_btn' by default.
    // NOTE: Requirement diagrams of params above:
-   //    tabs|((container|containerSelector)[,tabsSelector])|tabsSelector
-   //    buttons|generateButtons|((container|containerSelector)[,buttonsSelector])|buttonsSelector
+   //    tabs|((container|selectorContainer)[,tabsSelector])|tabsSelector
+   //    buttons|generateButtons|((container|selectorContainer)[,buttonsSelector])|buttonsSelector
    // eventType - an event which the buttons will listen to. Optional, the 'click' is default.
    // matchByCallback - boolean, if set true, then the switchCmpCallback() will be used to find a tab matching the selected button. Otherwise, the tabs will be mapped to the buttons in order (index).
    // switchCmpCallback - a user-defined callback, that will be assigned to aponymous public property,
    //Attributed params of main container:
    // DATASET-TABS - equivalent of the tabsSelector.
    // DATASET-BUTTONS - equivalent of the buttonsSelector.
-   // DATASET-BUTTONS-CONTAINER - equivalent of the generateButtons.containerSelector.
+   // DATASET-BUTTONS-CONTAINER - equivalent of the generateButtons.selectorContainer.
    //Attributed params of tabs:
    // DATASET-CAPTION - Arbitary string that will be used as tab button text by default tab button generator. (Only if buttons are automatically generated.)
    //Properties:
@@ -2716,7 +3381,7 @@ class TabBox extends TabsController
       //Get main tabbox container if need to select tabs or buttons:
       let container=null;
       if (!(params_.buttons||params_.tabs))
-         container=params_.container??document.querySelector(params_.containerSelector);
+         container=params_.container??document.querySelector(params_.selectorContainer);
 
       //Split and map params for the inherited constructor and the child TabsController:
       let tabsParams={
@@ -2742,7 +3407,7 @@ class TabBox extends TabsController
       //Generate switching buttons for the tabs:
       if ((!params_.buttons)&&(params_.generateButtons||container?.dataset.buttonsContainer))
       {
-         let btnsContainer=params_.generateButtons.container??container?.querySelector(params_.generateButtons.containerSelector??container.dataset?.buttonsContainer??'.tab_btns');   //1st, look for already selected buttons' container,
+         let btnsContainer=params_.generateButtons.container??container?.querySelector(params_.generateButtons.selectorContainer??container.dataset?.buttonsContainer??'.tab_btns');   //1st, look for already selected buttons' container,
          let buttonGenerator=params_.generateButtons.callback??((tab_)=>{return buildNodes({tagName:'div',className:'tab_btn',textContent:tab_.dataset?.caption});}); //Take a user-deinned generator function or define the default one that will use tab's DATASET-CAPTION attribute.
 
          if (btnsContainer)
@@ -2767,7 +3432,7 @@ class TabBox extends TabsController
 
    switchCmpCallback=(class_,tab_)=>{return tab_.classList.contains(class_)};
 
-   //private props
+   //protected props
    _switch=null;           //The TabsSwitch instance which will control the tab butons.
    _matchByCallback=false; //By default, simply map buttons and tabs by the order.
 }
@@ -2820,7 +3485,7 @@ class SlideShow extends TabBox
       //Map params named in the "slider" context:
       let params={...params_};
       if (!params.container)
-         params.container=document.querySelector(params.containerSelector);
+         params.container=document.querySelector(params.selectorContainer);
       if (params.slides)
       {
          params.tabs=params.slides;
@@ -2877,7 +3542,7 @@ class SlideShow extends TabBox
    get isAtStart(){return this._currIndex<=0;}                    //If the current tab is the first one.
    get isAtEnd(){return this._currIndex>=(this._tabs.length-1);}  //If the current tab is the last one.
    
-   //private props
+   //protected props
    _intervalID=null;
    _interval=0;
    _buttons={prev:null,next:null};
@@ -2928,7 +3593,7 @@ class SlideShow extends TabBox
       }
    }
    
-   //private methods
+   //protected methods
    _onSwitch()
    {
       //Repaint the large viewport:
@@ -2999,7 +3664,7 @@ class Scroller
    constructor(params_)
    {
       //Get key elements:
-      this._root=params_?.container??(params_?.containerSelector ? document.querySelector(params_.containerSelector) : null);
+      this._root=params_?.container??(params_?.selectorContainer ? document.querySelector(params_.selectorContainer) : null);
       if (this._root)
       {
          
@@ -3095,7 +3760,7 @@ class Scroller
       }
    }
    
-   //private props
+   //protected props
    _root=null;      //root node.
    _area=null;      //scrolling area node.
    _content=null;   //content container node.
@@ -3327,7 +3992,7 @@ class Scroller
       return evtConsumed;
    }
    
-   //private methods
+   //protected methods
    _onInput(e_)
    {
       if (this._shortcuts.match(e_))
@@ -3365,10 +4030,10 @@ function reqServer(url_,data_,method_,enctype_,responseType_)
    // responseType_ - string, variants: ''|'text' - text in a DOMString object; 'json' - JS object, parsed from JSON data; 'document' - HTML or XML document; 'blob' - Blob object with binary data; 'arraybuffer' - ArrayBuffer containing binary data.
    //Return value:
    // A promise.
-   //    onResolve(xhr_response,xhr) - a callback function for the case if request will be successfully sent.
-   //    onReject(xhr) - a callback function for the case if request will not be sent.
+   //    onResolve_(xhr_response,xhr) - a callback function for the case if request will be successfully sent.
+   //    onReject_(xhr) - a callback function for the case if request will not be sent.
    
-   return new Promise(function (onResolve,onReject)
+   return new Promise(function (onResolve_,onReject_)
                       {
                          //Init parameters:
                          url_??=document.location.pathname;
@@ -3377,8 +4042,6 @@ function reqServer(url_,data_,method_,enctype_,responseType_)
                             enctype_='application/x-www-form-urlencoded';
                          enctype_=(enctype_??'application/x-www-form-urlencoded').toLowerCase();
                          responseType_=responseType_??'json';
-                         onResolve=onResolve??function(ans_){console.log('XHR succeded. Response:',ans_);}; //TODO: These two fallbacks are seems not working.
-                         onReject=onReject??function(xhr_){console.error('XHR failed:',xhr_);};             //
                          
                          //Prepare data to sending:
                          let query='';
@@ -3413,7 +4076,7 @@ function reqServer(url_,data_,method_,enctype_,responseType_)
                          }
                          
                          let xhr=new XMLHttpRequest();
-                         xhr.addEventListener('load',function(e_){if(xhr.readyState === 4){if (xhr.status === 200) onResolve(xhr.response); else onReject(xhr);}});
+                         xhr.addEventListener('load',function(e_){if(xhr.readyState===4){if (xhr.status===200) onResolve_(xhr.response); else onReject_(xhr);}});
                          xhr.open(method_,url_);
                          xhr.setRequestHeader('X-Requested-With','JSONHttpRequest');
                          if (enctype_!='multipart/form-data')              //If data containf a file, 
@@ -3471,7 +4134,7 @@ function setCookie(name_,val_,expires_,path_)
 function setElementRecursively(object_,keySequence_,value_)
 {
    //[Re]places $value_ into multidimensional $array_, using a sequence of keys from the argument $key_sequence_. Makes missing dimensions.
-   //Analog of the set_element_recursively() from utils.php.
+   //Analog of the /core/utils.php\set_array_element().
    //NOTE: Unlike its php's analog, it returns the resulting array/object. Also the input argument object_ can be initially undefined.
    
    let currKey=keySequence_[0];
@@ -3664,6 +4327,31 @@ function cloneOverriden(default_,actual_,options_)
    return res;
 }
 
+function arrayRelativeSlice(base_,array_,end_)
+{
+   //Extracts a portion of array_ by matching its beginning against the base_.
+   //Arguments:
+   // base_ - Array. Base array, that is assumed to match the beginning of array_.
+   // array_ - Array. An array from which the result being extracted.
+   // end_ - int. Auxiliary argument that is passed as the second argument to Array.splice(). Allows to exclude several elements at the array_ end.
+   //Return value:
+   // If beginning of array_ matches the base_, a portion of array_ that starts right after the base_ and ends at the end_.
+   // If array_ don't starts with base_ or if either base_ or array_ is not Array, null is returned.
+   
+   let res=null;
+   
+   if ((base_ instanceof Array)&&(array_ instanceof Array))
+   {
+      let i=0;
+      while ((i<base_.length)&&(base_[i]===array_[i]))
+         i++;
+      if (i==base_.length)
+         res=array_.slice(i,end_);
+   }
+   
+   return res;
+}
+
 //------- String -------//
 function HTMLSpecialChars(val_)
 {
@@ -3695,6 +4383,59 @@ function serializeUrlQuery(query_data_,parent_)
    }
    
    return res_arr.join('&');
+}
+
+function splitInpFieldName(name_,isMultiple_=false)
+{
+   //Splits input field name to array.
+   //Return value:
+   // Array of input field name elements, e.g. splitInpFieldName('a[b][c]')==['a','b','c'] or splitInpFieldName('a[b][c][d][]')==['a','b','c','d'] or splitInpFieldName('a[b][c][d][]',0)==['a','b','c','d',0];
+   // If name_ is not defined or is empty string or has invalid format, returns null. E.g. splitInpFieldName('[b][c]')===null or splitInpFieldName('a[b[c]')===null or splitInpFieldName('a[b][][d]')===null;
+   
+   let res=null;
+   
+   if ((name_!=null)&&(name_!=''))
+   {
+      let matches=/^([^\[\]]+)(\[([^\[\]]+(\]\[[^\[\]]+)*)\])?(\[\])?$/.exec(name_);
+      if (matches)
+      {
+         if (matches[3])
+         {
+            res=[matches[1],...matches[3]?.split('][')];
+            if (matches[5]&&!isMultiple_)
+               res.push(null);
+         }
+         else
+            res=[matches[1]];
+      }
+   }
+   
+   return res;
+}
+
+function inputNameFromKeySeq(keySeq_,isMultiple_=false,offset_=0)
+{
+   //Returns an input field name that corresponds to the given request element location.
+   // Almost analog of /core/utils.php\inp_name_from_req_loc().
+   //Arguments:
+   // keySeq_ - array. A key sequence that defines a request element location, e.g. ["$_REQUEST|$_COOKIE","sort","col1"].
+   // isMultiple_ - bool. If true, a trainling "[]" will be appended. This option is usually required by select or file input fields with "multiple" attribute.
+   // offset_ - int. A number of keys from the beginning of keySeq to skip. Optional, default 0.
+   //Return value:
+   // E.g. "sort[col1]".
+   
+   let res='';
+   
+   for (let i in keySeq_)
+      if (i==offset_)
+         res+=keySeq_[i];
+      else if (i>offset_)
+         res+='['+keySeq_[i]+']';
+   
+   if (isMultiple_)
+      res+='[]';
+   
+   return res;
 }
 
 //------- Date/time -------//
