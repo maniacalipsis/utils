@@ -159,22 +159,24 @@ class InputCAPTCHA extends InputString
    protected string $fonts_dir="";
    protected array  $options=[];
    
-   public function renew_captcha()
+   public function renew_captcha():?string
    {
-      $captcha_str=generate_captcha_str();
-      $_SESSION["CAPTCHA"]=$captcha_str;
-      return make_captcha_image($captcha_str,$this->fonts_dir,$this->options);
+      $res=null;
+      if (session_start())
+      {
+         $captcha_str=generate_captcha_str();
+         $_SESSION["CAPTCHA"]=$captcha_str;
+         $res=make_captcha_image($captcha_str,$this->fonts_dir,$this->options);
+      }
+      return $res;
    }
    
    public function render()
    {
-      if (session_start())
-      {
-         ?>
-         <BUTTON TYPE="button" CLASS="captcha" TITLE="<?=_("Обновить картинку")?>"><IMG CLASS="captcha" SRC="data:image/png;base64,<?=base64_encode($this->renew_captcha())?>" ALT="CAPTCHA"></BUTTON>
-         <?php
-         parent::render();
-      }
+      ?>
+      <BUTTON TYPE="button" CLASS="captcha" TITLE="<?=_("Обновить картинку")?>"><IMG CLASS="captcha" SRC="data:image/png;base64,<?=base64_encode($this->renew_captcha())?>" ALT="CAPTCHA"></BUTTON>
+      <?php
+      parent::render();
    }
    
    public function validate()

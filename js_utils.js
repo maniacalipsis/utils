@@ -1630,6 +1630,45 @@ function popupsClose()
    return res;
 }
 
+function dialogOpen(struct_,parentNode_,collection_)
+{
+   //Make popup and assigns to parent_ (or to document.body by default).
+   
+   var res=null;
+   
+   if (struct_)
+   {
+      let collection_={};
+      res=buildNodes(struct_,collection_);                  //Create new popup's DOM structure
+      if (res)
+      {
+         collection_.btn_close.addEventListener('click',(e_)=>{res.close(); res.parentNode.removeChild(res); return cancelEvent(e_);});   //Close dialog by close button.
+         collection_.title    .addEventListener('click',(e_)=>{e_.stopPropagation();});         //Prevent close when the dialog title
+         collection_.container.addEventListener('click',(e_)=>{e_.stopPropagation();});         // or some content elemants is clicked.
+         res.addEventListener('click',(e_)=>{res.close(); res.parentNode.removeChild(res);});   //Close dialog by click on the dialod element itself (this includes the area around).
+         res.addEventListener('wheel',(e_)=>{e_.stopPropagation();});      //Prevent page scrolling
+         res.addEventListener('scroll',(e_)=>{return cancelEvent(e_);});   // under the dialog shown.                         
+         //NOTE: Dialog can be closed by Esc key as default browser behaviour.
+         
+         (parentNode_??document.body)?.appendChild(res);    //If DOM structure was built successfully, attach it to the parent.
+         res.showModal();
+      }
+   }
+   
+   return res;
+}
+
+function dialogsClose()
+{
+   //Closes all dialogs (generrally - one).
+   
+   for (let dialog of document.querySelectorAll('dialog'))
+   {
+      dialog.close();
+      dialog.parentNode.removeChild(dialog);
+   }
+}
+
 //--- Common dialog structures ---//
 function basePopupStruct(caption_,childNodes_,params_)
 {
@@ -1698,6 +1737,65 @@ function imagePopupStruct(link_,caption_) //makes structure of window for displa
                             }
                          ],
               onclick:function(){popupsClose()},
+           };
+   
+   return res;
+}
+
+function baseDialogStruct(caption_,childNodes_,params_)
+{
+   var res={
+              tagName:'dialog',
+              className:'window '+(params_?.windowClassName??''),
+              childNodes:[
+                            {
+                               tagName:'div',
+                               className:'title',
+                               childNodes:[
+                                             {tagName:'span',className:'caption',innerHTML:caption_??''},
+                                             {tagName:'div',className:'button close',_collectAs:'btn_close'},
+                                          ],
+                               _collectAs:'title',
+                            },
+                            {
+                               tagName:'div',
+                               className:'container',
+                               childNodes:childNodes_,
+                               _collectAs:'container',
+                            }
+                         ],
+           };
+   
+   return res;
+}
+
+function imageDialogStruct(link_,caption_,params_) //makes structure of window for displaying of enlarged image
+{
+   var res={
+              tagName:'dialog',
+              className:'window'+(params_?.windowClassName??''),
+              childNodes:[
+                            {
+                               tagName:'div',
+                               className:'title',
+                               childNodes:[
+                                             {tagName:'span',className:'caption',innerHTML:caption_??''},
+                                             {tagName:'div',className:'button close',onclick:function(){popupsClose()}},
+                                          ]
+                            },
+                            {
+                               tagName:'div',
+                               className:'container image',
+                               childNodes:[
+                                              {
+                                                 tagName:'img',
+                                                 src:link_,
+                                                 _collectAs:'image',
+                                              }
+                                          ],
+                               _collectAs:'container',
+                            }
+                         ],
            };
    
    return res;

@@ -22,7 +22,7 @@ function ajaxFormOnSubmit(e_)
 {
    ajaxSendForm(e_.target)
       .then((ans_,xhr_)=>{if (this.dataset.onsuccess) window[this.dataset.onsuccess](ans_,xhr_,this/*form ptr*/); else printAjaxResponse(this,ans_);})
-      .catch((xhr_)=>{if (this.dataset.onerror) window[this.dataset.onerror](xhr_,this/*form ptr*/); else {console.warn(xhr_); printAjaxResponse(this,{res:false,errors:['Отправка данных не удалась. Возможно нет подключения к Сети или ошибка на сервере.']});}});
+      .catch((xhr_)=>{if (this.dataset.onerror) window[this.dataset.onerror](null,xhr_,this/*form ptr*/); else {console.warn(xhr_); printAjaxResponse(this,{res:false,errors:['Отправка данных не удалась. Возможно нет подключения к Сети или ошибка на сервере.']});}});
    
    return cancelEvent(e_);
 }
