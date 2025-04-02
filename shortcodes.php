@@ -122,6 +122,102 @@ trait TMetaQueryHepler
    }
 }
 
+trait TAsyncPostsLoader
+{
+   //Allows to load posts using XHR.
+   //Shall be used with classes that extends PostsPrefabShortcode.
+   
+   public $items_container_class="items"; //CSS-class for the list items container.
+   public $btn_load_class="load_more";    //CSS-class for the "Load More" button.
+   public $btn_load_caption="Load More";  //Caption for the "Load More" button.
+   
+   protected ?int   $rows_total=null;
+   protected  array $response=[];
+   protected  int   $default_count=25;
+   
+   public function __construct($name_="")
+   {
+      parent::__construct($name_);
+      
+      if (wp_doing_ajax())
+      {
+         add_action("wp_ajax_nopriv_".$this->name,[$this,"handle_request"]);
+         add_action("wp_ajax_".$this->name       ,[$this,"handle_request"]);
+      }
+   }
+   
+   public function handle_request():void
+   {
+      //Handle AJAX request from the feedback form.
+      // This method is a parallel of the Dhortcode::do().
+      
+      //Get data:
+      try
+      {
+         $params=$_REQUEST;
+         if (isset($params["count"]))
+            $params["numberposts"]=$params["count"];  //Translate forntend's "count" back to the WP's "numberposts".
+         $this->get_data($params,true);               //Get params from request and tell the self::prepare_filter() to escape'em.
+         
+         $this->response=[
+                            "status"=>"ok",
+                            "data"=>$this->data,               //Method self::get_data() shall set props $this->data
+                            "rows_total"=>$this->rows_total,   // and $this->rows_total.
+                         ];
+      }
+      catch (Exception $ex)
+      {
+         $this->response["status"]="fail";
+         $this->response["errors"]=[$ex->getMessage()];
+      }
+      finally
+      {
+         //Finally, send a response:
+         echo json_encode($this->response,JSON_ENCODE_OPTIONS);
+         die();
+      }
+   }
+   
+   protected function get_rendering_params($params_,$content_)
+   {
+      parent::get_rendering_params($params_,$content_);
+      
+      //Static block params:
+      $this->items_container_class=$params_["items_container_class"]??$this->items_container_class;
+      $this->btn_load_class       =$params_["btn_load_class"       ]??$this->btn_load_class       ;
+      $this->btn_load_caption     =$params_["btn_load_caption"     ]??$this->btn_load_caption     ;
+      
+      //Copy filter params to the list tag data attributes:
+      $ajax_req_data=["action"=>$this->name,...array_intersect_key($params_,$this->filter_allowed)];
+      if (isset($ajax_req_data["numberposts"]))
+      {
+         $ajax_req_data["count"]=$ajax_req_data["numberposts"];   //Translate WP's "numberposts" to "count" for compatibility with js_utils.js functions.
+         unset($ajax_req_data["numberposts"]);
+      }
+      
+      $this->attr_data.=" DATA-FILTER=\"".htmlspecialchars(json_encode($ajax_req_data,JSON_ENCODE_OPTIONS))."\"";
+   }
+   
+   protected function default_list_tpl()
+   {
+      //Render the simple list.
+      
+      ob_start();
+      ?>
+      <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->list_class?> <?=$this->custom_class?>" <?=$this->attr_data?>>
+         <DIV CLASS="<?=$this->items_container_class?>">
+            <?php
+               foreach ($this->data as $item)
+                  echo $this->{$this->tpl_pipe["item_tpl"]}($item);
+            ?>
+         </DIV>
+         <BUTTON TYPE="button" CLASS="<?=$this->btn_load_class?>"><?=$this->btn_load_caption?></BUTTON>
+      </DIV>
+      <?php
+      return ob_get_clean();
+   }
+}
+
 abstract class Shortcode
 {
    //A bare base for the parametrized multi-templated shortcodes.
@@ -404,99 +500,6 @@ abstract class PostsPrefabShortcode extends DataListShortcode
       //$size_ - [full|large|medium|thumbnail].
       
       return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_??$this->image_size));
-   }
-}
-
-abstract class AsyncPostsPrefabShortcode extends PostsPrefabShortcode
-{
-   public $items_container_class="items"; //CSS-class for the list items container.
-   public $btn_load_class="load_more";    //CSS-class for the "Load More" button.
-   public $btn_load_caption="Load More";  //Caption for the "Load More" button.
-   
-   protected ?int   $rows_total=null;
-   protected  array $response=[];
-   protected  int   $default_count=25;
-   
-   public function __construct($name_="")
-   {
-      parent::__construct($name_);
-      
-      if (wp_doing_ajax())
-      {
-         add_action("wp_ajax_nopriv_".$this->name,[$this,"handle_request"]);
-         add_action("wp_ajax_".$this->name       ,[$this,"handle_request"]);
-      }
-   }
-   
-   public function handle_request():void
-   {
-      //Handle AJAX request from the feedback form.
-      // This method is a parallel of the Dhortcode::do().
-      
-      //Get data:
-      try
-      {
-         $params=$_REQUEST;
-         if (isset($params["count"]))
-            $params["numberposts"]=$params["count"];  //Translate forntend's "count" back to the WP's "numberposts".
-         $this->get_data($params,true);               //Get params from request and tell the self::prepare_filter() to escape'em.
-         
-         $this->response=[
-                            "status"=>"ok",
-                            "data"=>$this->data,               //Method self::get_data() shall set props $this->data
-                            "rows_total"=>$this->rows_total,   // and $this->rows_total.
-                         ];
-      }
-      catch (Exception $ex)
-      {
-         $this->response["status"]="fail";
-         $this->response["errors"]=[$ex->getMessage()];
-      }
-      finally
-      {
-         //Finally, send a response:
-         echo json_encode($this->response,JSON_ENCODE_OPTIONS);
-         die();
-      }
-   }
-   
-   protected function get_rendering_params($params_,$content_)
-   {
-      parent::get_rendering_params($params_,$content_);
-      
-      //Static block params:
-      $this->items_container_class=$params_["items_container_class"]??$this->items_container_class;
-      $this->btn_load_class       =$params_["btn_load_class"       ]??$this->btn_load_class       ;
-      $this->btn_load_caption     =$params_["btn_load_caption"     ]??$this->btn_load_caption     ;
-      
-      //Copy filter params to the list tag data attributes:
-      $ajax_req_data=["action"=>$this->name,...array_intersect_key($params_,$this->filter_allowed)];
-      if (isset($ajax_req_data["numberposts"]))
-      {
-         $ajax_req_data["count"]=$ajax_req_data["numberposts"];   //Translate WP's "numberposts" to "count" for compatibility with js_utils.js functions.
-         unset($ajax_req_data["numberposts"]);
-      }
-      
-      $this->attr_data.=" DATA-FILTER=\"".htmlspecialchars(json_encode($ajax_req_data,JSON_ENCODE_OPTIONS))."\"";
-   }
-   
-   protected function default_list_tpl()
-   {
-      //Render the simple list.
-      
-      ob_start();
-      ?>
-      <DIV <?=$this->attr_id?> CLASS="<?=$this->identity_class?> <?=$this->list_class?> <?=$this->custom_class?>" <?=$this->attr_data?>>
-         <DIV CLASS="<?=$this->items_container_class?>">
-            <?php
-               foreach ($this->data as $item)
-                  echo $this->{$this->tpl_pipe["item_tpl"]}($item);
-            ?>
-         </DIV>
-         <BUTTON TYPE="button" CLASS="<?=$this->btn_load_class?>"><?=$this->btn_load_caption?></BUTTON>
-      </DIV>
-      <?php
-      return ob_get_clean();
    }
 }
 
