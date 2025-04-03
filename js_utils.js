@@ -4563,10 +4563,10 @@ function formatDate(format_,date_,params_)
    res=res.replaceAll(/(?<!\\)G/g,date_.getHours().toString());
    res=res.replaceAll(/(?<!\\)v/g,date_.getMilliseconds().toString());
    res=res.replaceAll(/(?<!\\)Z/g,date_.getTimezoneOffset().toString());
-   //res=res.replaceAll(/(?<!\\)D/g,(params_?.shortWeekDays??['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])[date_.getDay()-1]);
-   //res=res.replaceAll(/(?<!\\)l/g,(params_?.fullWeekDays??['Monday','Tuesday','Wednesday','Thursday','Frighday','Saturday','Sunday'])[date_.getDay()-1]);
-   //res=res.replaceAll(/(?<!\\)M/g,(params_?.shortMonths??['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'])[date_.getMonth()]);
-   //res=res.replaceAll(/(?<!\\)F/g,(params_?.fullMonths??['January','February','March','April','May','June','July','August','September','October','November','December'])[date_.getMonth()]);
+   res=res.replaceAll(/(?<!\\)D/g,(params_?.shortWeekDays??['Mon','Tue','Wed','Thu','Fri','Sat','Sun'])[date_.getDay()-1]);
+   res=res.replaceAll(/(?<!\\)l/g,(params_?.fullWeekDays??['Monday','Tuesday','Wednesday','Thursday','Frighday','Saturday','Sunday'])[date_.getDay()-1]);
+   res=res.replaceAll(/(?<!\\)M/g,(params_?.shortMonths??['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'])[date_.getMonth()]);
+   res=res.replaceAll(/(?<!\\)F/g,(params_?.fullMonths??['January','February','March','April','May','June','July','August','September','October','November','December'])[date_.getMonth()]);
    res=res.replaceAll(/\\(.)/g,'$1');
    
    return res;
