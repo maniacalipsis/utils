@@ -32,7 +32,7 @@ class ThemeSetup
    
    public $remove_category_base=true;
    
-   protected $required_plugins=["Utlilties"=>"FSG a.k.a ManiaC"];
+   protected $required_plugins=["Utilities"=>"FSG a.k.a ManiaC"];
    
    protected $actions_to_remove=null;
    protected $actions_to_add=null;

@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Utlilties
+Plugin Name: Utilities
 Description: Set of theme setup and utility functions.
 Version: 2.3
 Author: FSG a.k.a ManiaC
