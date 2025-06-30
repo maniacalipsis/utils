@@ -88,7 +88,7 @@ class InputHidden extends InputField
       
       $attrs=["type"=>"hidden","name"=>$this->key,"value"=>(string)$this->value??$this->default]+$this->attrs;
       ?>
-      <INPUT<?=serialize_element_attrs($attrs)?>>
+      <INPUT<?=render_element_attrs($attrs)?>>
       <?php
    }
 }
@@ -99,7 +99,7 @@ class InputPwd extends InputField
    {
       $attrs=["type"=>"password","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
@@ -121,7 +121,7 @@ class InputString extends InputField
    {
       $attrs=["type"=>"text","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
@@ -132,7 +132,7 @@ class InputText extends InputString
    {
       $attrs=["name"=>$this->key]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <TEXTAREA <?=serialize_element_attrs($attrs)?>><?=htmlspecialchars($this->value??$this->default)?></TEXTAREA></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <TEXTAREA <?=render_element_attrs($attrs)?>><?=htmlspecialchars($this->value??$this->default)?></TEXTAREA></LABEL>
       <?php
    }
 }
@@ -242,7 +242,7 @@ class InputFloat extends InputField
    {
       $attrs=["type"=>"number","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
@@ -283,7 +283,7 @@ class InputBool extends InputField
       $attrs_hdden=["type"=>"hidden","name"=>$this->key,"value"=>$this->value??$this->default];
       $attrs_ccheck=["type"=>"checkbox","checked"=>to_bool($this->value??$this->default),"onclick"=>"let inp=this.parentNode.querySelector('input[type=hidden]'); console.log(inp); if (inp) inp.value=(this.checked ? '1' : '0');"]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs_hdden)?>> <INPUT<?=serialize_element_attrs($attrs_ccheck)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs_hdden)?>> <INPUT<?=render_element_attrs($attrs_ccheck)?>></LABEL>
       <?php
    }
 }
@@ -557,7 +557,7 @@ class InputFile extends InputField
    {
       $attrs=["type"=>"file","name"=>$this->key.($this->attrs["multiple"]??false ? "[]" : ""),"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=serialize_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }

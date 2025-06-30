@@ -5,103 +5,46 @@
 /* Contact: imroot@maniacalipsis.ru */
 /* License: GNU GPL v3              */
 /*----------------------------------*/
-/* Utility functions                */
-/* (partially migrated from         */
-/*  ThePatternEngine v3.3)          */
+/* Utility functions migrated from  */
+/*  ThePatternEngine v4.2           */
 /*==================================*/
+
+/*===========================================================================================================*/
+/* This file is part of The Pattern Engine.                                                                  */
+/* The Pattern Engine is free software: you can redistribute it and/or modify it under the terms of the      */
+/* GNU General Public License as published by the Free Software Foundation, either version 3 of the License. */
+/* The Pattern Engine is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;           */
+/* without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                 */
+/* See the GNU General Public License for more details.                                                      */
+/* You should have received a copy of the GNU General Public License along with The Pattern Engine.          */
+/* If not, see http://www.gnu.org/licenses/.                                                                 */
+/*===========================================================================================================*/
 
 //Global namespace.
 
-// ========================================== Utility Functions ========================================== //
-function similar($a_,$b_)
-{
-   //$a_ == $b_ - Equal (after type juggling); $a_ === $b_ - Identical (both types and values are equal); same($a_,$b_) - meaning the similar things.
-   //In some cases like a request, 0 and false doesn't means the same as NULL, "" and []. Also "" and [] are means the same - the "nothing".
-   //Thus both of == and === aren't suitable for testing two values for similarity.
-   //As the == is more equal for the task, the same() uses it after excluding of that cases when the == "misses".
-   
-   return (($a_===0||$a_===false)&&(is_null($b_)||$b_===""||$b_===[]))||(($b_===0||$b_===false)&&(is_null($a_)||$a_===""||$a_===[])) ? false : (($a_===""&&$b_===[])||($b_===""&&$a_===[]) ? true : $a_==$b_);
-}
 
-function wp_bs_escape($val_)
-{
-   //As WP applies the wp_unslash() to the data before putting to DB, the JSON 
-   return str_replace("\\","[[_bs]]",$val_);
-}
+//Depends on:
+// settings.php
+//    Certain functions are use following constants:
+//      define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_PARTIAL_OUTPUT_ON_ERROR);   //Options for json_encode(). See PHP man pages for details.
+//      define("JSON_DECODE_OPTIONS",JSON_OBJECT_AS_ARRAY|JSON_THROW_ON_ERROR);                   //Options for json_decode(). See PHP man pages for details. NOTE: Flag JSON_OBJECT_AS_ARRAY is mandatory, dismissing it will result many engine's methods fail to operate.
+//      define("JSON_MAX_DEPTH",512);                                                             //Allows to raise (or lower) default PHP's value of the depth argument of json_encode() and json_decode(). The PHP's default is 512.
+// core.php
+//    class LC. TODO: Seems functions query_report_error() and query_report_success() which use core.php\LC can be removed.
 
-function wp_bs_unescape($val_)
-{
-   //As WP applies the wp_unslash() to the data before putting to DB, the JSON 
-   return str_replace("[[_bs]]","\\",$val_);
-}
 
-function decode_request($raw_req_)
-{
-   if (is_array($raw_req_))
-   {
-      $res=[];
-      foreach ($raw_req_ as $key=>$val)
-         $res[$key]=decode_request($val);
-   }
-   else
-      $res=stripcslashes($raw_req_);
-   
-   return $res;
-}
+/* Unsorted */
+/* NOTE: functions in this section are may be a subject to reallocate among other sections */
 
-class CheckList
+define("FILE_NAME_EXT_REGEXP","/^(\\.?[^.]+)\\.([.a-z0-9_-]+)$/i");  //Matches a filename with extension[s]. Works correctly with filenames that starts with a dot. Usage example: $basename="file.jpg.exe"; $ext=(preg_match(FILE_NAME_EXT_REGEXP,$basename,$matches) ? $matches[FILE_EXT_MATCH_INDEX] : null); dump($ext); //This will output "jpg.exe".
+define("FILE_NAME_MATCH_INDEX",1);                                   // Index of filename part that precedes an extension[s], matched by FILE_NAME_EXT_REGEXP.
+define("FILE_EXT_MATCH_INDEX",2);                                    // Index of filename extension[s], matched by FILE_NAME_EXT_REGEXP.
+
+function is_not_null($val_)
 {
-   //This class helps to maintain a long check sequences.
-   //Usage example:
-   // $errors=[];
-   // $cl=new CheckList($errors);
-   // $cl->check($val1==CORRECT_VAL1,"err1");      //<- The independent check.
-   // if ($cl->check($val2==CORRECT_VAL2,"err2"))  //If master check fails, then dependent checks will not be made. But it's ok, because this one failed check made the list unable to pass the whole test.
-   //    $cl->check($val3==CORRECT_VAL3,"err3");   //<- The dependent check.
-   // if ($cl->is_passed())
-   //    do_something();
-   // else
-   //    dump($errors);
+   //May be used as callback for e.g. array_filter().
    
-   private $checks_made=0;
-   private $checks_passed=0;
-   private $errors=null;
-   
-   public function __construct(&$errors_)
-   {
-      $this->errors=&$errors_;   //Save ptr to put error messages directly into an external array.
-   }
-   
-   public function check($check_res_,$err_msg_=null)
-   {
-      //Register a check result.
-      
-      $this->checks_made++;
-      if ($check_res_)
-         $this->checks_passed++;
-      elseif ($err_msg_&&is_array($this->errors))
-         if (is_array($err_msg_))
-            $this->errors+=$err_msg_;
-         else
-            $this->errors[]=$err_msg_;
-      
-      return $check_res_;   //Return $check_res_ to enable the chained and conditional checks.
-   }
-   
-   public function is_passed()
-   {
-      //Does the whole test is passed?
-      // This method returns true if all checks are passed.
-      // If any of checks failed false or also if there are no check was made at all, the false will be returned.
-      
-      return (($this->checks_made>0)&&($this->checks_passed==$this->checks_made));
-   }
-   
-   public function reset()
-   {
-      $this->checks_made=0;
-      $this->checks_passed=0;
-   }
+   return !is_null($val_);
 }
 
 /* --------------------------------------- string utilities --------------------------------------- */
@@ -109,7 +52,7 @@ function to_bool($val_)
 {
    //Returns true if val_ may be understood as some variation of boolean true.
 
-   return (is_bool($val_) ? $val_ : preg_match("/^(1|\+|on|ok|true|positive|y|yes|да)$/i",$val_)==1);   //All, what isn't True - false.
+   return (is_bool($val_) ? $val_ : (is_string($val_) ? preg_match("/^(1|\+|on|ok|true|positive|y|yes|да)$/i",$val_) : (bool)$val_));   //All, what isn't True - false.
 }
 
 function is_any_bool($val_)
@@ -118,14 +61,6 @@ function is_any_bool($val_)
    
    return preg_match("/^(1|\+|on|ok|true|y|yes|да|0|-|off|not ok|false|negative|n|no|нет)$/i",$val_);
 }
-
-function mb_ucfirst($str_)
-{
-   //While mb_convert_case() has no native option to uppercase only the first letter as ucfirst() do, this function will do this instead it.
-   
-   return $str_=="" ? $str_ : mb_convert_case(mb_substr($str_,0,1),MB_CASE_UPPER).mb_convert_case(mb_substr($str_,1),MB_CASE_LOWER);
-}
-
 
 function mb_icmp($str1_,$str2_)
 {
@@ -148,17 +83,33 @@ function blend_with_spices($substance_,$spice_)
    return $mix;
 }
 
-function translate_date($date_str_,$is_genitive_=false)
+function remove_quotes(string $val_):string
 {
-   $months_l_en=["January","February","March","April","May","June","July","August","September","October","November","December"];
-   $months_l_ru=[
-                   ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"],
-                   ["Января","Февраля","Марта","Апреля","Мая","Июня","Июля","Августа","Сентября","Октября","Ноября","Декабря"],
-                ];
-   return str_replace($months_l_en,$months_l_ru[$is_genitive_],$date_str_);
+   //Removes double quotes.
+   // Callback helper.
+   
+   return str_replace("\"","",$res);
 }
 
-/* --------------------------------------- array utilities --------------------------------------- */
+function translate_quotes(string $val_):string
+{
+   //Translates double quotes to guillemets as HTML char codes.
+   // Callback helper.
+   
+   $val_=preg_replace("/\"(.*)\"/iU","&#171;$1&#187;",$val_);
+   return str_replace("\"","&quot;",$val_);
+}
+
+function translate_quotes_utf(string $val_):string
+{
+   //Translates double quotes to guillemets as UTF-8 chars.
+   // Callback helper.
+   
+   $val_=preg_replace("/\"(.*)\"/iU","«$1»",$val_);
+   return str_replace("\"","»",$val_);
+}
+
+/* ---------------------------------------- array utilities --------------------------------------- */
 function array_keys_to_labels(array $array_)
 {
    //It is like array_keys(), but also adds [[ ]] to use keys in str_replace.
@@ -172,36 +123,44 @@ function array_keys_to_labels(array $array_)
    return $res;
 }
 
-function array_take_a_place(&$array_,$value_=NULL)
+function set_array_element(array &$array_,array $key_seq_,mixed $value_,int $offset=0):void
 {
-   //Takes a place for a new element in the array and returns its key
+   //Sets a given value into the multidimensional array at location specified by the key sequence.
+   //Arguments:
+   // $array_ - &array. Reference to the top-level array, where the $value_ should be allocated.
+   // $key_seq_ - array. Sequence of keys that specifies a path to the place where the $value_ should be allocated in the nested arrays hierarchy.
+   // $value_ - mixed. An allocating value.
+   // $offset - int. A number of keys from the beginning of the $key_seq_ to skip.
+   //Return value:
+   // None. This function modifies the original $array_ in the way described below:
+   //  If $array_ has no hierarchy specified by the $key_seq_, it will be created. Also if non array element appears on the $key_seq_ path, it will be replaced with array.
+   //  If $key_seq_ is an empty array, the $array_ will be unaffected.
    
-   array_push($array_,$value_);
-   end($array_);
-   return key($array_);
-}
-
-function set_element_recursively(&$array_,array $key_sequence_,$value_)
-{
-   //[Re]places $value_ into multidimensional $array_, using a sequence of keys from the argument $key_sequence_. Makes missing dimensions.
-   
-   $curr_key=array_shift($key_sequence_);
-   if ($curr_key=="")
-      $curr_key=array_take_a_place($array_); //if key is empty, then new element with autoincremental numeric index will be appended.
-   
-   if (count($key_sequence_)>0)
+   if ($key_seq_)
    {
-      if (!is_array($array_[$curr_key]??null))
-         $array_[$curr_key]=[];
-      set_element_recursively($array_[$curr_key],$key_sequence_,$value_);
+      $curr_arr=&$array_;
+      $last_key=array_pop($key_seq_);
+      foreach ($key_seq_ as $i=>$key)
+         if ($i>=$offset)
+         {
+            if (!is_array($curr_arr[$key]??null))
+               $curr_arr[$key]=[];
+            $curr_arr=&$curr_arr[$key];
+         }
+      $curr_arr[$last_key]=$value_;
    }
-   else
-      $array_[$curr_key]=$value_;
 }
 
-function get_array_element($array_,array $key_sequence_,&$element_exists_=false)
+function get_array_element(mixed $array_,array $key_sequence_,bool &$element_exists_=false):mixed
 {
-   //Gets an element, specified by the key sequence, from the depths of the nested array.
+   //Gets an element from the depths of a nested arrays.
+   //Arguments:
+   // $array_ - array. A top-level array, from where to look for an element.
+   // $key_sequence_ - array. Sequence of keys used to find a path to the element in the nested arrays.
+   // $element_exists_ - &bool. Reference to a variable that will be set true if the element was found by the given path and false if not.
+   //Return value:
+   // Returns an element, found in the $array_ hierarchy by the $key_sequence_ path, or null if the $array_ hierarchy has no such path.
+   // To distinguish whether the element itself was null or it was not found, refer the value of $element_exists_.
    
    foreach ($key_sequence_ as $key)
       if (is_array($array_)&&key_exists($key,$array_))
@@ -211,7 +170,7 @@ function get_array_element($array_,array $key_sequence_,&$element_exists_=false)
       }
       else
       {
-         $array_=NULL;
+         $array_=null;
          $element_exists_=false;
          break;
       }
@@ -219,40 +178,35 @@ function get_array_element($array_,array $key_sequence_,&$element_exists_=false)
    return $array_;
 }
 
-class JSONAns extends ArrayObject implements Stringable,JsonSerializable
+function rows_search($needle_key_,$needle_val_,array $rows_,$cmp_func_=null)
 {
-   //Array that automatically converts to JSON when casted to string.
-   //Usefull for making of JSON answers, that can be directly echoed. Works correctly when multidimensional.
+   //Returns key of a row if it contains a matched element or boolean false otherwise.
    
-   public function jsonSerialize():mixed
+   $res=false;
+   
+   if (is_null($cmp_func_))
    {
-      //Represents $this to the json_encode() as normal array.
-      // This solve the problem that json_encode() always encodes ArrayObject as object, regardless to its keys.
-      
-      return (array)$this;
+      foreach ($rows_ as $key=>$row)
+         if ($row[$needle_key_]==$needle_val_)
+         {
+            $res=$key;
+            break;
+         }
    }
-   
-   public function __toString():string
+   else
    {
-      return json_encode($this,JSON_ENCODE_OPTIONS);
+      foreach ($rows_ as $key=>$row)
+         if ($cmp_func_($row[$needle_key_],$needle_val_)==0)
+         {
+            $res=$key;
+            break;
+         }
    }
-}
-
-function array_extend(array $defaults_,array $array_)
-{
-   //Recursively replaces $defaults_ elements having the string keys and appends elements with the numeric keys.
-   $res=$defaults_;
-   
-   foreach ($array_ as $key=>$val)
-      if (is_int($key))
-         $res[]=$val;
-      else
-         $res[$key]=(is_array($val)&&is_array($res[$key]??null) ? array_extend($res[$key],$val) : $val);   //If $defaults_ has no key of $array_, then recursion is needless.
    
    return $res;
 }
 
-/* --------------------------------------- [de]serialization --------------------------------------- */
+/* ------------------------------------- parsing/serialization ------------------------------------ */
 function deserialize_nameval($text_,$separator_="\n",$eq_="=",$val_trim_mask_=" \t")
 {
    //Parses a simple name=value string data into associative array.
@@ -275,36 +229,95 @@ function deserialize_nameval($text_,$separator_="\n",$eq_="=",$val_trim_mask_=" 
    return $res;
 }
 
-function serialize_element_attrs(array|string|null $attrs_=NULL):string
+function parse_flags(string $flags,string $class_name=""):int
 {
-   //This function allows to almost completely make any HTML element from associative array of its attributes. E.g.: echo "<INPUT".serialize_element_attrs(["name"=>"a","class"=>"someclass","value"=>$value]).">";
-   //Arguments:
-   // $attrs_ - array of tag attributes, where key is attribute name and val is its value.
-   //           If the attribute value type is boolean, it will be recognized as a boolean attribute, which is true if its name exist in the tag and false if not. But note that if not boolean attribute will come with boolean value, it will esult a logically incorrect result.
-   //           If the $attrs_ is a string, it will be returned as is. This feature can be used for optimization.
-   //NOTE: this function doesn't checks are the attributes correct and suitable for the HTML element you making with it.
+   $ops=[
+           "("=>["pri"=>3,"ass"=>"l"],
+           "~"=>["pri"=>2,"ass"=>null],
+           "&"=>["pri"=>1,"ass"=>"l"],
+           "|"=>["pri"=>0,"ass"=>"l"],
+        ];
    
-   if (is_array($attrs_))
+   //Tokenize expression:
+   $in=preg_split("/(\||&|~|\(|\))/",$flags,-1,PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
+   
+   //Sort to the reverse polish notation using the shunting yard algorythm:
+   $out=[];
+   $op_stack=[];
+   foreach ($in as $token)
    {
-      $res="";
-      foreach ($attrs_ as $name=>$val)
-         if ($val!==null)
+      
+      switch ($token)
+      {
+         case "~":
+         case "&":
+         case "|":
          {
-            if (is_bool($val)&&(!str_starts_with($name,"data-")))   //Boolean attribute like checked, disabled and so on.
+            $op=end($op_stack);
+            while (($op!==false)&&($op!="(")&&(($ops[$op]["pri"]>$ops[$token]["pri"])||(($ops[$op]["pri"]==$ops[$token]["pri"])&&($ops[$token]["ass"]=="l"))))
             {
-               if ($val)
-                  $res.=" ".strtoupper($name);
+               array_push($out,array_pop($op_stack));
+               $op=end($op_stack);
             }
-            else
-               $res.=" ".strtoupper($name)."=\"".htmlspecialchars(str_replace("\n"," ",$val),ENT_COMPAT|ENT_HTML5)."\"";
+            
+            array_push($op_stack,$token);
+            
+            break;
          }
+         case "(":
+         {
+            array_push($op_stack,$token);
+            
+            break;
+         }
+         case ")":
+         {
+            do
+            {
+               $op=array_pop($op_stack);
+               if ($op===null)
+               {
+                  throw new RuntimeException("Syntax error: missing open parenthesis");
+               }
+               
+               if ($op=="(")
+                  break;
+               else
+                  array_push($out,$op);
+            }
+            while ($op!==null);
+            
+            break;
+         }
+         default: {$flag=constant($class_name ? "$class_name::$token" : $token); array_push($out,$flag);}
+      }
    }
-   else
-      $res=(string)$attrs_;
+   do
+   {
+      $op=array_pop($op_stack);
+      if ($op=="(")
+         throw new RuntimeException("Syntax error: missing close parenthesis");
+      if ($op!==null)
+         array_push($out,$op);
+   }
+   while ($op!==null);
    
-   return $res;
+   //Compute expression in the reverse polish notation:
+   $arg_stack=[];
+   foreach ($out as $token)
+   {
+      switch ($token)
+      {
+         case "~":{array_push($arg_stack,~array_pop($arg_stack));  break;}
+         case "&":{array_push($arg_stack,array_pop($arg_stack)&array_pop($arg_stack)); break;}
+         case "|":{array_push($arg_stack,array_pop($arg_stack)|array_pop($arg_stack)); break;}
+         default: {array_push($arg_stack,$token);}
+      }
+   }
+      
+   return array_pop($arg_stack);
 }
-
+   
 class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSerializable
 {
    //Provides a convenient way to parse, modify amd serialize relative URLs, URL query strings and file paths.
@@ -318,9 +331,9 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
    public const PATH_ONLY           =0b0000_0000_1000_0000; //Parse only URL-path, discarding a query string. Affects only constructor, query elements can be added then, however.
    public const IMMUTABLE           =0b1000_0000_0000_0000; //Sets instance immutable. This flag can't be unset.
    
-   public const SAFE_PATH   =self::BACKREF_DISCARD|self::SANITIZE_PATH|self::PATH_ONLY;   //Mode for using URLParams as filesystem path.
-   public const URL_PARAMS  =self::SAFE_PATH|self::STRIP_INDEX|self::STRIP_EXT;           //Mode for parsing URL params (path basename is treated as request parameter).
-   public const DEFAULT_MODE=self::URL_PARAMS;                                            //A shorthand for the mode, prferred as defult. (Useful to keep dafault mode consistent across the class methods.)
+   public const URL_PARAMS  =self::BACKREF_DISCARD|self::SANITIZE_PATH|self::STRIP_INDEX|self::STRIP_EXT;   //Mode for parsing URL params (path basename is treated as request parameter).
+   public const SAFE_PATH   =self::BACKREF_DISCARD|self::SANITIZE_PATH|self::PATH_ONLY;                     //Mode for using URLParams as filesystem path.
+   public const DEFAULT_MODE=self::URL_PARAMS;                                                              //A shorthand for the mode, prferred as default. (Useful to keep dafault mode consistent across the class methods.)
    
    public const TYPE_DIR  =0b0001;
    public const TYPE_FILE =0b0010;
@@ -366,7 +379,7 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
                {
                   $keys=explode("][",$name_matches[2]);
                   array_unshift($keys,$name_matches[1]);
-                  set_element_recursively($res,array_map("rawurldecode",$keys),rawurldecode($pair[1]));
+                  set_array_element($res,array_map("rawurldecode",$keys),rawurldecode($pair[1]));
                }
             else
                $res[rawurldecode($pair[0])]=rawurldecode($pair[1]);
@@ -375,7 +388,7 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
       return $res;
    }
 
-   public static function stringify_url_query(array $data_,int|string $parent_key_=NULL):string
+   public static function stringify_url_query(array $data_,null|int|string $parent_key_=null):string
    {
       //Serializes an associative array to the query tart of an URL.
       // This funs is opposite to parse_url_query();
@@ -389,23 +402,6 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
          $res.=$sep.(is_array($val) ? self::stringify_url_query($val,$full_key) : $full_key."=".rawurlencode($val));
          $sep??="&";
       }
-      
-      return $res;
-   }
-   
-   public static function extract_file_ext(string $basename):null|string
-   {
-      //Extracts extension[s] from given file basename.
-      //Arguments:
-      // $basename - string. File basename.
-      //Return value:
-      // null, if no file extension detected;
-      // string, containing file extension[s] w/o leading dot.
-      
-      $res=null;
-      
-      if (preg_match_all("/^(\\.?[^.]+)\\.([.a-z0-9_-]+)$/i",$basename,$matches))
-         $res=$matches[2];
       
       return $res;
    }
@@ -562,10 +558,10 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
          else
          {
             $last_elem=end($this->_elements["path"]);
-            if (preg_match("/^(\\.?[^.]+)\\.([.a-z0-9_-]+)$/i",$last_elem,$matches))  //If trailing path element looks like a file name (i.e. has a file extension), it uncertainly recognized as a file name.
+            if (preg_match(FILE_NAME_EXT_REGEXP,$last_elem,$matches))  //If trailing path element looks like a file name (i.e. has a file extension), it uncertainly recognized as a file name.
             {
                $this->_basename=$last_elem;     //Original basename and file extension are always available independently of the parsing mode.
-               $this->_file_ext=$matches[2];    //
+               $this->_file_ext=$matches[FILE_EXT_MATCH_INDEX];    //
                $this->_type=self::TYPE_FILE|(preg_match(self::INDEX_FILE_REGEXP,$last_elem) ? self::TYPE_INDEX : 0);
                
                if (($this->_mode&self::STRIP_FILE_NAME)||
@@ -577,8 +573,8 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
                }
                elseif ($this->_mode&self::STRIP_EXT)
                {
-                  $this->_elements["path"][count($this->_elements["path"])-1]=$matches[1];
-                  $this->_path_ending=".".$matches[2];
+                  $this->_elements["path"][count($this->_elements["path"])-1]=$matches[FILE_NAME_MATCH_INDEX];
+                  $this->_path_ending=".".$matches[FILE_EXT_MATCH_INDEX];
                }
             }
          }
@@ -629,6 +625,30 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
       return $this;  //For chain call.
    }
    
+   public function set_query_element(array $key_seq,mixed $val,int $offset=0):self
+   {
+      //Sets a given value into the query elements at location specified by the key sequence.
+      //Arguments:
+      // $key_seq - A sequence of keys that defines a location in the multidimensional array of query elements where the $val shall be placed.
+      // $val - A value to insert.
+      // $offset - A number of keys from the beginning of $req_loc to skip. Optional, default 1.
+      //Return value:
+      // Reference to this instance.
+      
+      if ($this->_mode&self::IMMUTABLE)
+         throw new LogicException(self::EX_IMMUTABLE_MSG);
+      
+      if ($key_seq&&($val!==null))
+      {
+         $this->_elements["query"]??=[];
+         set_array_element($this->_elements["query"],$key_seq,$val,$offset);
+         
+         $this->_query_string_cache=null;
+      }
+      
+      return $this;  //For chain call.
+   }
+   
    public function append(self|array|string $from_):self
    {
       //Appends path and query elements.
@@ -662,7 +682,7 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
          //Append query elements:
          if ($from_->_elements["query"])
          {
-            $this->_elements["query"]=array_merge_recursive($this->_elements["query"],$from_->_elements["query"]);
+            $this->_elements["query"]=array_replace_recursive($this->_elements["query"],$from_->_elements["query"]);
             $this->_query_string_cache=null;
          }
       }
@@ -714,7 +734,6 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
       return $this;
    }
    
-   
    public function sanitize():self
    {
       //Sanitizes all path elements.
@@ -729,6 +748,20 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
       $this->_path_cache=null;
       
       return $this;  //For chain call.
+   }
+   
+   public function get_extension(string $prefix="",string $default=""):string
+   {
+      //A shorthand, that wraps a property self::file_ext with a couple of options to make renaming easier.
+      // This method works similarly af ImpFInfo::getExtension().
+      //Arguments:
+      // $prefix - string. If result isn't empty, it will be prepended by this prefix. Optional. Typical usage is rename file, keeping original extension: $file=new ImpFInfo($new_name.$file->getExtension(".")).
+      // $default - string. Allows to define a default extension, if the filename has no its own. Optional.
+      //NOTE: Be aware that $prefix and $default are not validated/sanitized.
+      //Return value:
+      // self::file_ext or the $default, if self::file_ext is empty, prepended with the $prefix.
+      
+      return ($this->_file_ext!="" ? $prefix.$this->_file_ext : ($default!="" ? $prefix.$default : ""));
    }
    
    public function path_intersection_depth(self $path_):int
@@ -813,12 +846,14 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
    //ArrayAccess implementation:
    public function offsetExists(mixed $offset):bool
    {
-      return key_exists($offset,$this->_elements[is_numeric($offset) ? "path" : "query"]);
+      //return key_exists($offset,$this->_elements[is_numeric($offset) ? "path" : "query"]);
+      return ($this->_elements["path"][$offset]??$this->_elements["query"][$offset]??null)!==null;
    }
    
    public function offsetGet(mixed $offset):mixed
    {
-      return $this->_elements[is_numeric($offset) ? "path" : "query"][$offset]??null;
+      //return $this->_elements[is_numeric($offset) ? "path" : "query"][$offset]??null;
+      return $this->_elements["path"][$offset]??$this->_elements["query"][$offset]??null;
    }
    
    public function offsetSet(mixed $offset,mixed $value):void
@@ -882,16 +917,24 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
          next($this->_elements);
    }
    
-   public function rewind(): void
+   public function rewind():void
    {
       reset($this->_elements);
       reset($this->_elements["path"]);
       reset($this->_elements["query"]);
    }
    
-   public function valid(): bool
+   public function valid():bool
    {
       return (key(current($this->_elements))!==null);
+   }
+   
+   //Misc array capabilities:
+   public function last()
+   {
+      $last_elems=($this->_elements["query"] ? $this->_elements["query"] : $this->_elements["path"]);
+      $last_key=array_key_last($last_elems);
+      return ($last_key!==null ? $last_elems[$last_key] : null);
    }
    
    //Countable implementation:
@@ -989,53 +1032,250 @@ class URLParams implements ArrayAccess,Iterator,Countable,Stringable,JsonSeriali
    }
 }
 
-/* --------------------------------------- HTML forms, inputs --------------------------------------- */
-function html_select($name,array $var,array|string|null $default="",array|string|null $attrs="",$is_multiple=null)
+interface IXHRAns extends ArrayAccess,Stringable
 {
-   //Arguments:
-   // $name - name of the element.
-   // $var  - ["val"=>_opt_,...] array of variants of choise, where 
-   //          "val" - is a value of option,
-   //          _opt_ - is a string or array. The string is just a simple option text, whereas array allows to add some attribute to the option tag, its format is ["text"=>"Option text","attrs"=>_tag_attrs_], where _tag_attrs_ can be string or array (see serialize_element_attrs() for details).
-   // $default - the value[s] of selected option[s]. NOTE: this function doesn't care if the number of $default values doesn't conform the "multiple" attribute.
-   // $attrs - attributes for <SELECT> tag. The value can be an array or a precomplied string (see serialize_element_attrs() for details).
-   // $is_multiple - NOTE: Use this argument only if $attrs is a precomplied string. Otherwise use $attrs["multiple"].
+   //An answer for XHR. It should act like an array and be able to represent itself as string.
+   // The first means that it can be created from an existing array and a new elements can be set and unset afterwards. To be iterable is optional.
+   // The second means ability to encode a primitive data types, multidimensional arrays and instances of self to string with appropriate format (e.g. JSON, XML or something else). But its not obligued to properly encode objects that can't encode themselves to certain format seamlessly, including classes that implements this interface, but has another encoding format.
    
-   $is_multiple??=$attrs["multiple"]??false;
+   public function __construct(array|object $array);
+   public function getMIME():string;
+}
+
+class JSONAns extends ArrayObject implements IXHRAns
+{
+   //Array that automatically converts to JSON when casted to string.
+   //Usefull for making of JSON answers, that can be directly echoed. Works correctly when multidimensional.
    
-   $default??="";                  //The null has to match option with value "" but not with int(0). Btw, array key can't be null (it's casted to "").
-   $is_def_arr=is_array($default); //Array will be treaten as array, regardless to $is_multiple.
-   
-   $res="<SELECT NAME=\"".$name.($is_multiple ? "[]" : "")."\"".serialize_element_attrs($attrs).">";
-   
-   foreach ($var as $val=>$opt)
+   public function getMIME():string
    {
-      if (is_array($opt))
-      {
-         $opt_text=$opt["text"];
-         $opt_attrs=serialize_element_attrs($opt["attrs"]??null);
-      }
-      else
-      {
-         $opt_attrs="";
-         $opt_text=$opt;
-      }
-      
-      if (($is_def_arr&&$default&&array_search($val,$default)!==false)||($val==$default)) //NOTE: Conditions order is important! Also $is_def_arr&&$default allows to avoid useless call of the array_search for the empty array.
-         $opt_attrs.=" SELECTED";
-      
-      $res.="<OPTION VALUE=\"".htmlspecialchars($val,ENT_COMPAT|ENT_HTML5)."\"".$opt_attrs.">".$opt_text."</OPTION>";
+      return "application/json";
    }
    
-   $res.="</SELECT>";
+   public function jsonSerialize():mixed
+   {
+      //Represents $this to the json_encode() as normal array.
+      // This solve the problem that json_encode() always encodes ArrayObject as object, regardless to its keys.
+      
+      return (array)$this;
+   }
+   
+   public function __toString():string
+   {
+      return json_encode($this,flags:JSON_ENCODE_OPTIONS,depth:JSON_MAX_DEPTH);
+   }
+}
+
+/* -------------------------------------- HTML forms, inputs -------------------------------------- */
+
+function inp_name_from_req_loc(array $req_loc,int $offset=1):string
+{
+   //Returns an input field name that corresponds to the given request element location.
+   //Arguments:
+   // $req_loc - array. A key sequence that defines a request element location, e.g. ["$_REQUEST|$_COOKIE","sort","col1"].
+   // $offset - int. A number of keys from the beginning of $req_loc to skip. Optional, default 1.
+   //Return value:
+   // E.g. "sort[col1]".
+   
+   $res="";
+   
+   foreach ($req_loc as $i=>$key)
+      if ($i==$offset)
+         $res.=$key;
+      elseif ($i>$offset)
+         $res.="[$key]";
    
    return $res;
 }
 
-/* --------------------------------------- error reporting,etc --------------------------------------- */
+function render_element_attrs(?array $attrs_):string
+{
+   //This function allows to almost completely make any HTML element from associative array of its attributes. E.g.: echo "<INPUT".render_element_attrs(["name"=>"a","class"=>"someclass","value"=>$value]).">";
+   //Arguments:
+   // $attrs_ - array of tag attributes, where key is attribute name and val is its value.
+   //           If the attribute value type is boolean, it will be recognized as a boolean attribute, which is true if its name exist in the tag and false if not. But note that if not boolean attribute will come with boolean value, it will esult a logically incorrect result.
+   //NOTE: this function doesn't checks are the attributes correct and suitable for the HTML element you making with it.
+   
+   $res="";
+   
+   if ($attrs_)
+      foreach ($attrs_ as $attr_name=>$val)
+         if ($val!==null)
+            switch ($attr_name)
+            {
+               case "allowfullscreen":    //iframe          \
+               case "autofocus":          //inputs          |
+               case "checked":            //checkbox,radio  |
+               case "disabled":           //                |
+               case "inert":              //                > boolean
+               case "multiple":           //                |
+               case "readonly":           //                |
+               case "required":           //                |
+               case "selected":           //select>option   /
+               {
+                  if ($val)
+                     $res.=" ".strtoupper($attr_name);
+                  break;
+               }
+               case "hidden":
+               {
+                  if ($val=="until-found")
+                     $res.=" HIDDEN=\"until-found\"";
+                  elseif ($val)
+                     $res.=" HIDDEN";
+                  break;
+               }
+               default:
+               {
+                  $res.=" ".strtoupper($attr_name)."=\"".htmlspecialchars($val,ENT_COMPAT|ENT_HTML5)."\"";
+               }
+            }
+   
+   return $res;
+}
+
+function data_to_opts(array $data, array $wrappers):array
+{
+   //Converts result of IDataSource::get_data() to options format used by html_opts().
+   //NOTE: Despite of the fact, this function handles either single and multi-column row IDs in a seamless manner, this don't makes'em interchangeable in all cases, because it also depends on how the option values are handled outside of this function.
+   //Usage example:
+   // echo html_select("inp_name",data_to_opts($data_source->get_data(),$data_source->get_wrappers()),[1,2,3],["multiple"=>true]);
+   
+   $res=[];
+   
+   //Prepare key to attribute name mapping:
+   $id_key=null;
+   $id_cols_cnt=0;
+   $attr_names=[];
+   $optgroup_key=null;
+   foreach ($wrappers as $wrp)
+   {
+      if ($wrp->flags["index"]??false)
+      {
+         $id_cols_cnt++;
+         $id_key??=$wrp->key;
+      }
+      
+      if (($wrp->flags["attr"]??false)&&($wrp->key!="value")&&($wrp->key!="text"))
+      {
+         $attr_names[$wrp->key]=$wrp->key;
+         if (str_starts_with($attr_names[$wrp->key],"data_"))
+            $attr_names[$wrp->key]=($wrp->flags["camel"]??false ? strtr($attr_names[$wrp->key],"_","-") : $attr_names[$wrp->key][4]="-");
+      }
+      
+      if ($wrp->flags["optgroup"]??false)
+         $optgroup_key=$wrp->key;
+   }
+   
+   //Make options prefabs:
+   foreach ($data as $row)
+   {
+      $value=($id_cols_cnt>1 ? json_encode($row["id"],flags:JSON_ENCODE_OPTIONS,depth:JSON_MAX_DEPTH) : $row["id"][$id_key]);
+      $res_row=[
+                  "text"=>$wrappers["text"]->to_output($row["data"]["text"]),
+                  "attrs"=>[],
+               ];
+      if ($optgroup_key!==null)
+         $res_row["optgroup"]=$row["data"][$optgroup_key];
+      
+      foreach ($attr_names as $key=>$attr_name)
+         switch ($attr_name)
+         {
+            case "disabled":
+            case "hidden":
+            case "inert":
+            {
+               $res_row["attrs"][$attr_name]=$row["data"][$wrappers[$key]->key];
+               break;
+            }
+            default:
+            {
+               $wrp=$wrappers[$key];
+               $res_row["attrs"][$attr_name]=($wrp->flags["input"]??false ? $wrp->to_input($row["data"][$wrp->key]) : $wrp->to_output($row["data"][$wrp->key]));
+            }
+         }
+      
+      $res[$value]=$res_row;
+   }
+   
+   return $res;
+}
+
+function html_opts(array $opts,array|string|null $default=null):string
+{
+   //Renders a HTML options, suitable for <SELECT> and <DATALIST>.
+   //Arguments:
+   // $opts - array. Dictionary with options of choice. Format: ["<opt_1>"=>"<Text 1>","<opt_2>"=>["text"=>"<Text 2>","attrs"=>[<option attributes>]],"<opt_3>"=>["text"=>"<Text 3>","attrs_str"=>"VALUE=\"&lt;opt_3&gt;\" DISABLED"],...], where "<opt_*>" is an option value, "<Text *>" - displayed text, <option attributes> - option attributes (see render_element_attrs for details).
+   //         Refer the <SELECT> and <DATALIST> specifications to learn how option's textContent and attributes works in each particular case.
+   // $default - array|string|null. A single (string|null) or a multiple (array) option values that are selected. Makes sense if the options are used in <SELECT> field.
+   
+   $default??=""; //The null has to match options that has value "" but not int(0). Btw, array key can't be null (it's casted to "").
+   $default_dict=($default&&is_array($default) ? array_flip($default) : null); //Turn multiple default values into array keys. This makes testing option values much faster than when using in_array().
+   
+   $res="";
+   $prev_opt_group=null;
+   
+   foreach ($opts as $opt_val=>$opt_data)
+   {
+      if (is_array($opt_data))
+      {
+         $opt_group=$opt_data["optgroup"]??null;
+         $opt_text=$opt_data["text"];
+         $opt_attrs_str=" VALUE=\"".htmlspecialchars($opt_val,ENT_COMPAT|ENT_HTML5)."\"".render_element_attrs($opt_data["attrs"]);
+      }
+      else
+      {
+         $opt_group=null;
+         $opt_text=$opt_data;
+         $opt_attrs_str=" VALUE=\"".htmlspecialchars($opt_val,ENT_COMPAT|ENT_HTML5)."\"";
+      }
+      
+      if (($default_dict&&isset($default_dict[$opt_val]))||($opt_val==$default)) //NOTE: Conditions order is important!
+         $opt_attrs_str.=" SELECTED";
+      
+      if ($prev_opt_group!==$opt_group)
+      {
+         if ($prev_opt_group!==null)
+            $res.="</OPTGROUP>";
+         if ($opt_group!==null)
+            $res.="<OPTGROUP LABEL=\"".htmlspecialchars($opt_group,ENT_COMPAT|ENT_HTML5)."\">";
+         $prev_opt_group=$opt_group;
+      }
+      $res.="<OPTION $opt_attrs_str>$opt_text</OPTION>";
+   }
+   if ($prev_opt_group!==null)
+      $res.="</OPTGROUP>";
+   
+   return $res;
+}
+
+function html_select(string $name,array $opts,array|string|null $default=null,?array $attrs=null):string
+{
+   //Shorthand for rendering a select input field.
+   //Arguments:
+   // $name - name of the element.
+   // $opts  - dictionary with variants of choice, hawing format ["option_value_1"=>"Option text 1","option_value_2"=>["text"=>"Option text 2","attrs"=>[<option attributes>]],...].
+   // $default - the value[s] of selected option[s]. NOTE: this function doesn't care if the number of $default values doesn't conform the "multiple" attribute.
+   // $attrs - array|string|null. Attributes of <SELECT> tag. The value can be an array (see render_element_attrs() for details) or a prerendered string.
+   
+   return "<SELECT NAME=\"".$name.($attrs["multiple"]??false ? "[]" : "")."\"".($attrs ? render_element_attrs($attrs) : "").">".html_opts($opts,$default)."</SELECT>";
+}
+
+/* ------------------------------------- error reporting, etc ------------------------------------- */
 function message_box($type_,$messages_)
 {
    return "<DIV CLASS=\"message ".$type_."\">".(is_array($messages_) ? "<P>".implode("</P><P>",$messages_)."</P>" : $messages_)."</DIV>";
+}
+
+function query_report_error($error_,$query_)
+{
+      
+   return LC::get("Query failed").": ".$error_."<PRE>".htmlspecialchars($query_,ENT_COMPAT|ENT_HTML5)."</PRE>";
+}
+function query_report_success($affected_rows_,$query_)
+{
+      
+   return "-- ".LC::get("Query succeeded").", ".LC::get("affected rows").": ".$affected_rows_."<BR>\n<PRE>".htmlspecialchars($query_,ENT_COMPAT|ENT_HTML5)."</PRE>"; //message is prepended with MySQL comment
 }
 
 define("SPOILER_FOLDED","");
@@ -1077,22 +1317,22 @@ function dumpr(...$args_)
    }
 }
 
-/* --------------------------------------- File sistem utils --------------------------------------- */
+/* --------------------------------------- File sistem utils -------------------------------------- */
 interface IFileInfoMIME extends Stringable
 {
    public function getMIME():string;
    //Basic features, inherited from SplFileInfo:
    public function __construct(string $filename);
-   public function getExtension();     // \
-   public function getFilename();      //  |
-   public function getLinkTarget();    //  |
-   public function getPathname();      //  |
-   public function getPerms();         //  | NOTE: Prior to PHP 8.3 these methods of SplFileInfo was untyped.
-   public function getRealPath();      //  |
-   public function getSize();          //  |
-   public function isDir();            //  |
-   public function isFile();           //  |
-   public function isLink();           //  /
+   public function getExtension():string;
+   public function getFilename():string;
+   public function getLinkTarget():string|false;
+   public function getPathname():string;
+   public function getPerms():int|false;
+   public function getRealPath():string|false;
+   public function getSize():int|false;
+   public function isDir():bool;
+   public function isFile():bool;
+   public function isLink():bool;
 }
 
 class ImpFInfo extends SplFileInfo implements IFileInfoMIME
@@ -1111,20 +1351,19 @@ class ImpFInfo extends SplFileInfo implements IFileInfoMIME
    protected $encoding=null;
    protected $supposed_ext=null;
    
-   public function getExtension(bool $secure=false,string $prefix="",string $default=""):string
+   public function getExtension(string $prefix="",string $default=""):string
    {
-      //Return an extension from file name or path. Works correctly with unix hidden files.
-      //NOTE: Overrides SplFileInfo::getExtension().
-      //NOTE: Same as file_ext($this->getFilename(),$prefix,$default).
-      // If file name has a multiple extension, only the last one will be returned.
+      //Returns an extension from the filename. Also has a couple of options to make renaming easier.
+      //NOTE: Overrides SplFileInfo::getExtension(). Unlike its predecessor, this method works correctly with unix hidden files and extracts all of multiple extensions.
       //Arguments:
-      // $secure - bool. If true, then extensions, which contains characters other than alphanumeric, dash and underscore will be rejected and the $default will be used. Optional, default is false.  This argument is useful when file will be securely renamed, but the extension will be retained.
-      // $prefix - string. Will be prepended, if result is not empty. Optional. Typical case: set it "." to get extension with dot included.
-      // $default - string. Allows to set custom extension, if the file name doesn't have one or it doesn't pass the secure matching.
+      // $prefix - string. If result isn't empty, it will be prepended by this prefix. Optional. Typical usage is rename file, keeping original extension: $file=new ImpFInfo($new_name.$file->getExtension(".")).
+      // $default - string. Allows to define a default extension, if the filename has no its own. Optional.
+      //NOTE: Be aware that $prefix and $default are not validated/sanitized.
+      //Return value:
+      // Filename extension, free of any illegal and potentially harmful characters, or the default value, if no filename extension is detected. 
       
-      $regexp=($secure ? "/[^\\/]+\\.([a-z0-9_-]{1,10})$/i" : "/[^\\/]+\\.([^.\\/]+)$/");          //In secure mode filename extension is restricted to the safe characters (latin alphanumeric, underscore and dash) and limited by length.
-      $ext=(preg_match($regexp,$this->getFilename(),$matches) ? $prefix.$matches[1] : $default);   //Get bare extension (w/o dot).
-      return (($ext!="")&&($prefix!="") ? $prefix.$ext : $ext);                                    //Add prefix, if resulting extention isn't empty.
+      $ext=(preg_match(FILE_NAME_EXT_REGEXP,$this->getFilename(),$matches) ? $matches[FILE_EXT_MATCH_INDEX] : $default);
+      return ($ext!="" ? $prefix.$ext : ($default!="" ? $prefix.$default : ""));
    }
    
    public function getMIME():string
@@ -1164,7 +1403,7 @@ class ImpFInfo extends SplFileInfo implements IFileInfoMIME
    public function getRelPath(null|string|self $root_=null):?string
    {
       //Extracts a relative path from the $root_ to this.
-      //Argumants:
+      //Arguments:
       // $root_ - null|string|self. A path, supposed to be root of this. Optional. By default, the $_SERVER["DOCUMENT_ROOT"] is used.
       //Return value:
       // If $root_ is absolute and $this is relative, this path is returned.
@@ -1201,7 +1440,7 @@ class ImpFInfo extends SplFileInfo implements IFileInfoMIME
       
       $root_??=$_SERVER["DOCUMENT_ROOT"];
       
-      return ((($this_path[0]??null)=="/")&&$this->isSubPathOf($root_) ? clone $this : $this->concat($root_));
+      return ($this->isSubPathOf($root_) ? clone $this : ($root_ instanceof self ? $root_ : new self($root_))->concat($this));
    }
    
    public function isExists():bool
@@ -1277,7 +1516,6 @@ class ImpFInfo extends SplFileInfo implements IFileInfoMIME
       
       return $res;
    }
-   
 }
 
 trait TArrayableFSIterator
@@ -1298,7 +1536,7 @@ trait TArrayableFSIterator
    }
 }
 
-class FSIterator extends FilesystemIterator
+class FSIterator extends RecursiveDirectoryIterator
 {
    //A shorthand for FilesystemIterator with ImpFInfo and file names as keys.
    //NOTE: When the iterated folder contents change, the changes are reflected after the iterator rewind. This behaviour is inherited by this class and the FilesystemIterator from the DirectoryIterator.
@@ -1511,7 +1749,7 @@ class Uploads
    protected  array  $_move_exceptions=[];                  //List of exceptions, occured during moving uploads to the destination folder.
                                                             
    public function __construct(                             
-             ?string $dest_folder=null,                     //string|null. Path to the destination folder where uploads will be moved. Must be in absolute notation, valid and safe. Optional, can be [re]assigned later, but before call the $this->init_validation(), $this->init_autoincrement() and $this->move().
+             null|ImpFInfo|string $dest_folder=null,        //string|null. Path to the destination folder where uploads will be moved. Must be in absolute notation, valid and safe. Optional, can be [re]assigned later, but before call the $this->init_validation(), $this->init_autoincrement() and $this->move().
       //Validation params:                                  
       public ?string $types_allowed=null,                   //string|null. Regexp, matching welcomed mime types. Others considered as prohibited.
       public ?string $types_disallowed=null,                //string|null. Regexp, matching unwelcome mime types. Others considered as welcomed. Has priority over "types_allowed".
@@ -1531,7 +1769,7 @@ class Uploads
               string $file_class=self::DEFAULT_FILE_CLASS,  //string. Class name of the file instances. Should implement IFileInfoMIME.
    )
    {
-      $this->_dest_folder=$dest_folder;
+      $this->dest_folder=$dest_folder;
    }
    
    public function __get($prop_)
@@ -1539,7 +1777,7 @@ class Uploads
       return match ($prop_)
              {
                 "dest_folder"          =>$this->_dest_folder,
-                "existing_files"       =>($this->_existing_files??=($this->_dest_folder->isDir() ? new FSFilterIterator($this->_dest_folder,show_files:true,show_folders:false,include_names:$this->fname_filter) : null)),   //Readonly. Can be used outside. NOTE: Will be NULL if the destination folder is not defined or not exist.
+                "existing_files"       =>($this->_existing_files??=($this->_dest_folder->isDir() ? new FSFilterIterator($this->_dest_folder,show_files:true,show_folders:false,include_names:$this->fname_filter) : null)),   //Readonly. Can be used outside. NOTE: Will be null if the destination folder is not defined or not exist.
                 "req_info"             =>$this->_req_info,              //Readonly.
                 "valid_info"           =>$this->_valid_info,            //Readonly.
                 "validation_exceptions"=>$this->_validation_exceptions, //Readonly.
@@ -1552,7 +1790,7 @@ class Uploads
    {
       switch ($prop_)
       {
-         case "dest_folder":{$this->_dest_folder=($val_ instanceof ImpFInfo ? $val_ : new ImpFInfo($val_)); $this->_existing_files=null; break;}
+         case "dest_folder":{$this->_dest_folder=($val_ instanceof ImpFInfo ? $val_ : ($val_!=null ? new ImpFInfo($val_) : null)); $this->_existing_files=null; break;} //NOTE: Consider "" value as unset.
       }
    }
    
@@ -1645,27 +1883,27 @@ class Uploads
             
             //Test each file against given conditions:
             if ($upload_info["error"])
-               throw new \RuntimeException("UPLOAD_ERR".$upload_info["error"],$upload_info["error"]);  //String "UPLOAD_ERRxx" refers to the localized error message.
+               throw new RuntimeException("UPLOAD_ERR".$upload_info["error"],$upload_info["error"]);  //String "UPLOAD_ERRxx" refers to the localized error message.
             if (!is_uploaded_file($upload_info["file"]))
-               throw new \RuntimeException("Not an uploaded file");
+               throw new RuntimeException("Not an uploaded file");
             
             //First, validate file type and name:
             if ((($this->types_disallowed)&&preg_match($this->types_disallowed,$upload_info["file"]->getMIME()))||
                 (($this->types_allowed)&&(!preg_match($this->types_allowed,$upload_info["file"]->getMIME()))))
-               throw new \RuntimeException("File type is not allowed",self::UPLOADED_EX_FILE_TYPE);
+               throw new RuntimeException("File type is not allowed",self::UPLOADED_EX_FILE_TYPE);
             if ((($this->names_disallowed)&&(preg_match($this->names_disallowed,$upload_info["name"])))||
                 (($this->names_allowed)&&(!preg_match($this->names_allowed,$upload_info["name"]))))
-               throw new \RuntimeException("File name is not allowed",self::UPLOADED_EX_FILE_NAME);
+               throw new RuntimeException("File name is not allowed",self::UPLOADED_EX_FILE_NAME);
             
             //Second, validate file size:
             if (($this->max_size)&&($upload_info["file"]->getSize()>$this->max_size))
-               throw new \RuntimeException("File is too large",self::UPLOADED_EX_FILE_SIZE);
+               throw new RuntimeException("File is too large",self::UPLOADED_EX_FILE_SIZE);
             
             //Last, validate summary size and amount of the files:
             if (($this->max_count)&&($this->_count>$this->max_count))
-               throw new \RuntimeException("Too many files",self::UPLOADED_EX_MAX_COUNT);
+               throw new RuntimeException("Too many files",self::UPLOADED_EX_MAX_COUNT);
             elseif (($this->max_total_size)&&($this->_total_size+$upload_info["file"]->getSize()>$this->max_total_size))
-               throw new \RuntimeException("Total uploads size exceeded",self::UPLOADED_EX_MAX_SIZE);
+               throw new RuntimeException("Total uploads size exceeded",self::UPLOADED_EX_MAX_SIZE);
             
             //If no exception occures, add entry to valid uploads:
             unset($upload_info["error"]);          //There are no upload errors in validated entries.
@@ -1674,7 +1912,7 @@ class Uploads
             $this->_count++;
             $this->_total_size+=$upload_info["file"]->getSize();
          }
-         catch (\RuntimeException $ex)
+         catch (RuntimeException $ex)
          {
             $this->_validation_exceptions[$i]=$ex; //NOTE: Keep original indexes.
             
@@ -1712,7 +1950,7 @@ class Uploads
       //Enumerates files incrementally.
       
       foreach ($this->_valid_info as &$upload_info)
-         $upload_info["name"]=sprintf($this->fname_format,++$this->file_number,$upload_info["name"]->file_ext);   //Enumerate files, using the sprintf() capabilities to format a number.
+         $upload_info["name"]=sprintf($this->fname_format,++$this->file_number,$upload_info["name"]->get_extension("."));  //Enumerate files, using the sprintf() capabilities to format a number.
       
       return $this;  //For chain call.
    }
@@ -1749,7 +1987,7 @@ class Uploads
       {
          if ($this->_valid_info&&(!$this->_dest_folder->isDir()))    //Do not create destination folder if there are no files to move.
             if (!mkdir($this->_dest_folder,$this->dest_folder_permissions,true))
-               throw new \RuntimeException("Failed to create destination folder",self::UPLOADED_EX_DEST_FOLDER);
+               throw new RuntimeException("Failed to create destination folder",self::UPLOADED_EX_DEST_FOLDER);
          
          foreach ($this->_valid_info as $i=>$upload_info)
             try
@@ -1759,12 +1997,12 @@ class Uploads
                {
                   $dest_path=$this->_dest_folder->concat($upload_info["name"]->basename);  //NOTE: The user-defined filename is already escaped by the extract_info(). Also, use URLParams::$basename to ensure that no subfolder will be appended to the destination path.
                   if (!move_uploaded_file($upload_info["file"],$dest_path))
-                     throw new \RuntimeException("Failed to move uploaded file",self::UPLOADED_EX_MOVE);
+                     throw new RuntimeException("Failed to move uploaded file",self::UPLOADED_EX_MOVE);
                      
                   if ((!chmod($dest_path,$this->files_permissions))&&$this->require_permissions)
                   {
                      unlink($dest_path);
-                     throw new \RuntimeException("Failed to change uploaded file permissions",self::UPLOADED_EX_CHMOD);
+                     throw new RuntimeException("Failed to change uploaded file permissions",self::UPLOADED_EX_CHMOD);
                   }
                   
                   $upload_info["file"]=new $this->_file_class($dest_path); //Replace outdated temporary path to the file with an actual one.
@@ -1773,15 +2011,15 @@ class Uploads
                //If no exception occurs, copy info to result:
                $this->_moved_info[$i]=$upload_info;   //NOTE: Keep original indexes.
             }
-            catch (\RuntimeException $ex)
+            catch (RuntimeException $ex)
             {
                $this->_move_exceptions[$i]=$ex; //NOTE: Keep original indexes.
                
-               if (match ($ex.getCode()) {self::UPLOADED_EX_MAX_COUNT,self::UPLOADED_EX_MAX_SIZE=>true,default=>false}) //Stop uploads processing on certain exceptions.
-                  break;   //Break the cycle after the finally section executed.
+               if (match ($ex->getCode()) {self::UPLOADED_EX_MAX_COUNT,self::UPLOADED_EX_MAX_SIZE=>true,default=>false})   //Stop uploads processing on certain exceptions.
+                  break;
             }
       }
-      catch (\RuntimeException $ex)
+      catch (RuntimeException $ex)
       {
          $this->_move_exceptions["dest_folder"]=$ex;
       }
@@ -1832,7 +2070,7 @@ class Uploads
    }
 }
 
-function format_bytes($val_,$precision_=2,$space_=" ")
+function format_bytes_number($val_,$precision_=2,$space_=" ")
 {
    $prefixes=["B","KB","MB","GB","TB"];   //binary prefixes
    $pow=floor(log($val_,1024));           //get real power of $val_
@@ -1894,7 +2132,70 @@ function permissions_decode(string $perms_sym):int
    return $res;
 }
 
-/* --------------------------------------- email --------------------------------------- */
+function echo_attachment($data,string $file_name="file",string $mime="application/octet-stream"):void
+{
+   //Sends data as attachment.
+   
+   header("Content-Description: File Transfer");
+   header("Content-Type: $mime;");
+   header("Content-Disposition: attachment; filename=$file_name;");
+   header("Content-Transfer-Encoding: ".OUTPUT_CHARSET); //TODO: Is it valid for binaries?
+   header("Expires: 0");
+   header("Cache-Control: must-revalidate");
+   header("Pragma: public");
+   header("Content-Length: ".strlen($data));
+   ob_clean();
+   echo $data;
+   die();
+}
+
+function check_perms(string $path_,array $perms_list_)
+{
+   //
+   
+   $res=["perms"=>0,"top_dir"=>""];
+   
+   $max_matched=0;
+   foreach ($perms_list_ as $dir=>$perms)
+   {
+      $len=strlen($dir);
+      if ((strncmp($path_,$dir,$len)==0)&&($len>$max_matched))  //Find permissions with the most long path amongst all matching ones.
+      {
+         $res["perms"]=$perms; //Current permissions
+         $res["top_dir"]=$dir; //The topmost directory permitted at selected branch of FS-tree
+         $max_matched=$len;
+      }
+   }
+   
+   return $res;
+}
+
+function rmdir_r(string $path_):bool
+{
+   //Remove deirectory recursively. 
+   //NOTE: exec("rm -rf ".$path_) is good thing, but may not work on some hostings. 
+   
+   $removed=false;
+   
+   $contents=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path_,RecursiveDirectoryIterator::SKIP_DOTS),RecursiveIteratorIterator::CHILD_FIRST);
+   foreach ($contents as $entry)
+   {
+      if ($entry->isLink()||$entry->isFile())
+         $removed=unlink($entry);
+      else
+         $removed=rmdir($entry);
+      
+      if (!$removed)
+         break;
+   }
+   
+   if ($removed)
+      $removed=rmdir($path_);
+   
+   return $removed;
+}
+
+/* -------------------------------------------- email --------------------------------------------- */
 function send_email(string|array $recipients,string $subject,string $text,?array $attachments=null,string $sender="noreply"):bool
 {
    //Send an email with optional attachments
@@ -1973,110 +2274,6 @@ function send_email(string|array $recipients,string $subject,string $text,?array
    
    //Send
    return mail($recipients,$subject,$content,$headers);
-}
-
-// ------------------------ Database functions ------------------------ //
-function name_to_query($name_)
-{
-   //Permanently replaces characters depreciated in the names of databases, tables, columns.
-   //This function don't needs complementary decoding one, cause the correct names needs not any encoding.
-   return "`".strtr($name_,"\0\"\n\\ `'[](){}<>.,/?!@#$%^&*-+=:;|","_________________________________")."`";
-}
-
-function data_to_query($val_)
-{
-   //General purpose function that protects queries from breaking or injections by means of special characters in data.
-   //Usage: "UPDATE `table` SET `col_a`=".data_to_query($value).";";
-   //NOTE: performance tests shows that str_replace() noticeably slows code only when it called for huge strings.
-   //      But when it applied on a short values, the fact of calling of a function has more effect on execution time, so differentiation of, e.g., numbers will not make it faster because of caling of a type-checking functions.
-   //NOTE: In MySQL the TRUE and the FALSE are aliases of '1' and '0', so raw boolean values in the data will be correctly type-casted.
-   
-   return is_null($val_) ? "NULL" : (array_search($val_,DB_CONSTANTS)!==false ? $val_ : "'".str_replace(["\0","`","'","\\"],["[[_0]]","[[_bq]]","[[_q]]","[[_bs]]"],$val_)."'");
-}
-
-function data_from_query($val_)
-{
-   //General purpose function that decodes special characters in data, encoded by data_to_query() and the same.
-   
-   return is_null($val_) ? NULL : str_replace(["[[_0]]","[[_bq]]","[[_q]]","[[_bs]]"],["\0","`","'","\\"],$val_);
-}
-
-// =============================================== Wrappers =============================================== //
-function phones_output($val_,$params_=NULL)
-{
-   $glue=$params_["glue"]??",";
-   $out_glue=$params_["out_glue"]??" ";
-   
-   $attrs_str=is_array($params_["attrs"]??null) ? " ".serialize_element_attrs($params_["attrs"]) : "";
-   $phones=is_array($val_) ? $val_ : explode($glue,$val_);
-   $links=[];
-   foreach ($phones as $phone)
-      $links[]="<A HREF=\"tel:".preg_replace(["/^ *8/","/доб(авочный)?|ext/i","/[^0-9+]/"],["+7",""],$phone)."\"".$attrs_str.">".htmlspecialchars(trim($phone))."</A>";
-   
-   return implode($out_glue,$links);
-}
-
-function emails_output($val_,$params_=NULL)
-{
-   $glue=$params_["glue"]??",";
-   $out_glue=$params_["out_glue"]??" ";
-   
-   $attrs_str=(is_array($params_["attrs"]??null) ? " ".serialize_element_attrs($params_["attrs"]) : "");
-   $emails=is_array($val_) ? $val_ : explode($glue,$val_);
-   $links=[];
-   foreach ($emails as $email)
-   {
-      $email=htmlspecialchars($email);
-      $links[]="<A HREF=\"mailto:".$email."\"".$attrs_str.">".$email."</A>";
-   }
-   
-   return implode($out_glue,$links);
-}
-
-function text_clip_output($val_,$params_=NULL)
-{
-   $max=$params_["max"]??512;            //Max output length.
-   $min=$params_["min"]??max(1,$max-64); //Min output length.
-   $keep_trailing_punct=to_bool($params_["keep_punct"]??false);
-      
-   $val_=strip_tags($val_);   //Tags currently unsupported.
-   $chr_len=mb_strlen($val_); //String length in characters.
-   if ($chr_len>$max)
-   {
-      $str_end=mb_substr($val_,$min,$max-$min); //Seek punctuation marks and whitespaces between $min and $max characters.
-      $max_pref=0;     //Rightest byte offset of one of the most preferred punctuation marks,
-      $max_def=0;      // and the same but for deffered punctuation marks and whitespaces.
-      if (preg_match_all("/[.!?;)(\]\[,\"& -]|\n/",$str_end,$matches,PREG_OFFSET_CAPTURE))   //Search single-byte punctuation marks.
-      {
-         foreach ($matches[0] as $match)  //Find byte offsets of the most right punctuation marks
-            switch ($match[0])
-            {
-               case ".":
-               case "!":
-               case "?":
-               {
-                  if ($max_pref<$match[1])
-                     $max_pref=$match[1];
-                  break;
-               }
-               default:
-               {
-                  if ($max_def<$match[1])
-                     $max_def=$match[1];
-               }
-            }
-         
-         $break_pos=($max_pref ? $max_pref : $max_def);        //Cut string end at the rightmost preferred punctuation mark, or, if it wasn't found, at the deffered one.
-         if (!$keep_trailing_punct||($val_[$break_pos]==" "))
-            $break_pos--;
-         
-         $val_=mb_substr($val_,0,$min).substr($str_end,0,$break_pos+1).($params_["suffix"]??"");   //Concat start of the string ($min characters length) and the end of the string, truncated at the $break_pos byte offset.
-      }
-      else
-         $val_=mb_substr($val_,0,$max).($params_["suffix"]??"");
-   }
-   
-   return $val_;
 }
 
 ?>
