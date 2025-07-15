@@ -16,6 +16,7 @@ class ThemeSetup
    public array $theme_supports=["title-tag"=>true,"html5"=>['comment-list','comment-form','search-form','gallery','caption','script','style']];
    public array $page_supports=[];
    public array $post_supports=[];
+   public array $menu_locations=[];
    
    public array $allowed_mimes=["svg"=>"image/svg+xml","webp"=>"image/webp"];
    public array $disallowed_mimes=[];
@@ -48,7 +49,7 @@ class ThemeSetup
    protected array $actions_to_add=[];
    protected array $actions_deferred=[];
    
-   protected $settings_pages=[]; //Array of ThemeSettingsPage instances.
+   protected array $settings_pages=[]; //Array of ThemeSettingsPage instances.
    
    public function __construct()
    {
@@ -90,7 +91,7 @@ class ThemeSetup
                                          ];
    }
    
-   public function remove_action($tag_,$callback_,$priority_=null,$argc_=null)
+   public function remove_action($tag_,$callback_,$priority_=null,$argc_=null):void
    {
       $was_found=false;
       //Try to find this action into the adding list:
@@ -221,6 +222,9 @@ class ThemeSetup
       
       add_post_type_support("page",$this->page_supports);
       add_post_type_support("post",$this->post_supports);
+      
+      if ($this->menu_locations)
+         register_nav_menus($this->menu_locations);
    }
    
    public function init_admin_menu_callback()
