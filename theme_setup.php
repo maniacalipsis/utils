@@ -16,6 +16,7 @@ class ThemeSetup
    public array $theme_supports=["title-tag"=>true,"html5"=>['comment-list','comment-form','search-form','gallery','caption','script','style']];
    public array $page_supports=[];
    public array $post_supports=[];
+   
    public array $menu_locations=[];
    
    public array $allowed_mimes=["svg"=>"image/svg+xml","webp"=>"image/webp"];
@@ -91,7 +92,7 @@ class ThemeSetup
                                          ];
    }
    
-   public function remove_action($tag_,$callback_,$priority_=null,$argc_=null):void
+   public function remove_action(string $tag_,array|string|callable $callback_,?int $priority_=null,?int $argc_=null):void
    {
       $was_found=false;
       //Try to find this action into the adding list:
@@ -116,7 +117,7 @@ class ThemeSetup
       $this->actions_to_remove[]=$act;
    }
    
-   public function add_action($tag_,$callback_,$priority_=null,$argc_=null)
+   public function add_action(string $tag_,array|string|callable $callback_,?int $priority_=null,?int $argc_=null):void
    {
       $act=["tag"=>$tag_,"callback"=>$callback_];
       if ($priority_!==null)
@@ -127,18 +128,18 @@ class ThemeSetup
       $this->actions_to_add[]=$act;
    }
    
-   public function require_plugin($name_,$author_=null)
+   public function require_plugin(string $name_,?string $author_=null):void
    {
       $this->required_plugins[$name_]=$author_;
    }
    
-   public function add_settings_page(/*ThemeSettingsSection*/ $settings_page_)
+   public function add_settings_page(ThemeSettingsPage $settings_page_):void
    {
       $settings_page_->parent=$this;
       $this->settings_pages[]=$settings_page_;
    }
    
-   public function setup()
+   public function setup():void
    {
       //Performs the admin page setup.
       //Call this after set all properties needed.
@@ -163,7 +164,7 @@ class ThemeSetup
    }
    
    //Callbacks
-   public function filter_allowed_mimes_callback($mimes_)
+   public function filter_allowed_mimes_callback(array $mimes_):array
    {
       foreach ($this->allowed_mimes as $key=>$mime)
          $mimes_[$key]=$mime;
@@ -175,12 +176,12 @@ class ThemeSetup
       return $mimes_;
    }
    
-   public function filter_category_link($link_str_)
+   public function filter_category_link(string $link_str_):string
    {
       return str_replace("/category/","/",$link_str_);
    }
    
-   public function enqueue_public_assets_callback()
+   public function enqueue_public_assets_callback():void
    {
       //Remove unwanted styles and scripts:
       foreach ($this->unwanted_public_styles as $asset_key)
@@ -205,7 +206,7 @@ class ThemeSetup
          wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
    }
    
-   public function init_settings_callback()
+   public function init_settings_callback():void
    {
       //Add deferred actions:
       foreach ($this->actions_deferred as $action)
@@ -227,7 +228,7 @@ class ThemeSetup
          register_nav_menus($this->menu_locations);
    }
    
-   public function init_admin_menu_callback()
+   public function init_admin_menu_callback():void
    {
       //Remove unwanted styles and scripts:
       foreach ($this->unwanted_admin_styles as $asset_key)
@@ -256,7 +257,7 @@ class ThemeSetup
          $setting_page->setup();
    }
    
-   public function plugin_actions_callback($actions_,$plugin_file_,$plugin_data_,$context_)
+   public function plugin_actions_callback(array $actions_,string $plugin_file_,array $plugin_data_,$context_):array
    {
       //Disable deactivation of the required plugins.
       
@@ -282,31 +283,27 @@ class ThemeSetup
 
 class ThemeSettingsPage
 {
-   public $key="";                        //Menu slug.
-   public $title="";                      //Page title (main).
-   public $menu_title="";                 //Menu title (separate title for menu, by default equal to the main title).
-   public $parent_page="themes.php";      //Parent page slug.
-   public $permissions="manage_options";  //User permissions required.
-   public $parent=null;                   //Parent ThemeSetup.
+   public ?ThemeSetup $parent=null;              //Parent ThemeSetup instance.
    
-   protected $sections=[];
+   protected array $sections=[];
    
-   public function __construct($key_,$title_,$menu_title_=null,$parent_page_=null,$permissions_=null)
+   public function __construct(
+      public string $key="",                       //Menu slug.
+      public string $title="",                     //Page title (main).
+      public string $menu_title="",                //Menu title (separate title for menu, by default equal to the main title).
+      public string $parent_page="themes.php",     //Parent page slug.
+      public string $permissions="manage_options", //User permissions required.
+   )
    {
-      $this->key=$key_;
-      $this->title=$title_;
-      if ($menu_title_) $this->menu_title=$menu_title_;
-      if ($parent_page_) $this->parent_page=$parent_page_;
-      if ($permissions_) $this->permissions=$permissions_;
    }
    
-   public function add_section(/*ThemeSettingsSection*/ $section_)
+   public function add_section(ThemeSettingsSection $section_):void
    {
       $section_->page=$this;
       $this->sections[]=$section_;
    }
    
-   public function setup()
+   public function setup():void
    {
       //Performs the admin page setup.
       //Call this after set all properties needed.
@@ -320,7 +317,7 @@ class ThemeSettingsPage
          $section->setup();
    }
    
-   public function setup_callback()
+   public function setup_callback():void
    {
       if (!current_user_can($this->permissions))
       wp_die("Не достаточно прав для изменения настроек.");
@@ -340,24 +337,23 @@ class ThemeSettingsPage
 
 class ThemeSettingsSection
 {
-   public $key="";     	//Section ID.
-   public $title="";    //Section title.
    public $page=null;   //Parent ThemeSettingsPage.
    
    protected $fields=[];
    
-   public function __construct($key_,$title_)
+   public function __construct(
+      public $key="",      //Section ID.
+      public $title="",    //Section title.
+   )
    {
-      $this->key=$key_;
-      $this->title=$title_;
    }
    
-   public function add_field(InputField $field_)
+   public function add_field(InputField $field_):void
    {
       $this->fields[]=$field_;
    }
    
-   public function setup()
+   public function setup():void
    {
       //Performs the admin section setup.
       //NOTE: Must be called only by the page ThemeSettingsPage.
@@ -371,7 +367,7 @@ class ThemeSettingsSection
       }
    }
    
-   public function render_callback()
+   public function render_callback():void
    {
       foreach ($this->fields as $field)
          $field->value=get_option($field->key,$field->default);
