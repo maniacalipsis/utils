@@ -1,5 +1,5 @@
 //Media setter ------------------------------------------------------------------------------------------------------
-class StructList extends DynamicForm
+export class StructList extends DynamicForm
 {
    //A list of the data structures.
    
@@ -39,7 +39,7 @@ class StructList extends DynamicForm
    }
 }
 
-class StructForm extends DynamicListItem
+export class StructForm extends DynamicListItem
 {
    //Form for the structured data input.
    
@@ -112,7 +112,7 @@ class StructForm extends DynamicListItem
    }
 }
 
-class MediaList
+export class MediaList
 {
    constructor(params_)
    {
@@ -250,7 +250,7 @@ class MediaList
    }
 }
 
-class MediaSelector
+export class MediaSelector
 {
    //Selector of the WP media file[s]. It makes a node with the inputs that allows to select a file from the WP media library and annotate it.
    //NOTE: All the inputs the MediaSelector makes are not related to any form and normally will NOT be sent on submit. Instead the parent has to get the data from its MediaSelector[s] and deal with it on its own.
@@ -447,7 +447,7 @@ class MediaSelector
    }
 }
 
-class wpJSONForm
+export class wpJSONForm
 {
    //This class handles a [part] of a static form that represents JSON data from the hidden inupt.
    constructor(params_)

@@ -2,7 +2,7 @@
 /*
 Plugin Name: Utilities
 Description: Set of theme setup and utility functions.
-Version: 2.3
+Version: 2.4
 Author: FSG a.k.a ManiaC
 Author URI: http://maniacalipsis.ru/
 Plugin URI:
@@ -29,17 +29,17 @@ if (version_compare(phpversion(),"8.4.0","<"))        //This is a tempopary solu
 function plugin_init()
 {
    //Common utility scripts for both of front and back ends:
-   wp_enqueue_script("js_utils",plugins_url("/js_utils.js",__FILE__));
+   // wp_enqueue_script_module("@maniacalipsis/utils/utils",plugins_url("/js_utils.js",__FILE__));
    
    //Backend-specific utils:
    if (is_admin())
    {
-      wp_enqueue_script("admin_utils",plugins_url("/admin.js",__FILE__));
-      wp_enqueue_style("admin_utils",plugins_url("/admin.css",__FILE__));
+      // wp_enqueue_script_module("@maniacalipsis/utils/admin_utils",plugins_url("/admin.js",__FILE__));
+      // wp_enqueue_style("@maniacalipsis/utils/admin_style",plugins_url("/admin.css",__FILE__));
    }
    else
    {
-      wp_enqueue_script("feedback",plugins_url("/feedback.js",__FILE__));
+      // wp_enqueue_script_module("@maniacalipsis/utils/feedback",plugins_url("/feedback.js",__FILE__));
    }
 }
 add_action("init",__NAMESPACE__."\\plugin_init");

@@ -1,10 +1,12 @@
-function initFeedbackForms(selector_)
+import {ajaxSendForm} from 'utils';
+
+export function initFeedbackForms(selector_)
 {
    for (let form of document.forms)
       form.addEventListener('submit',window[form.dataset.onsubmit]??ajaxFormOnSubmit);
 }
 
-function printAjaxResponse(form_,ans_)
+export function printAjaxResponse(form_,ans_)
 {
    let resBox=form_.querySelector('.result');
    if (resBox)
@@ -18,7 +20,7 @@ function printAjaxResponse(form_,ans_)
       alert(ans_.errors?.join('\n')+'\n\n'+ans_.success?.join('\n'));
 }
 
-function ajaxFormOnSubmit(e_)
+export function ajaxFormOnSubmit(e_)
 {
    ajaxSendForm(e_.target)
       .then((ans_,xhr_)=>{if (this.dataset.onsuccess) window[this.dataset.onsuccess](ans_,xhr_,this/*form ptr*/); else printAjaxResponse(this,ans_);})

@@ -19,10 +19,10 @@
 /* If not, see http://www.gnu.org/licenses/.                                                                 */
 /*===========================================================================================================*/
 
-//NOTE: This file is respective to The Pattern Engine commit 30c09a82a2e20cfe89492d9b46321433a46325e7 (HEAD -> oop_new_select), except the "export" keywords are removed.
+//NOTE: This file is respective to The Pattern Engine commit 30c09a82a2e20cfe89492d9b46321433a46325e7 (HEAD -> oop_new_select) with addition of dialog*() functions.
 
 //--------------------- JS localization ---------------------//
-class LC
+export class LC
 {
    //Localized messages storage, global static class.
    
@@ -60,7 +60,7 @@ const MOUSE_LEFT  =0b001;
 const MOUSE_RIGHT =0b010;
 const MOUSE_MIDDLE=0b100;
 
-function cancelEvent(e_)
+export function cancelEvent(e_)
 {
    //A shorthand to completely cancel a DOM event
    
@@ -69,7 +69,7 @@ function cancelEvent(e_)
    return false;
 }
 
-function decorateToEventTarget(obj_)
+export function decorateToEventTarget(obj_)
 {
    //Makes an object implementing the EventTarget interface.
    //Arguments:
@@ -163,7 +163,7 @@ function decorateToEventTarget(obj_)
    return obj_;
 }
 
-class EventListenersMap extends Map
+export class EventListenersMap extends Map
 {
    //Helps to manage an event listeners, which should be priodically attached to and detached from somewhere.
    
@@ -333,7 +333,7 @@ class EventListenersMap extends Map
    }
 }
 
-function pointToRelative(point_,node_)
+export function pointToRelative(point_,node_)
 {
    //Converts a point_ coordinates to the node_ basis. Its helpful when unable to use layerX and layerY of mouse event or touch.
    //Arguments:
@@ -344,7 +344,7 @@ function pointToRelative(point_,node_)
    return {x:point_.clientX-nodeRect.x,y:point_.clientY-nodeRect.y};
 }
 
-function touchListToRelative(touches_,node_)
+export function touchListToRelative(touches_,node_)
 {
    //Batch version of the pointToRelative().
    //Arguments:
@@ -360,7 +360,7 @@ function touchListToRelative(touches_,node_)
    return res;
 }
 
-function forceKbLayout(e_,dest_)
+export function forceKbLayout(e_,dest_)
 {
    //Converts characters entered to the target layout.
    //TODO: Seems should be moved to separate library. Reason: rarely used.
@@ -418,7 +418,7 @@ function forceKbLayout(e_,dest_)
    return true;
 }
 
-function numericInputScroll(e_)
+export function numericInputScroll(e_)
 {
    //Allows to change value of text input using a mouse wheel (for inputs, intended only for numeric values).
    //TODO: revision required. Also use e_.target.dataset.step prior to e_.target.step.
@@ -454,7 +454,7 @@ function numericInputScroll(e_)
        return true;
 }
 
-function mixed_input_scroll(e_)
+export function mixed_input_scroll(e_)
 {
    //Allows to change numeric values of text input using mouse wheel, but not changes a NaN values.
    //TODO: revision required. Also use e_.target.dataset.step prior to e_.target.step.
@@ -483,21 +483,21 @@ function mixed_input_scroll(e_)
        return true;
 }
 
-function numericInputRestrict(e_)
+export function numericInputRestrict(e_)
 {
    //TODO: Think about rewriting as complex decorator.
    if ((!(/^([0-9.,-]|Tab|Backspace|Del|Enter|Escape|Arrow.*|Page.*|Home|End|Insert)$/i.test(e_.key)||e_.ctrlKey||e_.altKey))||((e_.key=='.'||e_.key==',')&&(/[,.]/.test(this.value))))
       return cancelEvent(e_);
 }
 
-function InitNumericInputs()
+export function InitNumericInputs()
 {
    var numInputs=document.querySelectorAll('input[type=number],input.number');
    for (var inp of numInputs)
       inp.addEventListener('keypress',numericInputRestrict);
 }
 
-function bindEvtInputToDeferredChange(inpField_,delay_)
+export function bindEvtInputToDeferredChange(inpField_,delay_)
 {
    //Makes inputs (e.g. text, number, textarea) trigger 'change' event handler on 'input' event with some delay.
    
@@ -505,7 +505,7 @@ function bindEvtInputToDeferredChange(inpField_,delay_)
    inpField_.addEventListener('change',function(e_){if (this.changeTimeout!==undefined) clearTimeout(this.changeTimeout); this.changeTimeout=undefined;});
 }
 
-class ShortcutsList
+export class ShortcutsList
 {
    //Class helps to detect specific input events and run associated actions.
    //Usage example:
@@ -642,7 +642,7 @@ class ShortcutsList
 }
 
 //--------------------- Input elements extention ---------------------//
-function decorateExistingProp(object_,propName_,getter_,setter_)
+export function decorateExistingProp(object_,propName_,getter_,setter_)
 {
    //Decorates an existing property of an object.
    //Arguments:
@@ -671,12 +671,12 @@ function decorateExistingProp(object_,propName_,getter_,setter_)
    Object.defineProperty(object_,propName_,descr);
 }
 
-function decorateInputFieldName(inpField_)
+export function decorateInputFieldName(inpField_)
 {
    Object.defineProperty(inpField_,'keySeq',{get(){return this._keySeq??=new InpNameKeySeq(this.name);},set(newVal_){this._keySeq=newVal_; this.name=this._keySeq.toString();},enumerable:true,writable:true});
 }
 
-function decorateInputFieldVal(inpField_,propName_)
+export function decorateInputFieldVal(inpField_,propName_)
 {
    //This is an almost decorator of the HTMLInputElements.
    //It allows to uniformly access the fields value in a sae manner as it would be with form data on a server-side or with JSON data in the response.
@@ -747,7 +747,7 @@ function decorateInputFieldVal(inpField_,propName_)
    return inpField_;
 }
 
-function decorateCheckbox(checkbox_)
+export function decorateCheckbox(checkbox_)
 {
    //Decorate checkbox checked and disabled setters to make checkbox repainted when it changed by code:
    {
@@ -773,7 +773,7 @@ function decorateCheckbox(checkbox_)
    checkbox_.addEventListener('blur' ,function(e_){this.closest('label')?.classList.toggle('focused',document.activeElement==this);});
 }
 
-function initCheckboxes(params_)
+export function initCheckboxes(params_)
 {
    //Initializes all customized checkboxes into the given container_ or entire document.
    //Usage: 
@@ -784,7 +784,7 @@ function initCheckboxes(params_)
       decorateCheckbox(checkbox);        //TODO: Find how to detect already decorated checkboxes.
 }
 
-function decorateRadio(radio_)
+export function decorateRadio(radio_)
 {
    //Decorates the radio button, making its status change reflected in its label classList.
    //NOTE: Unlike the checkbox, a single radio button isn't self-sufficient, because it not receive any event on uncheck when another radio with the same name is checked.
@@ -816,7 +816,7 @@ function decorateRadio(radio_)
    return radio_;
 }
 
-class RadioGroup extends Map
+export class RadioGroup extends Map
 {
    //This class allows to work with the group of radios as with a single input fueld.
    
@@ -957,7 +957,7 @@ class RadioGroup extends Map
    }
 }
 
-function initRadios(params_)
+export function initRadios(params_)
 {
    //Initializes all customized radio buttons into the given container_ or entire document.
    //Usage:
@@ -979,7 +979,7 @@ function initRadios(params_)
    return groups;
 }
 
-class RangeBar
+export class RangeBar
 {
    //TODO: Legacy code, revision required.
    constructor(node_,params_)
@@ -1413,7 +1413,7 @@ class RangeBar
    }
 }
 
-function initRangeBars(selector_,params_)
+export function initRangeBars(selector_,params_)
 {
    var res=[];
    
@@ -1424,7 +1424,7 @@ function initRangeBars(selector_,params_)
    return res;
 }
 
-function filterSelectOptions(selectInp_,callback_,postprocess_)
+export function filterSelectOptions(selectInp_,callback_,postprocess_)
 {
    let enabledOpts=[];
    let selectedOpts=[];
@@ -1447,7 +1447,7 @@ function filterSelectOptions(selectInp_,callback_,postprocess_)
 }
 
 //--------------------- Dynamic DOM ---------------------//
-function buildNodes(struct_,collection_)
+export function buildNodes(struct_,collection_)
 {
    //Creates a branch of the DOM-tree using a structure declaration struct_.
    //Arguments:
@@ -1585,7 +1585,7 @@ function buildNodes(struct_,collection_)
    return res;
 }
 
-function popupOpen(struct_,parentNode_,collection_)
+export function popupOpen(struct_,parentNode_,collection_)
 {
    //Make popup and assigns to parent_ (or to document.body by default).
    var res=null;
@@ -1605,7 +1605,7 @@ function popupOpen(struct_,parentNode_,collection_)
    return res;
 }
 
-function popupsClose()
+export function popupsClose()
 {
    //Closes all popups (generrally - one), placed into parent_.
    let res=null;
@@ -1630,7 +1630,7 @@ function popupsClose()
    return res;
 }
 
-function dialogOpen(struct_,parentNode_,collection_)
+export function dialogOpen(struct_,parentNode_,collection_)
 {
    //Make popup and assigns to parent_ (or to document.body by default).
    
@@ -1658,7 +1658,7 @@ function dialogOpen(struct_,parentNode_,collection_)
    return res;
 }
 
-function dialogsClose()
+export function dialogsClose()
 {
    //Closes all dialogs (generrally - one).
    
@@ -1670,7 +1670,7 @@ function dialogsClose()
 }
 
 //--- Common dialog structures ---//
-function basePopupStruct(caption_,childNodes_,params_)
+export function basePopupStruct(caption_,childNodes_,params_)
 {
    var res={
               tagName:'div',
@@ -1705,7 +1705,7 @@ function basePopupStruct(caption_,childNodes_,params_)
    return res;
 }
 
-function imagePopupStruct(link_,caption_) //makes structure of window for displaying of enlarged image
+export function imagePopupStruct(link_,caption_) //makes structure of window for displaying of enlarged image
 {
    var res={
               tagName:'div',
@@ -1742,7 +1742,7 @@ function imagePopupStruct(link_,caption_) //makes structure of window for displa
    return res;
 }
 
-function baseDialogStruct(caption_,childNodes_,params_)
+export function baseDialogStruct(caption_,childNodes_,params_)
 {
    var res={
               tagName:'dialog',
@@ -1769,7 +1769,7 @@ function baseDialogStruct(caption_,childNodes_,params_)
    return res;
 }
 
-function imageDialogStruct(link_,caption_,params_) //makes structure of window for displaying of enlarged image
+export function imageDialogStruct(link_,caption_,params_) //makes structure of window for displaying of enlarged image
 {
    var res={
               tagName:'dialog',
@@ -1802,7 +1802,7 @@ function imageDialogStruct(link_,caption_,params_) //makes structure of window f
 }
 
 //--------------------- Dynamic trees and lists ---------------------//
-class TreeNode extends Map
+export class TreeNode extends Map
 {
    //Basic class for tree items.
    
@@ -2225,7 +2225,7 @@ class TreeNode extends Map
    }
 }
 
-class TreeDataNode extends TreeNode
+export class TreeDataNode extends TreeNode
 {
    //public props
    get data()
@@ -2269,7 +2269,7 @@ class TreeDataNode extends TreeNode
    _data=undefined;
 }
 
-class DataList extends TreeDataNode
+export class DataList extends TreeDataNode
 {
    //Base class for 
    
@@ -2737,7 +2737,7 @@ class DataList extends TreeDataNode
    }
 }
 
-class DynamicHTMLList extends DataList
+export class DynamicHTMLList extends DataList
 {
    //A prefab for dynamic lists.
    
@@ -2796,7 +2796,7 @@ class DynamicHTMLList extends DataList
    }
 }
 
-class AsyncList extends DynamicHTMLList
+export class AsyncList extends DynamicHTMLList
 {
    //Implements an asyncronous loading of list items from server.
    //Events:
@@ -2963,7 +2963,7 @@ class AsyncList extends DynamicHTMLList
 }
 
 //--------------------- Input complexes ---------------------//
-class InputFieldsMap extends TreeDataNode
+export class InputFieldsMap extends TreeDataNode
 {
    //This class wraps the TreeDataNode, implementing a routine of collecting and decoration of input fields, located in the given container.
    
@@ -3165,7 +3165,7 @@ class InputFieldsMap extends TreeDataNode
    }
 }
 
-class SortingController
+export class SortingController
 {
    constructor(params_)
    {
@@ -3276,7 +3276,7 @@ class SortingController
 
 //--------------------- Interactive blocks ---------------------//
 //------- Spoiler -------//
-function Spoiler(node_)
+export function Spoiler(node_)
 {
    //TODO: Rewrite as a class.
    //protected props
@@ -3318,7 +3318,7 @@ function Spoiler(node_)
    this.init(node_);
 }
 
-function initSpoilers(selector_)
+export function initSpoilers(selector_)
 {
    var spoilerNodes=document.body.querySelectorAll(selector_??'.spoiler');
    if (spoilerNodes)
@@ -3327,7 +3327,7 @@ function initSpoilers(selector_)
 }
 
 //------- Tabs -------//
-class TabsController
+export class TabsController
 {
    //The bare controller of the tabs.
    //Params:
@@ -3428,7 +3428,7 @@ class TabsController
    }
 }
 
-class TabsSwitch extends TabsController
+export class TabsSwitch extends TabsController
 {
    //Controller of the switching buttons.
 
@@ -3441,7 +3441,7 @@ class TabsSwitch extends TabsController
    }
 }
 
-class TabBox extends TabsController
+export class TabBox extends TabsController
 {
    //TabBox controller. It controls the tabs, while tab-buttons are delegated to the child TabsController instance.
    // Note that params are slightly differs from the bare TabsController.
@@ -3535,7 +3535,7 @@ class TabBox extends TabsController
    _matchByCallback=false; //By default, simply map buttons and tabs by the order.
 }
 
-function initTabBoxes(selector_,TabBoxClass_,defaultParams_)
+export function initTabBoxes(selector_,TabBoxClass_,defaultParams_)
 {
    //Default global tabboxes initializer.
    
@@ -3548,7 +3548,7 @@ function initTabBoxes(selector_,TabBoxClass_,defaultParams_)
 }
 
 //------- Slider -------//
-class SlideShow extends TabBox
+export class SlideShow extends TabBox
 {
    //SlideShow is a kinda tabbox with additional prev/next buttons, timer and the optional large scale viewport.
    // It may be used in a bunch of the different ways from the simple slideshow to the image slider or even the async loader of some detailed info.
@@ -3721,7 +3721,7 @@ class SlideShow extends TabBox
    }
 }
 
-function initSlideShows(selector_,SlideShowClass_,defaultParams_)
+export function initSlideShows(selector_,SlideShowClass_,defaultParams_)
 {
    var containers=document.body.querySelectorAll(selector_??'.slideshow');
    for (var container of containers)
@@ -3731,7 +3731,7 @@ function initSlideShows(selector_,SlideShowClass_,defaultParams_)
 }
 
 //------- Scroller -------//
-class Scroller
+export class Scroller
 {
    //Animates a scroller.
    //Usage:
@@ -4105,7 +4105,7 @@ class Scroller
    }
 }
 
-function initScrollers(selector_,scrollerClass_,defaultParams_)
+export function initScrollers(selector_,scrollerClass_,defaultParams_)
 {
    var containers=document.body.querySelectorAll(selector_??'.scroller');
    for (var container of containers)
@@ -4117,7 +4117,7 @@ function initScrollers(selector_,scrollerClass_,defaultParams_)
 
 //--------------------- Utility ----------------------//
 //------- XHR -------//
-function reqServer(url_,data_,method_,enctype_,responseType_)
+export function reqServer(url_,data_,method_,enctype_,responseType_)
 {
    //Send a data to server using AJAX.
    //Arguments:
@@ -4184,7 +4184,7 @@ function reqServer(url_,data_,method_,enctype_,responseType_)
                       });
 }
 
-function ajaxSendForm(form_)
+export function ajaxSendForm(form_)
 {
    //Send form data to server.
    //This is a wrapper of reqServer() made for more usability.
@@ -4199,7 +4199,7 @@ function ajaxSendForm(form_)
 }
 
 //------- Cookie -------//
-function getCookie(name_)
+export function getCookie(name_)
 {
    var reg=new RegExp('(?:^|; +)'+name_+'=([^;]*)(?:;|$)','i');
    var matches=reg.exec(document.cookie);
@@ -4207,7 +4207,7 @@ function getCookie(name_)
    return (matches ? matches[1] : null);
 }
 
-function setCookie(name_,val_,expires_,path_)
+export function setCookie(name_,val_,expires_,path_)
 {
    //Sets/removes cookie.
    //Arguments:
@@ -4229,7 +4229,7 @@ function setCookie(name_,val_,expires_,path_)
 }
 
 //------- Array and Object -------//
-function setElementRecursively(object_,keySequence_,value_)
+export function setElementRecursively(object_,keySequence_,value_)
 {
    //[Re]places $value_ into multidimensional $array_, using a sequence of keys from the argument $key_sequence_. Makes missing dimensions.
    //Analog of the /core/utils.php\set_array_element().
@@ -4263,7 +4263,7 @@ function setElementRecursively(object_,keySequence_,value_)
    return object_;
 }
 
-function getElementRecursively(object_,keySequence_)
+export function getElementRecursively(object_,keySequence_)
 {
    //Complementary function to the setElementRecursively().
    
@@ -4284,7 +4284,7 @@ function getElementRecursively(object_,keySequence_)
    return element;
 }
 
-function structuredCloneAwared(object_)
+export function structuredCloneAwared(object_)
 {
    //Recursively clones a plain object|Array|Map, passing through a simple types, instances of custom classes and [potentially] not cloneable objects, including functions and DOM nodes.
    //NOTE: This method tested on plain objects, functions, DOM nodes, DocumentFragment and custom classes. However it may fail in some unpredicted cases.
@@ -4313,7 +4313,7 @@ function structuredCloneAwared(object_)
    return res;
 }
 
-function cloneOverriden(default_,actual_,options_)
+export function cloneOverriden(default_,actual_,options_)
 {
    //Recursively clones two objects, overriding the first one with the second.
    //Arguments:
@@ -4425,7 +4425,7 @@ function cloneOverriden(default_,actual_,options_)
    return res;
 }
 
-function arrayRelativeSlice(base_,array_,end_)
+export function arrayRelativeSlice(base_,array_,end_)
 {
    //Extracts a portion of array_ by matching its beginning against the base_.
    //Arguments:
@@ -4451,7 +4451,7 @@ function arrayRelativeSlice(base_,array_,end_)
 }
 
 //------- String -------//
-function HTMLSpecialChars(val_)
+export function HTMLSpecialChars(val_)
 {
    //Analog of htmlspecialchars() in PHP.
    
@@ -4459,7 +4459,7 @@ function HTMLSpecialChars(val_)
    return val_.replace(/[&<>"]/g,function(ch_){return map[ch_];});
 }
 
-function HTMLSpecialCharsDecode(val_)
+export function HTMLSpecialCharsDecode(val_)
 {
    //Analog of htmlspecialchars_decode() in PHP.
    
@@ -4467,7 +4467,7 @@ function HTMLSpecialCharsDecode(val_)
    return val_.replace(/&(amp|lt|gt|quot);/g,function(ch_){return map[ch_];});
 }
 
-function serializeUrlQuery(query_data_,parent_)
+export function serializeUrlQuery(query_data_,parent_)
 {
    //Serializes a structured data into URL-query.
    //NOTE: There is a standard JS class URLSearchParams(), but it catn't replace this function because it unable to work with multidimensional data.
@@ -4483,7 +4483,7 @@ function serializeUrlQuery(query_data_,parent_)
    return res_arr.join('&');
 }
 
-function splitInpFieldName(name_,isMultiple_=false)
+export function splitInpFieldName(name_,isMultiple_=false)
 {
    //Splits input field name to array.
    //Return value:
@@ -4511,7 +4511,7 @@ function splitInpFieldName(name_,isMultiple_=false)
    return res;
 }
 
-function inputNameFromKeySeq(keySeq_,isMultiple_=false,offset_=0)
+export function inputNameFromKeySeq(keySeq_,isMultiple_=false,offset_=0)
 {
    //Returns an input field name that corresponds to the given request element location.
    // Almost analog of /core/utils.php\inp_name_from_req_loc().
@@ -4537,7 +4537,7 @@ function inputNameFromKeySeq(keySeq_,isMultiple_=false,offset_=0)
 }
 
 //------- Date/time -------//
-function formatDate(format_,date_,params_)
+export function formatDate(format_,date_,params_)
 {
    //Analog for PHP's date()
    //NOTE: format support is incomplete. Missing labels: SzWtLoXxyAaBghueIOPpTcrU.
@@ -4573,21 +4573,21 @@ function formatDate(format_,date_,params_)
 }
 
 //------- Value/notation parsing -------//
-function toBool(val_)
+export function toBool(val_)
 {
    //Returns true if val_ may be understood as some variation of boolean true. Analog of to_bool() in /core/utils.php
    
    return (typeof val_=='boolean') ? val_ : /^(1|\+|on|ok|true|positive|y|yes|да)$/i.test(val_);   //All, what isn't True - false.
 }
 
-function isAnyBool(val_)
+export function isAnyBool(val_)
 {
    //Detects can the val_ be considered a some kind of boolean. Analog of is_any_bool() in /core/utils.php.
    
    return (typeof val_=='boolean')||/^(1|\+|on|ok|true|y|yes|да|0|-|off|not ok|false|negative|n|no|нет)$/i.test(val_);
 }
 
-function parseCompleteFloat(val_)
+export function parseCompleteFloat(val_)
 {
    //Unlike standard parseFloat() this function returns NaN if number input was incomplete, i.e. a decimal point was left without any digits after.
    // Its useful for the "input" event listeners with correcting feedback: doing something like {var val=parseFloat(input.value); if(!isNaN(val)) input.value=val;} will makes the user unable to enter a decimal point.
@@ -4604,7 +4604,7 @@ function parseCompleteFloat(val_)
    return res;
 }
 
-function mUnit(size_)
+export function mUnit(size_)
 {
    //Returns measurement unit from the single linear dimension value in CSS format.
    //NOTE: Tolerant to leading and trailing spaces.
@@ -4614,7 +4614,7 @@ function mUnit(size_)
    return matches ? matches[1].toLowerCase() : '';
 }
 
-function toPixels(size_,context_)
+export function toPixels(size_,context_)
 {
    //TODO: Removal candidate: this function has narrow use in specific tasks, so think about move it to a separate dedicated lib. QUESTIONABLE.
    //TODO: This func may be transformed to something like PhisicalQuantity from scientific.js.
@@ -4689,7 +4689,7 @@ function toPixels(size_,context_)
    return res;
 }
 
-function getTransitionDuration(element_,durIndex_)
+export function getTransitionDuration(element_,durIndex_)
 {
    //Returns indexed or maximum of the element_'s transition durations. It may be useful if e.g. some DOM manipulations are to be made after some css-defined fadings ends.
    //TODO: Removal candidate: rarely used, so think about move it to a separate dedicated lib.
@@ -4710,7 +4710,7 @@ function getTransitionDuration(element_,durIndex_)
    return targetDur;
 }
 
-function parsePhones(phonesStr_,glue_)
+export function parsePhones(phonesStr_,glue_)
 {
    //The buildNodes()-ready phone numbers parser.
    //TODO: Use class LC for localization.
@@ -4730,7 +4730,7 @@ function parsePhones(phonesStr_,glue_)
 }
 
 //--------------------- Misc ---------------------//
-function getElementOffset(element_,fromElement_)
+export function getElementOffset(element_,fromElement_)
 {
    //Calculates offset of one element from another.
    //TODO: Refactor this. Add default fromElement_ to /?body?/, mb rename fromElement_ to refElement_.
@@ -4747,7 +4747,7 @@ function getElementOffset(element_,fromElement_)
    return res;
 }
 
-function functionExists(func_)
+export function functionExists(func_)
 {
    return (typeof func_=='string' ? typeof window[func_]=='function' : func_ instanceof Function);
 }

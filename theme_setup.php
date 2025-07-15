@@ -12,55 +12,82 @@ namespace Utilities;
 
 class ThemeSetup
 {
-   public $noindex=false;
-   public $theme_supports=["title-tag"=>true,"html5"=>true];
-   public $page_supports=[];
-   public $post_supports=[];
+   public bool  $noindex=false;
+   public array $theme_supports=["title-tag"=>true,"html5"=>['comment-list','comment-form','search-form','gallery','caption','script','style']];
+   public array $page_supports=[];
+   public array $post_supports=[];
    
-   public $allowed_mimes=["svg"=>"image/svg+xml","webp"=>"image/webp"];
-   public $disallowed_mimes=[];
+   public array $allowed_mimes=["svg"=>"image/svg+xml","webp"=>"image/webp"];
+   public array $disallowed_mimes=[];
    
-   public $unwanted_public_styles=[];
-   public $unwanted_public_scripts=[];
-   public $unwanted_admin_styles=[];
-   public $unwanted_admin_scripts=[];
+   public array $unwanted_public_styles=[];
+   public array $unwanted_public_scripts=[];
+   public array $unwanted_admin_styles=[];
+   public array $unwanted_admin_scripts=[];
    
-   public $public_styles=[];
-   public $public_scripts=[];
-   public $admin_styles=[];
-   public $admin_scripts=[];
+   //Format for (public|admin)_scripts and (public|admin)_styles: ["<id>"=>"uri",...].
+   //Format for (public|admin)_script_(modules|module_imports): ["<id>"=>"uri","<id2>"=>["src"=>"<uri2>","deps"=>[...],"version"=>"1.0"],...], where array form contains arguments for WP_Script_Modules::register() and WP_Script_Modules::enqueue().
+   //NOTE: Modules from (public|admin)_script_module_imports will appear in the importmap if (and only if) there is any enqueued module that refers them in their "deps" directly or indirectly.
+   public array $public_styles=[];                    //Styles will be enqueued on public pages.
+   public array $public_scripts=[];                   //Simple JS scripts will be enqueued on public pages.
+   public array $public_script_module_imports=[];     //JS modules will be just registered for public pages.
+   public array $public_script_modules=[];            //JS modules will be enqueued on public pages.
+   public array $admin_styles=[];                     //Styles will be enqueued on admin pages.
+   public array $admin_scripts=[];                    //Simple JS scripts will be enqueued on admin pages.
+   public array $admin_script_module_imports=[];      //JS modules will be just registered for admin pages.
+   public array $admin_script_modules=[];             //JS modules will be enqueued on admin pages.
    
-   public $remove_category_base=true;
+   public bool  $remove_category_base=true;
+   
+   public readonly string $theme_uri;  //Current theme directory URI.
+   public readonly string $plugin_uri; //This plugin directory URI.
    
    protected $required_plugins=["Utilities"=>"FSG a.k.a ManiaC"];
    
-   protected $actions_to_remove=null;
-   protected $actions_to_add=null;
-   protected $actions_deferred=null;
+   protected array $actions_to_remove=[];
+   protected array $actions_to_add=[];
+   protected array $actions_deferred=[];
    
    protected $settings_pages=[]; //Array of ThemeSettingsPage instances.
    
    public function __construct()
    {
-      //NOTE: Unfortubatelly, PHP can't use $this in properties declaration.
+      //NOTE: Unfortunatelly, PHP can't use $this and non constant expressions in properties declaration.
+      
+      $this->theme_url=get_stylesheet_directory_uri();
+      $this->plugin_uri=plugins_url("",__FILE__);
+      
       $this->actions_to_remove=[
-         ["tag"=>"wp_head","callback"=>"rsd_link"],
-         ["tag"=>"wp_head","callback"=>"wlwmanifest_link"],
-         ["tag"=>"wp_head","callback"=>"wp_generator"],
-         ["tag"=>"wp_head","callback"=>"print_emoji_detection_script","priority"=>7],   //Disable emoji.
-         ["tag"=>"admin_print_scripts","callback"=>"print_emoji_detection_script"],     //
-         ["tag"=>"wp_print_styles","callback"=>"print_emoji_styles"],                   //
-         ["tag"=>"admin_print_styles","callback"=>"print_emoji_styles"],                //
-      ];
-      $this->actions_to_add=[
-         ["tag"=>"wp_enqueue_scripts","callback"=>[$this,"enqueue_public_assets_callback"]],
-         ["tag"=>"admin_menu","callback"=>[$this,"init_admin_menu_callback"]],
-         ["tag"=>"after_setup_theme","callback"=>[$this,"init_settings_callback"]],
-      ];
-      $this->actions_deferred=[
-         ["tag"=>"plugin_action_links","callback"=>[$this,"plugin_actions_callback"],"argc"=>4],
-         ["tag"=>"the_content","callback"=>"do_shortcode","priority"=>11],                //Enable shortcodes in content.
-      ];
+                                  ["tag"=>"wp_head","callback"=>"rsd_link"],
+                                  ["tag"=>"wp_head","callback"=>"wlwmanifest_link"],
+                                  ["tag"=>"wp_head","callback"=>"wp_generator"],
+                                  ["tag"=>"wp_head","callback"=>"print_emoji_detection_script","priority"=>7],   //Disable emoji.
+                                  ["tag"=>"admin_print_scripts","callback"=>"print_emoji_detection_script"],     //
+                                  ["tag"=>"wp_print_styles","callback"=>"print_emoji_styles"],                   //
+                                  ["tag"=>"admin_print_styles","callback"=>"print_emoji_styles"],                //
+                               ];
+      $this->actions_to_add   =[
+                                  ["tag"=>"wp_enqueue_scripts","callback"=>[$this,"enqueue_public_assets_callback"]],
+                                  ["tag"=>"admin_menu","callback"=>[$this,"init_admin_menu_callback"]],
+                                  ["tag"=>"after_setup_theme","callback"=>[$this,"init_settings_callback"]],
+                               ];
+      $this->actions_deferred =[
+                                  ["tag"=>"plugin_action_links","callback"=>[$this,"plugin_actions_callback"],"argc"=>4],
+                                  ["tag"=>"the_content","callback"=>"do_shortcode","priority"=>11],                //Enable shortcodes in content.
+                               ];
+      
+      $this->public_script_module_imports=[
+                                             "@maniacalipsis/utils/utils"=>["src"=>$this->plugin_uri."/js_utils.js"],
+                                             "@maniacalipsis/utils/feedback"=>["src"=>$this->plugin_uri."/feedback.js","deps"=>[["id"=>"@maniacalipsis/utils/utils","import"=>"dynamic"]]],
+                                          ];
+      
+      $this->admin_styles=[
+                             "@maniacalipsis/utils/admin_style"=>$this->plugin_uri."/admin.css",
+                          ];
+      $this->admin_script_module_imports=[
+                                            "@maniacalipsis/utils/utils"=>["src"=>$this->plugin_uri."/js_utils.js"],
+                                            "@maniacalipsis/utils/admin"=>["src"=>$this->plugin_uri."/admin.js","deps"=>[["id"=>"@maniacalipsis/utils/utils","import"=>"dynamic"]]],
+                                         ];
    }
    
    public function remove_action($tag_,$callback_,$priority_=null,$argc_=null)
@@ -126,8 +153,9 @@ class ThemeSetup
          remove_action($action["tag"],$action["callback"],$action["priority"]??10); //WP's default action priority is 10,
       
       //Add actions:
-      if (WP_DEBUG||$this->noindex)        //
-         add_action("wp_head","noindex");  //NOTE: This action will set metatag robots noindex,nofollow.
+      //TODO: Needs get synced with new API:
+      //if (WP_DEBUG||$this->noindex)        //
+      //   add_action("wp_head","noindex");  //NOTE: This action will set metatag robots noindex,nofollow.
          
       foreach ($this->actions_to_add as $action)
          add_action($action["tag"],$action["callback"],$action["priority"]??10,$action["argc"]??1); //WP's default action priority is 10, args count is 1.
@@ -165,6 +193,12 @@ class ThemeSetup
       
       foreach ($this->public_styles as $asset_key=>$asset_url)
          wp_enqueue_style($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
+      
+      $wp_script_modules=wp_script_modules();
+      foreach ($this->public_script_module_imports as $asset_key=>$asset_def)
+         $wp_script_modules->register($asset_key,...$this->unify_asset_definition($asset_def));
+      foreach ($this->public_script_modules as $asset_key=>$asset_def)
+         $wp_script_modules->enqueue($asset_key,...$this->unify_asset_definition($asset_def));
       
       foreach ($this->public_scripts as $asset_key=>$asset_url)
          wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
@@ -204,6 +238,10 @@ class ThemeSetup
       foreach ($this->admin_styles as $asset_key=>$asset_url)
          wp_enqueue_style($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
       
+      $wp_script_modules=wp_script_modules();
+      foreach ($this->admin_script_modules as $asset_key=>$asset_url)
+         $wp_script_modules->enqueue($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
+      
       foreach ($this->admin_scripts as $asset_key=>$asset_url)
          wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
       
@@ -223,6 +261,18 @@ class ThemeSetup
          unset($actions_['deactivate']);
       
       return $actions_;
+   }
+   
+   protected function unify_asset_definition(string|array $asset_def_):array
+   {
+      //Make asset definitions uniform and also makes their URI absolute.
+      
+      $res=(is_array($asset_def_) ? $asset_def_ : ["src"=>$asset_def_]);
+      
+      if (!preg_match("/^http(s)?:/i",$res["src"]))
+         $res["src"]=$this->theme_url.$res["src"];
+      
+      return $res;
    }
 }
 
