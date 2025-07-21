@@ -114,7 +114,6 @@ function text_clip_output($val_,$params_=NULL)
    return $val_;
 }
 
-
 function render_block_attributes(array $attributes,string $attrs_prefix="",array $attrs_map=["anchor"=>"id","className"=>"class","style"=>"style"]):string
 {
 	//Helps to convert Guttenberg block attributes to HTML element's ones and render'em to string.
@@ -128,5 +127,17 @@ function render_block_attributes(array $attributes,string $attrs_prefix="",array
          $mapped_attrs[$attr_name]=$attributes[$attrs_prefix.$key];
 
 	return render_element_attrs($mapped_attrs);
+}
+
+function get_post_image_src(WP_Post $post_,string $size_='full')
+{
+   //Shorthand for retrieving post's thumbnail image src.
+   //Arguments:
+   // $post_ - WP_Post instance.
+   // $size_ - [full|large|medium|thumbnail].
+   //Return value:
+   // Post's thumbnail URL encoded with htmlspecialchars().
+   
+   return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_??$this->image_size));
 }
 ?>

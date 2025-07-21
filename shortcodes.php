@@ -52,7 +52,7 @@ trait TMetaQueryHepler
       if ($escape_)
          foreach ($this->filter as $key=>$val)
             $this->filter[$key]=$this->{$this->filter_allowed[$key]}($val);
-      $this->filter=array_merge_recursive($this->filter_defaults,$this->filter);
+      $this->filter=array_merge($this->filter_defaults,$this->filter);
       
       return $this->filter;
    }
