@@ -247,7 +247,7 @@ class InputFloat extends InputField
    }
 }
 
-class InputInt extends InputFloat   //NOTE: THe int is more tight than the float.
+class InputInt extends InputFloat   //NOTE: The int is more tight than the float.
 {
    public $default=0;
    
@@ -292,7 +292,7 @@ class InputJson extends InputHidden
 {
    public function get_safe_value()
    {
-      return json_encode(json_decode(stripcslashes($this->value),true)??[],JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
+      return json_encode(json_decode(stripcslashes($this->value),true)??null,JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
    }
    
    public function print()
@@ -319,6 +319,28 @@ class InputStruct extends InputJson
          <SCRIPT>
             document.addEventListener('DOMContentLoaded',function(e_){let params={dataInputSelector:'input[type=hidden][name=<?=$this->key?>]',listNodeSelector:'.struct_list',btnAddSelector:'input[type=button].add',limit:<?=(int)$this->limit?>,itemClass:StructForm,itemClassParams:<?=$struct_params_json?>,node:document.getElementById('<?=$container_id?>')}; new StructList(params);});
          </SCRIPT>
+      </DIV>
+      <?php
+   }
+}
+
+class InputGeoLocation extends InputJson
+{
+   public function render()
+   {
+      //TODO: This code was written in a hurry and shall be refactored.
+      
+      $container_id="extra_media_".$this->key;
+      
+      $value_data=json_decode(stripcslashes($this->value),true);
+      ?>
+      <DIV ID="<?=$container_id?>" CLASS="geolocation" STYLE="display:flex; flex-flow:column; gap:1em; padding:0.5em; border:1px solid #CCCCCC;">
+         <?=parent::render()?>
+         <DIV STYLE="display:flex; flex-flow:row nowrap; align-items:flex-end; gap:0.5em;">
+            <LABEL CLASS="address"><SPAN><?=__("Address")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["address"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val=JSON.parse(inp.value)??{}; val.address=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
+            <BUTTON TYPE="button" CLASS="dashicons dashicons-location-alt" ONCLICK="let addr=arguments[0].target.parentNode.querySelector('.address>input')?.value; if (addr) window.open('https://2gis.ru/search/'+encodeURIComponent(addr.replaceAll('\n','')),'_blank').focus(); else alert('Enter the address');"></BUTTON>
+         </DIV>
+         <LABEL CLASS="location"><SPAN><?=__("Geo Location")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["location"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val=JSON.parse(inp.value)??{}; val.location=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
       </DIV>
       <?php
    }

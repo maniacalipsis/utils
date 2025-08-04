@@ -36,7 +36,7 @@ function data_from_query($val_)
    return is_null($val_) ? NULL : str_replace(["[[_0]]","[[_bq]]","[[_q]]","[[_bs]]"],["\0","`","'","\\"],$val_);
 }
 
-// =============================================== Wrappers =============================================== //
+// ------------------------ Content rendering ------------------------- //
 function phones_output($val_,$params_=NULL)
 {
    $glue=$params_["glue"]??",";
@@ -114,21 +114,6 @@ function text_clip_output($val_,$params_=NULL)
    return $val_;
 }
 
-function render_block_attributes(array $attributes,string $attrs_prefix="",array $attrs_map=["anchor"=>"id","className"=>"class","style"=>"style"]):string
-{
-	//Helps to convert Guttenberg block attributes to HTML element's ones and render'em to string.
-	//Arguments:
-	// $attributes - array. A Guttenberg block attributes. Note that, in general, they has no correlation with HTML element attributes.
-	//TODO: Currently, this function implements "strict" mode i.e. it filters-off all that is not listed in the $attrs_map. However, there is a thought to add feature to pass all $attributes as is if $attrs_map is explicitly set [] or null.
-
-   $mapped_attrs=[];
-	foreach ($attrs_map as $key=>$attr_name)
-		if (!empty($attributes[$attrs_prefix.$key]))
-         $mapped_attrs[$attr_name]=$attributes[$attrs_prefix.$key];
-
-	return render_element_attrs($mapped_attrs);
-}
-
 function get_post_image_src(WP_Post $post_,string $size_='full')
 {
    //Shorthand for retrieving post's thumbnail image src.
@@ -139,5 +124,15 @@ function get_post_image_src(WP_Post $post_,string $size_='full')
    // Post's thumbnail URL encoded with htmlspecialchars().
    
    return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_??$this->image_size));
+}
+
+function get_breadcrumbs(bool $include_current=false):array
+{
+   $res=[];
+   
+   $curr_post=get_post();
+   // var_dump($curr_post);
+   
+   return $res;
 }
 ?>

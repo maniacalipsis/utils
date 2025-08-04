@@ -64,7 +64,7 @@ function register_custom_post($post_type_,$labels_,$params_=[])
                 "supports"          =>["title","editor","excerpt","page-attributes","thumbnail","custom-fields"],  //Full list of standard features: "title","editor","author","thumbnail","excerpt","trackbacks","custom-fields","comments","revisions","page-attributes","post-formats".
                 //"query_var"=>true by WP default, that means it's equal to the $post_type_.
              ];
-   $params_=array_merge_recursive($defaults,$params_);
+   $params_=array_merge($defaults,$params_);
    $params_["labels"]=$labels_;
    
    register_post_type($post_type_,$params_);

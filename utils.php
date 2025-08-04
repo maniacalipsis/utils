@@ -10,16 +10,18 @@ Plugin URI:
 
 namespace Utilities\Init;
 
-define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_PARTIAL_OUTPUT_ON_ERROR);
+define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_PARTIAL_OUTPUT_ON_ERROR);
 define("DB_CONSTANTS",["NULL","TRUE","FALSE","CURRENT_TIMESTAMP","CURRENT_DATE","CURRENT_TIME","LOCALTIME","LOCALTIMESTAMP","UTC_DATE","UTC_TIME","UTC_TIMESTAMP"]);
 
 require_once(__DIR__."/functions.php");            //Utilities from ThePatternEngine. (Actually it's a copy of /core/utils.php)
 require_once(__DIR__."/functions2.php");           //Additional utilities.
+require_once(__DIR__."/data_helpers.php");         //Helpers and base classes for data querying and requesting.
 require_once(__DIR__."/inputs.php");               //Input fields handling.
 require_once(__DIR__."/post_customizations.php");  //Custom posts metaboxes.
 require_once(__DIR__."/menu_customizations.php");  //Custom rendering of menu.
 require_once(__DIR__."/theme_setup.php");          //Theme setup clases.
 require_once(__DIR__."/shortcodes.php");           //Set of the most commonly used shortcodes.
+require_once(__DIR__."/blocks.php");               //Collection of helper functions and classes for blocks rendering.
 require_once(__DIR__."/feedback.php");             //Feedback forms base classes.
 require_once(__DIR__."/captcha.php");              //Text captcha for feedback forms.
 
