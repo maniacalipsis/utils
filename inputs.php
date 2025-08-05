@@ -337,10 +337,10 @@ class InputGeoLocation extends InputJson
       <DIV ID="<?=$container_id?>" CLASS="geolocation" STYLE="display:flex; flex-flow:column; gap:1em; padding:0.5em; border:1px solid #CCCCCC;">
          <?=parent::render()?>
          <DIV STYLE="display:flex; flex-flow:row nowrap; align-items:flex-end; gap:0.5em;">
-            <LABEL CLASS="address"><SPAN><?=__("Address")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["address"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); try {let val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.address=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
+            <LABEL CLASS="address"><SPAN><?=__("Address")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["address"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val; try {val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.address=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
             <BUTTON TYPE="button" CLASS="dashicons dashicons-location-alt" ONCLICK="let addr=arguments[0].target.parentNode.querySelector('.address>input')?.value; if (addr) window.open('https://2gis.ru/search/'+encodeURIComponent(addr.replaceAll('\n','')),'_blank').focus(); else alert('Enter the address');"></BUTTON>
          </DIV>
-         <LABEL CLASS="location"><SPAN><?=__("Geo Location")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["location"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); try {let val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.location=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
+         <LABEL CLASS="location"><SPAN><?=__("Geo Location")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["location"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val; try {val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.location=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
       </DIV>
       <?php
    }
