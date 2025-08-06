@@ -29,7 +29,7 @@ trait TMetaQueryHepler
       //As a side effect, sets internal property $this->filter.
       
       //Get the posts filtering params:
-      $numberposts=$params_["numberposts"]??$params_["limit"]??null; //Translate "limit" to "numberposts" as the last one isn't intuitive.
+      $numberposts=$params_["numberposts"]??$params_["count"]??null; //Translate "count" to "numberposts" as the last one isn't intuitive.
       if ($numberposts!=null)                                        //
          $params_["numberposts"]=$numberposts;                       //
       
