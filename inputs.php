@@ -292,7 +292,7 @@ class InputJson extends InputHidden
 {
    public function get_safe_value()
    {
-      return json_encode(json_decode(stripcslashes($this->value),true)??null,JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
+      return json_encode(json_decode($this->value,true)??null,JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
    }
    
    public function print()
@@ -332,7 +332,7 @@ class InputGeoLocation extends InputJson
       
       $container_id="extra_media_".$this->key;
       
-      $value_data=json_decode(stripcslashes($this->value),true);
+      $value_data=json_decode($this->value,true);
       ?>
       <DIV ID="<?=$container_id?>" CLASS="geolocation" STYLE="display:flex; flex-flow:column; gap:1em; padding:0.5em; border:1px solid #CCCCCC;">
          <?=parent::render()?>

@@ -2936,10 +2936,10 @@ export class AsyncList extends DynamicHTMLList
       if (limit_.offset>this._lastRow) //Append.
       {
          this.fwindData(deleteCount,payload_.data);
-         this._firstRow=(this._firstRow<0 ? limit_.offset : this._firstRow+deleteCount);
-         this._lastRow=limit_.offset+payload_.data.length-1;
+         this._firstRow=(this._firstRow<0 ? limit_.offset : this._firstRow+deleteCount);  //When list is empty, the first row is equal to offset of the currently loaded portion of data. Otherwise, if this._maxSize>limit_.count, the offset of current data portion is beyond the first row, thus the first row shall be shifted by size of the unloaded data portion.
+         this._lastRow=limit_.offset+payload_.data.length-1;                              //
          
-         this._rowsTotal=payload_.rowsTotal??this._rowsTotal??(payload_.data.length<limit_.count??0 ? this._lastRow+1+payload_.data.length : undefined);   //Get the number of total rows available from the answer payload or try to autodetect by the length of loaded data portion.
+         this._rowsTotal=payload_.rowsTotal??this._rowsTotal??(payload_.data.length<limit_.count??0 ? this._lastRow+1 : undefined);    //Get the number of total rows available from the answer payload or try to autodetect by the length of loaded data portion (presumed that if the answer contains less data than was reqested, then the last recently loaded row is the totally last).
       }
       else if ((limit_.offset+limit_.count)<=this._firstRow) //Prepend.
       {

@@ -10,7 +10,9 @@ Plugin URI:
 
 namespace Utilities\Init;
 
-define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_PARTIAL_OUTPUT_ON_ERROR);
+define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_PARTIAL_OUTPUT_ON_ERROR);    //Options for json_encode(). See PHP man pages for details.
+define("JSON_DECODE_OPTIONS",JSON_OBJECT_AS_ARRAY|JSON_THROW_ON_ERROR);                                           //Options for json_decode(). See PHP man pages for details. NOTE: Flag JSON_OBJECT_AS_ARRAY is mandatory, dismissing it will result many engine's methods fail to operate.
+define("JSON_MAX_DEPTH",512);                                                                                     //Allows to raise (or lower) default PHP's value of the depth argument of json_encode() and json_decode(). The PHP's default is 512.
 define("DB_CONSTANTS",["NULL","TRUE","FALSE","CURRENT_TIMESTAMP","CURRENT_DATE","CURRENT_TIME","LOCALTIME","LOCALTIMESTAMP","UTC_DATE","UTC_TIME","UTC_TIMESTAMP"]);
 
 require_once(__DIR__."/functions.php");            //Utilities from ThePatternEngine. (Actually it's a copy of /core/utils.php)
@@ -27,6 +29,8 @@ require_once(__DIR__."/captcha.php");              //Text captcha for feedback f
 
 if (version_compare(phpversion(),"8.4.0","<"))        //This is a tempopary solution for extending compartibility 
    require_once("./functions.prior-to-phpv8.4.php");  // with older versions of PHP (until they are not tool old yet).
+
+spl_autoload_register("ClassesAutoloader::callback");
 
 function plugin_init()
 {

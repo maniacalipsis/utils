@@ -10,6 +10,62 @@
 
 //NOTE: This file contains some more useful code from ThePatternEngine, but from files other than /core/utils.php. Also it contains aditional utils originally written for this module.
 
+class ClassesAutoloader
+{
+   //This is adapted version of the /core/core.php\ClassesAutoloader from ThePatternEngine.
+   // Unlike the original one, it utilize error_log() and __() instead of core classes Report and LC. The rest is completely same.
+   
+   private function __construct(){}
+   
+   protected static array $map=[];
+   
+   public static function append(array $map_)
+   {
+      //Append mappings to the autoloader.
+      //Arguments:
+      // $map_ - array. Format: ["/absolute/path/to/classes/subfolder"=>"NameSpace\\Prefix",...]. See https://www.php-fig.org/psr/psr-4/ for details.
+      
+      foreach ($map_ as $base_dir=>$ns_prefix)
+      {
+         $prefix_len=0;
+         if ($ns_prefix!="")                 //Namespace prefix may be an empty string if certain classes are declared in the global namespace or if subfolder structure represents namespaces from their beginnings.
+         {
+            $ns_prefix="$ns_prefix\\";       //Append trailing backslash to the namespace prefix to make sure it will not match namespace names partially or className in a whole. Due to autoloading optimization, do this in advance.
+            $prefix_len=strlen($ns_prefix);  //Also cache the prefix length to optimize comparisons in the future.
+         }
+         self::$map[$base_dir]=["ns_prefix"=>$ns_prefix,"prefix_len"=>$prefix_len];
+      }
+   }
+   
+   public static function callback($class_name_)
+   {
+      //Callback function for classes autoloading.
+      
+      $php_rel_path=null;
+      foreach (self::$map as $base_dir=>$entry)
+      {
+         if (($entry["prefix_len"]==0)||(strncmp($class_name_,$entry["ns_prefix"],$entry["prefix_len"])==0))
+         {
+            $php_rel_path??=strtr($class_name_,"\\","/").".php";                       //To minimize overhead, make cached relative file path from the whole fully qualified class name
+            $php_abs_path=$base_dir."/".substr($php_rel_path,$entry["prefix_len"]);    // and then extract the rest of the path that follows the namespace prefix.
+            if (file_exists($php_abs_path))
+            try
+            {
+               require_once $php_abs_path;
+               break;
+            }
+            catch (Error|Exception $ex)
+            {
+               error_log($ex->getMessage());
+            }
+         }
+      }
+      
+      if (!(class_exists($class_name_,false)||trait_exists($class_name_,false)||interface_exists($class_name_,false)))
+         error_log(__("Class autoloader failed to find required class ")."\"$class_name_\"");
+   }
+}
+
 // ------------------------ Database functions ------------------------ //
 function name_to_query($name_)
 {

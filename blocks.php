@@ -11,6 +11,64 @@
 
 namespace Utilities;
 
+use \ClassesAutoloader;
+use \ImpFInfo;
+use \JSONAns;
+use \WP_Block;
+
+function blocks_plugin_init(ImpFInfo|string $plugin_dir,ImpFInfo|string $build_rel_path="/build",ImpFInfo|string $manifest_rel_path="/build/blocks-manifest.php",string $namespace=""):void
+{
+   //Initializes plugin with Guttenberg blocks.
+   /**
+    * Registers the block using a `blocks-manifest.php` file, which improves the performance of block type registration.
+    * Behind the scenes, it also registers all assets so they can be enqueued
+    * through the block editor in the corresponding context.
+    *
+    * @see https://make.wordpress.org/core/2025/03/13/more-efficient-block-type-registration-in-6-8/
+    * @see https://make.wordpress.org/core/2024/10/17/new-block-type-registration-apis-to-improve-performance-in-wordpress-6-7/
+    */
+
+   if (!($plugin_dir instanceof ImpFInfo))
+      $plugin_dir=new ImpFInfo($plugin_dir);
+   
+   $manifest_file=$plugin_dir->concat($manifest_rel_path);
+   $build_dir=$plugin_dir->concat($build_rel_path);
+   
+   //Register the block(s) metadata from the `blocks-manifest.php` and registers the block type(s):
+   \wp_register_block_types_from_metadata_collection($build_dir,$manifest_file);
+
+   //Registers blocks extra features:
+   //NOTE: The metadata keys used below are non-standard for WP.
+   $manifest_data=require $manifest_file;
+   foreach ($manifest_data as $block_type=>$block_meta)
+      if ($block_meta["extra"]??null)
+      {
+         $block_extra=$block_meta["extra"];  //All extra metadata are grouped in the "extra".
+         
+         //Block-specific classes autoload:
+         //NOTE: Directories with autoloading clases shall be registered before registration of AJAX handlers.
+         if ($block_extra["autoloadDir"]??null)
+            ClassesAutoloader::append([(string)$build_dir->concat($block_type,remove_block_asset_path_prefix($block_extra["autoloadDir"]))=>($block_extra["namespacePrefix"]??$namespace)]);
+         
+         //AJAX processing:
+         if (($block_extra["ajax"]??null)||($block_extra["ajaxClass"]??null))
+         {
+            $action=get_block_action($block_meta["name"]);  //Convert fully qualified block name to the action parameter used in XHR requests.
+            
+            if ($block_extra["ajax"]??null)  //PHP script for processing the AJAX requests.
+            {
+               $handler_path=$plugin_dir->concat(remove_block_asset_path_prefix($block_extra["ajax"]));
+               $callback=function()use($handler_path){require($handler_path);};
+            }
+            elseif ($block_extra["ajaxClass"]??null)  //Class able to process AJAX requests.
+               $callback=function()use($block_extra){die(new $block_extra["ajaxClass"]($_REQUEST)->get_ans());};
+            
+            add_action("wp_ajax_$action",$callback);
+            add_action("wp_ajax_nopriv_$action",$callback);
+         }
+      }
+}
+
 function render_block_attributes(array $attributes,string $attrs_prefix="",array $attrs_map=["anchor"=>"id","className"=>"class","style"=>"style"]):string
 {
 	//Helps to convert Guttenberg block attributes to HTML element's ones and render'em to string.
@@ -26,6 +84,11 @@ function render_block_attributes(array $attributes,string $attrs_prefix="",array
 	return render_element_attrs($mapped_attrs);
 }
 
+function get_block_action(WP_Block|string $from):string
+{
+   return strtr(($from instanceof WP_Block  ? $from->name : $from),"-/","__");
+}
+
 class PostsRenderer implements \Stringable
 {
    //Designed for use in dynamic block templates to select and render posts.
@@ -33,7 +96,10 @@ class PostsRenderer implements \Stringable
    //<file://./src/block/render.php>
    // echo new \Utilities\PostsRenderer($attributes,$content,$block);
    
-   use TMetaQueryHepler;
+   use TMetaQueryHepler
+   {
+      TMetaQueryHepler::prepare_filter as _helper_prepare_filter;
+   }
 
    protected ?array $data=null;
    
@@ -43,33 +109,29 @@ class PostsRenderer implements \Stringable
       //NOTE: Following props/args correspond to those available in block's render.php. See https://developer.wordpress.org/block-editor/getting-started/fundamentals/static-dynamic-rendering/#how-to-define-dynamic-rendering-for-a-block for details.
       protected readonly ?array     $attributes=null, //The array of attributes for the block.
       protected readonly ?string    $content=null,    //The markup of the block as stored in the database, if any. (Usually empty unless block use inner blocks).
-      protected readonly ?\WP_Block $block=null,      //The instance of the WP_Block class that represents the rendered block (metadata of the block).
+      protected readonly ?WP_Block  $block=null,      //The instance of the WP_Block class that represents the rendered block (metadata of the block).
    )
    {
       $this->load_data();
    }
    
-   protected function load_data():void
+   protected function prepare_filter(array $params_,bool $escape_=false):array
    {
-      //Loads posts using filter parameters from the block attributes.
-      // This method allows to extend posts loading in a simplier way than extending the constructor.
-      
-      $filter=$this->attributes["filter"]??[];
-      switch ($filter["selection_mode"]??"all")
+      switch ($params_["selection_mode"]??"all")
       {
          case "include":
          {
-            $filter["include"]=$filter["ids"];
+            $params_["include"]=$params_["ids"];
             break;
          }
          case "exclude":
          {
-            $filter["exclude"]=$filter["ids"];
+            $params_["exclude"]=$params_["ids"];
             break;
          }
          case "exclude_current":
          {
-            $filter["exclude"]=[get_post()?->ID];
+            $params_["exclude"]=[get_post()?->ID];
             break;
          }
          default:
@@ -78,7 +140,15 @@ class PostsRenderer implements \Stringable
          }
       }
       
-      $this->data=get_posts($this->prepare_filter($filter,true));
+      return $this->_helper_prepare_filter($params_,$escape_);
+   }
+   
+   protected function load_data():void
+   {
+      //Loads posts using filter parameters from the block attributes.
+      // This method allows to extend posts loading in a simplier way than extending the constructor.
+      
+      $this->data=get_posts($this->prepare_filter($this->attributes["filter"]??[],true));
    }
    
    public function __toString():string
@@ -134,6 +204,39 @@ class PostsRenderer implements \Stringable
          </A>
          <?php
       }
+      return ob_get_clean();
+   }
+}
+
+class AsyncPostsList extends PostsRenderer
+{
+   public function get_ans():JSONAns
+   {
+      return new JSONAns(["status"=>"ok","data"=>$this->data]);
+   }
+   
+   protected function make_list_attrs():array
+   {
+      //Returns array of attributes for rendering a static part of the block.
+      // Designed for convenient extending.
+      
+      return [
+                "id"=>$this->attributes["anchor"],
+                "class"=>$this->filter["post_type"]." ".($this->attributes["className"]??""),
+                "data-request"=>new JSONAns(["action"=>get_block_action($this->block),"filter"=>$this->attributes["filter"]??[]]),   //Allow descendant classes to append request params.
+             ];
+   }
+   
+   public function __toString():string
+   {
+      //Renders a static part of the block, i.e. an empty list, supplied with request parameters the JS shall use to load items.
+
+      $item_attrs_str=render_element_attrs($this->make_list_attrs());
+      
+      ob_start();
+         ?>
+         <DIV <?=$item_attrs_str?>></DIV>
+         <?php
       return ob_get_clean();
    }
 }
