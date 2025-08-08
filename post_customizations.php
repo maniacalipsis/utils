@@ -201,7 +201,7 @@ class Metabox
       foreach ($this->fields as $field)
       {
          //dump("???",$post_->ID,$field->key,$value);
-         $field->value=get_post_meta($post_->ID,$field->key,/*single=*/true);
+         $field->value=get_post_meta($post_->ID,$field->key,single:true);
          $field->render($post_);
       }
    }

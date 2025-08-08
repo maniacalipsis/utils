@@ -292,13 +292,29 @@ class InputJson extends InputHidden
 {
    public function get_safe_value()
    {
-      return json_encode(json_decode($this->value,true)??null,JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
+      try
+      {
+         //dump("!!!",$this->value,json_decode($this->value,flags:JSON_DECODE_OPTIONS),json_encode(json_decode($this->value,flags:JSON_DECODE_OPTIONS)??null,JSON_ENCODE_OPTIONS));
+         $res=json_encode(json_decode(stripcslashes($this->value),flags:JSON_DECODE_OPTIONS)??null,JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
+      }
+      catch (\JsonException $ex)
+      {
+         error_log($ex->getMessage()." Value=".$this->value);
+         $res=null;
+      }
    }
    
    public function print()
    {
-      //Outputs the value to any kind of document. 
-      echo json_encode(json_decode($this->value),JSON_ENCODE_OPTIONS|JSON_PRETTY_PRINT);
+      //Outputs the value to any kind of document.
+      try
+      {
+         echo json_encode(json_decode(stripcslashes($this->value),flags:JSON_DECODE_OPTIONS),JSON_ENCODE_OPTIONS|JSON_PRETTY_PRINT);
+      }
+      catch (\JsonException $ex)
+      {
+         error_log($ex->getMessage());
+      }
    }
 }
 
@@ -330,9 +346,17 @@ class InputGeoLocation extends InputJson
    {
       //TODO: This code was written in a hurry and shall be refactored.
       
-      $container_id="extra_media_".$this->key;
-      
-      $value_data=json_decode($this->value,true);
+      try
+      {
+         $container_id="extra_media_".$this->key;
+         
+         $value_data=json_decode(stripcslashes($this->value),flags:JSON_DECODE_OPTIONS);
+      }
+      catch (\JsonException $ex)
+      {
+         error_log($ex->getMessage()." Value=".$this->value);
+         $value_data=["address"=>"","location"=>""];
+      }
       ?>
       <DIV ID="<?=$container_id?>" CLASS="geolocation" STYLE="display:flex; flex-flow:column; gap:1em; padding:0.5em; border:1px solid #CCCCCC;">
          <?=parent::render()?>
