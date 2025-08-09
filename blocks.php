@@ -272,6 +272,7 @@ abstract class AMapRenderer extends ABlockRenderer
    public function __toString():string
    {
       $outer_attrs=array_diff_key($this->attributes,["anchor"=>null]);
+      $outer_attrs["className"]="map ".$outer_attrs["className"];
       
       ob_start();
       ?>
@@ -309,7 +310,7 @@ abstract class AMapRenderer extends ABlockRenderer
         }
         ymaps.ready(mapInitCallback);
       </SCRIPT>
-      <DIV <?=render_block_attributes($outer_attrs)?>><DIV ID="<?=$this->map_id?>"></DIV></DIV>
+      <DIV <?=render_block_attributes($outer_attrs)?>><DIV ID="<?=$this->map_id?>" CLASS="inner"></DIV></DIV>
       <?php
       return ob_get_clean();
    }
