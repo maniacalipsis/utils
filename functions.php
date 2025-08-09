@@ -1283,6 +1283,8 @@ define("SPOILER_UNFOLDED","unfolded");
 define("SPOILER_SEMI","semi");
 function spoiler($contents_,$state_=SPOILER_FOLDED,$additional_classes_="")
 {
+   //Renders a spoiler, more customizable and flexible than standard <details>&<summary>.
+   
    return "<DIV CLASS=\"spoiler ".$additional_classes_." ".$state_."\">\n".
           "  <DIV CLASS=\"button top\"></DIV>\n".
           "  <DIV CLASS=\"content\">\n".

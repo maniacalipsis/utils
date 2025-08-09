@@ -342,6 +342,7 @@ class InputStruct extends InputJson
 
 class InputGeoLocation extends InputJson
 {
+   //TODO: DEPRECATED.
    public function render()
    {
       //TODO: This code was written in a hurry and shall be refactored.
@@ -350,12 +351,13 @@ class InputGeoLocation extends InputJson
       {
          $container_id="extra_media_".$this->key;
          
-         $value_data=json_decode(stripcslashes($this->value),flags:JSON_DECODE_OPTIONS);
+         $value_data=["address"=>"","lat_long"=>""];
+         if ($this->value!="")
+            $value_data=array_merge($value_data,array_intersect_key(json_decode(stripcslashes($this->value),flags:JSON_DECODE_OPTIONS)??[],$value_data));
       }
       catch (\JsonException $ex)
       {
          error_log($ex->getMessage()." Value=".$this->value);
-         $value_data=["address"=>"","location"=>""];
       }
       ?>
       <DIV ID="<?=$container_id?>" CLASS="geolocation" STYLE="display:flex; flex-flow:column; gap:1em; padding:0.5em; border:1px solid #CCCCCC;">
@@ -364,9 +366,25 @@ class InputGeoLocation extends InputJson
             <LABEL CLASS="address"><SPAN><?=__("Address")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["address"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val; try {val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.address=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
             <BUTTON TYPE="button" CLASS="dashicons dashicons-location-alt" ONCLICK="let addr=arguments[0].target.parentNode.querySelector('.address>input')?.value; if (addr) window.open('https://2gis.ru/search/'+encodeURIComponent(addr.replaceAll('\n','')),'_blank').focus(); else alert('Enter the address');"></BUTTON>
          </DIV>
-         <LABEL CLASS="location"><SPAN><?=__("Geo Location")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["location"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val; try {val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.location=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
+         <LABEL CLASS="location"><SPAN><?=__("Coordinates")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["lat_long"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val; try {val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.lat_long=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
       </DIV>
       <?php
+   }
+}
+
+class InputPlaceMarks extends InputStruct
+{
+   public function __construct(array $params_=[])
+   {
+      parent::__construct($params_);
+      
+      $this->struct=[
+                       "address"=>["label"=>__("Address")],
+                       "lat_long"=>["label"=>__("Coordinates")],
+                       "text"=>["label"=>__("Icon text")],
+                       "hint"=>["label"=>__("Hint")],
+                       "baloon"=>["label"=>__("Baloon content"),"tagName"=>"textarea"],
+                    ];
    }
 }
 

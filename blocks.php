@@ -89,7 +89,27 @@ function get_block_action(WP_Block|string $from):string
    return strtr(($from instanceof WP_Block  ? $from->name : $from),"-/","__");
 }
 
-class PostsRenderer implements \Stringable
+abstract class ABlockRenderer implements \Stringable
+{
+   protected ?array  $data=null; //Primary dynamic data to render, e.g. array of posts.
+   protected  string $variation {get=>$this->attributes["variation"]??"default";} //A shorthand for the variation attribute.
+   
+   public function __construct(
+      //NOTE: Following props/args correspond to those available in block's render.php. See https://developer.wordpress.org/block-editor/getting-started/fundamentals/static-dynamic-rendering/#how-to-define-dynamic-rendering-for-a-block for details.
+      protected readonly ?array     $attributes=null, //The array of attributes for the block.
+      protected readonly ?string    $content=null,    //The markup of the block as stored in the database, if any. (Usually empty unless block use inner blocks).
+      protected readonly ?WP_Block  $block=null,      //The instance of the WP_Block class that represents the rendered block (metadata of the block).
+   )
+   {
+      $this->load_data();
+   }
+   
+   //Method load_data() retrieves all data the dynamic block require tyo be rendered.
+   // This is not limited to filling $this->data property, but may include any other props, defined in descendant classes. Thus this method designed as procedure, not a function.
+   abstract protected function load_data():void;
+}
+
+class PostsRenderer extends ABlockRenderer
 {
    //Designed for use in dynamic block templates to select and render posts.
    //Usage example:
@@ -101,20 +121,6 @@ class PostsRenderer implements \Stringable
       TMetaQueryHepler::prepare_filter as _helper_prepare_filter;
    }
 
-   protected ?array $data=null;
-   
-   protected string $variation {get=>$this->attributes["variation"]??"default";} //A shorthand for the variation attribute.
-
-   public function __construct(
-      //NOTE: Following props/args correspond to those available in block's render.php. See https://developer.wordpress.org/block-editor/getting-started/fundamentals/static-dynamic-rendering/#how-to-define-dynamic-rendering-for-a-block for details.
-      protected readonly ?array     $attributes=null, //The array of attributes for the block.
-      protected readonly ?string    $content=null,    //The markup of the block as stored in the database, if any. (Usually empty unless block use inner blocks).
-      protected readonly ?WP_Block  $block=null,      //The instance of the WP_Block class that represents the rendered block (metadata of the block).
-   )
-   {
-      $this->load_data();
-   }
-   
    protected function prepare_filter(array $params_,bool $escape_=false):array
    {
       switch ($params_["selection_mode"]??"all")
@@ -237,6 +243,74 @@ class AsyncPostsList extends PostsRenderer
          ?>
          <DIV <?=$item_attrs_str?>></DIV>
          <?php
+      return ob_get_clean();
+   }
+}
+
+abstract class AMapRenderer extends ABlockRenderer
+{
+   //Abstract map renderer.
+   //Usage example:
+   // class MyMapRenderer extends \Utilities\AMapRenderer
+   // {
+   //    protected function load_data():void
+   //    {
+   //       $this->json_data=get_option($this->attributes["optName"],$this->json_data);
+   //    }
+   // }
+   
+   //Map data:
+   protected string $json_data="[]";   //This property is used instead of parent::$data (for decode-encode optimization) and must be filled with actual data by method load_data().
+   
+   //Map parameters' defaults:
+   protected string $map_id {get=>htmlspecialchars(($this->attributes["anchor"]??"")!="" ? $this->attributes["anchor"] : "ymap");}
+   protected int    $map_zoom {get=>(int)($this->attributes["mapZoom"]??16);}
+   protected array  $default_map_state     {get=>["controls"=>["typeSelector","fullscreenControl","geolocationControl","trafficControl","zoomControl","routeEditor","rulerControl"]];}
+   protected array  $default_map_options   {get=>["yandexMapDisablePoiInteractivity"=>true];}
+   protected array  $default_place_options {get=>["preset"=>"islands#blueStretchyIcon"];}
+   
+   public function __toString():string
+   {
+      $outer_attrs=array_diff_key($this->attributes,["anchor"=>null]);
+      
+      ob_start();
+      ?>
+      <SCRIPT TYPE="module">
+        function mapInitCallback()
+        {
+           //Source data:
+           let places=<?=$this->json_data?>;
+           
+           let mapId='<?=$this->map_id?>';
+           let zoom=<?=$this->map_zoom?>;
+           let mapState=<?=json_encode($this->default_map_state,JSON_ENCODE_OPTIONS)?>;
+           let mapOptions=<?=json_encode($this->default_map_options,JSON_ENCODE_OPTIONS)?>;
+           let placeOptions=<?=json_encode($this->default_place_options,JSON_ENCODE_OPTIONS)?>;
+           
+           //Create places:
+           let yClusterer=new ymaps.Clusterer();
+           for (let place of places)
+              yClusterer.add(new ymaps.Placemark(place.lat_long,{iconContent:place.text??'',hintContent:place.hint??'',balloonContent:place.balloon},{...placeOptions,preset:place.preset??'islands#redStretchyIcon'}));
+           
+           //Adjust view area:
+           if (places.length>1)
+              mapState.bounds=yClusterer.getBounds();
+           else
+              mapState={...mapState,center:places[0]?.lat_long??[55.755819,37.617644],zoom:zoom};
+           
+           //Create map and add the places on it:
+           let yMap=new ymaps.Map(mapId,mapState,mapOptions);
+           yMap.geoObjects.add(yClusterer);
+           //Bounds hotfix:
+           if (mapState.bounds)
+              window.setTimeout(()=>{yMap.setBounds(mapState.bounds);},1000);
+           
+           window.yMap=yMap;  //Debug.
+        }
+        ymaps.ready(mapInitCallback);
+      </SCRIPT>
+      <DIV <?=render_block_attributes($outer_attrs)?>><DIV ID="<?=$this->map_id?>"></DIV></DIV>
+      <?php
       return ob_get_clean();
    }
 }
