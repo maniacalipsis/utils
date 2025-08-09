@@ -22,9 +22,7 @@ require_once(__DIR__."/inputs.php");               //Input fields handling.
 require_once(__DIR__."/post_customizations.php");  //Custom posts metaboxes.
 require_once(__DIR__."/menu_customizations.php");  //Custom rendering of menu.
 require_once(__DIR__."/theme_setup.php");          //Theme setup clases.
-require_once(__DIR__."/shortcodes.php");           //Set of the most commonly used shortcodes.
 require_once(__DIR__."/blocks.php");               //Collection of helper functions and classes for blocks rendering.
-require_once(__DIR__."/feedback.php");             //Feedback forms base classes.
 require_once(__DIR__."/captcha.php");              //Text captcha for feedback forms.
 
 if (version_compare(phpversion(),"8.4.0","<"))        //This is a tempopary solution for extending compartibility 
