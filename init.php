@@ -15,8 +15,8 @@ define("JSON_DECODE_OPTIONS",JSON_OBJECT_AS_ARRAY|JSON_THROW_ON_ERROR);         
 define("JSON_MAX_DEPTH",512);                                                                                     //Allows to raise (or lower) default PHP's value of the depth argument of json_encode() and json_decode(). The PHP's default is 512.
 define("DB_CONSTANTS",["NULL","TRUE","FALSE","CURRENT_TIMESTAMP","CURRENT_DATE","CURRENT_TIME","LOCALTIME","LOCALTIMESTAMP","UTC_DATE","UTC_TIME","UTC_TIMESTAMP"]);
 
-require_once(__DIR__."/functions.php");            //Utilities from ThePatternEngine. (Actually it's a copy of /core/utils.php)
-require_once(__DIR__."/functions2.php");           //Additional utilities.
+require_once(__DIR__."/utils.php");                //Utilities from ThePatternEngine. (Actually it's a copy of /core/utils.php)
+require_once(__DIR__."/utils_wp.php");             //Additional utilities.
 require_once(__DIR__."/data_helpers.php");         //Helpers and base classes for data querying and requesting.
 require_once(__DIR__."/inputs.php");               //Input fields handling.
 require_once(__DIR__."/post_customizations.php");  //Custom posts metaboxes.
@@ -25,8 +25,8 @@ require_once(__DIR__."/theme_setup.php");          //Theme setup clases.
 require_once(__DIR__."/blocks.php");               //Collection of helper functions and classes for blocks rendering.
 require_once(__DIR__."/captcha.php");              //Text captcha for feedback forms.
 
-if (version_compare(phpversion(),"8.4.0","<"))        //This is a tempopary solution for extending compartibility 
-   require_once("./functions.prior-to-phpv8.4.php");  // with older versions of PHP (until they are not tool old yet).
+if (version_compare(phpversion(),"8.4.0","<"))     //This is a tempopary solution for extending compartibility 
+   require_once("./utils.prior-to-phpv8.4.php");   // with older versions of PHP (until they are not tool old yet).
 
 spl_autoload_register("ClassesAutoloader::callback");
 
