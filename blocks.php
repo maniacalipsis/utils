@@ -11,7 +11,6 @@
 
 namespace Maniacalipsis\Utilities;
 
-use \ClassesAutoloader;
 use \ImpFInfo;
 use \JSONAns;
 use \WP_Block;
@@ -114,7 +113,8 @@ class PostsRenderer extends ABlockRenderer
    //Designed for use in dynamic block templates to select and render posts.
    //Usage example:
    //<file://./src/block/render.php>
-   // echo new \Utilities\PostsRenderer($attributes,$content,$block);
+   // use \Maniacalipsis\Utilities\PostsRenderer;
+   // echo new PostsRenderer($attributes,$content,$block);
    
    use TMetaQueryHepler
    {
@@ -251,7 +251,8 @@ abstract class AMapRenderer extends ABlockRenderer
 {
    //Abstract map renderer.
    //Usage example:
-   // class MyMapRenderer extends \Utilities\AMapRenderer
+   // use \Maniacalipsis\Utilities\AMapRenderer;
+   // class MyMapRenderer extends AMapRenderer
    // {
    //    protected function load_data():void
    //    {

@@ -13,6 +13,8 @@
 
 namespace Maniacalipsis\Utilities;
 
+use \WP_Post;
+
 class ClassesAutoloader
 {
    //This is adapted version of the /core/core.php\ClassesAutoloader from ThePatternEngine.
