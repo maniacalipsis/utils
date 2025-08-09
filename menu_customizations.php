@@ -8,7 +8,7 @@
 /* Custom menu                      */
 /*==================================*/
 
-namespace Utilities;
+namespace Maniacalipsis\Utilities;
 
 class CleanMenuWalker extends \Walker_Nav_Menu
 {

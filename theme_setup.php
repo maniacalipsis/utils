@@ -8,7 +8,7 @@
 /* WP Theme setup&settings classes  */
 /*==================================*/
 
-namespace Utilities;
+namespace Maniacalipsis\Utilities;
 
 class ThemeSetup
 {

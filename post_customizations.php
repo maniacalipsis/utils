@@ -8,7 +8,7 @@
 /* Custom posts metaboxes           */
 /*==================================*/
 
-namespace Utilities;
+namespace Maniacalipsis\Utilities;
 
 function custom_post_labels($plural_,$nominative_,$accusative_,$genitive_,$menu_="")
 {

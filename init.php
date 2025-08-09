@@ -2,13 +2,13 @@
 /*
 Plugin Name: Utilities
 Description: Set of theme setup and utility functions.
-Version: 2.4
+Version: 3.0
 Author: FSG a.k.a ManiaC
 Author URI: http://maniacalipsis.ru/
 Plugin URI:
 */
 
-namespace Utilities\Init;
+namespace Maniacalipsis\Utilities;
 
 define("JSON_ENCODE_OPTIONS",JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE|JSON_PARTIAL_OUTPUT_ON_ERROR);    //Options for json_encode(). See PHP man pages for details.
 define("JSON_DECODE_OPTIONS",JSON_OBJECT_AS_ARRAY|JSON_THROW_ON_ERROR);                                           //Options for json_decode(). See PHP man pages for details. NOTE: Flag JSON_OBJECT_AS_ARRAY is mandatory, dismissing it will result many engine's methods fail to operate.

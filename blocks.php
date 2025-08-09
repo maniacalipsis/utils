@@ -9,7 +9,7 @@
 /* for blocks rendering.            */
 /*==================================*/
 
-namespace Utilities;
+namespace Maniacalipsis\Utilities;
 
 use \ClassesAutoloader;
 use \ImpFInfo;

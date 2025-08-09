@@ -8,7 +8,7 @@
 /* Inputs handling classes          */
 /*==================================*/
 
-namespace Utilities;
+namespace Maniacalipsis\Utilities;
 
 class DataField
 {

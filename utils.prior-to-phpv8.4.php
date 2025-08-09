@@ -1,4 +1,13 @@
 <?php
+/*==================================*/
+/* Utilities plugin                 */
+/* Copyright: FSG a.k.a ManiaC      */
+/* Contact: imroot@maniacalipsis.ru */
+/* License: GNU GPL v3              */
+/*----------------------------------*/
+/* Legacy utility functions         */
+/*==================================*/
+
 //Here are some functions that does not exists in older versions of PHP.
 
 function mb_ucfirst($str_)

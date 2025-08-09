@@ -1,12 +1,11 @@
 <?php
 /*==================================*/
-/* Utilities plugin                 */
+/* The Pattern Engine Version 4.2   */
 /* Copyright: FSG a.k.a ManiaC      */
 /* Contact: imroot@maniacalipsis.ru */
 /* License: GNU GPL v3              */
 /*----------------------------------*/
-/* Utility functions migrated from  */
-/*  ThePatternEngine v4.2           */
+/* Core utility functions           */
 /*==================================*/
 
 /*===========================================================================================================*/
@@ -19,9 +18,6 @@
 /* You should have received a copy of the GNU General Public License along with The Pattern Engine.          */
 /* If not, see http://www.gnu.org/licenses/.                                                                 */
 /*===========================================================================================================*/
-
-//Global namespace.
-
 
 //Depends on:
 // settings.php
