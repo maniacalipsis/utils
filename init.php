@@ -17,7 +17,6 @@ define("DB_CONSTANTS",["NULL","TRUE","FALSE","CURRENT_TIMESTAMP","CURRENT_DATE",
 
 require_once(__DIR__."/utils.php");                //Utilities from ThePatternEngine. (Actually it's a copy of /core/utils.php)
 require_once(__DIR__."/utils_wp.php");             //Additional utilities.
-require_once(__DIR__."/data_helpers.php");         //Helpers and base classes for data querying and requesting.
 require_once(__DIR__."/inputs.php");               //Input fields handling.
 require_once(__DIR__."/post_customizations.php");  //Custom posts metaboxes.
 require_once(__DIR__."/menu_customizations.php");  //Custom rendering of menu.
@@ -28,7 +27,7 @@ require_once(__DIR__."/captcha.php");              //Text captcha for feedback f
 if (version_compare(phpversion(),"8.4.0","<"))     //This is a tempopary solution for extending compartibility 
    require_once("./utils.prior-to-phpv8.4.php");   // with older versions of PHP (until they are not tool old yet).
 
-spl_autoload_register("ClassesAutoloader::callback");
+spl_autoload_register(__NAMESPACE__."\\ClassesAutoloader::callback");
 
 function plugin_init()
 {

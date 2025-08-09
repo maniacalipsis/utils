@@ -8,7 +8,10 @@
 /* Additional utilities for WP      */
 /*==================================*/
 
-//NOTE: This file contains some more useful code from ThePatternEngine, but from files other than /core/utils.php. Also it contains aditional utils originally written for this module.
+//NOTE: This file contains some more useful code from ThePatternEngine, but from files other than /core/utils.php.
+//      Also it contains aditional utils originally written for this module.
+
+namespace Maniacalipsis\Utilities;
 
 class ClassesAutoloader
 {
