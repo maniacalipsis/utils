@@ -3800,6 +3800,7 @@ export class Scroller
          this.recalcContentSize();
                   
          //Attach event handlers:
+         //TODO: Rewrite this using the ResizeObserver.
          window.addEventListener('resize',(e_)=>{this.recalcContentSize();}); //For the case if content depends on window size.
          for (let img of this._content.querySelectorAll('img'))
             img.addEventListener('load',(e_)=>{this.recalcContentSize();});   //For the case of lazy/late image loading. (Some images may be loaded lately, so content size calculation right at DOMContentLoaded may give incorrect results.)
@@ -3811,6 +3812,7 @@ export class Scroller
          
          this._shortcuts=new ShortcutsList({scrollLeft :this._root.dataset.shortcuts?.left ??params_?.shortcuts?.left ??[],
                                             scrollRight:this._root.dataset.shortcuts?.right??params_?.shortcuts?.right??[]});
+         this._area.addEventListener('wheel',(e_)=>{return this._onInput(e_);});
          if (this._shortcuts.list.scrollLeft.find(sh_=>/^key/.test(sh_.type))||this._shortcuts.list.scrollRight.find(sh_=>/^key/.test(sh_.type)))  //Do not assign global listeners if not necessary.
          {
             window.addEventListener('keydown' ,(e_)=>{return this._onInput(e_);});
@@ -3863,7 +3865,7 @@ export class Scroller
    _area=null;      //scrolling area node.
    _content=null;   //content container node.
    _buttons={left:null,right:null};   //nodes of left and right buttons.
-   _shortcuts={};   //default handled events. Full list: 'click' - clicking on button nodes; 'wheel' - mouse wheel scrolling; 'touch' - dragging by touch input device; 'drag' - like touch, but by main mouse button; 'middlebtn' - like touch, but by the middle mouse button.
+   _shortcuts=null; //ShortcutsList. TODO: Update description.
    _interval=0;
    _intervalID=null;
    _mouseDragDescr={start:null,recent:null,enabled:false,deadzone:10};
