@@ -525,14 +525,14 @@ class InputSelect extends InputSelectRaw
 
 class InputPostsSelect extends InputSelectRaw
 {
-   public $filter=[];
+   use TMetaQueryHepler;
    
    public function __construct(array $params_=[])
    {
       parent::__construct($params_);
       
       //Get the posts and fill the selection variants with them:
-      $posts=get_posts($this->filter);
+      $posts=get_posts($this->prepare_filter($this->filter));
       foreach ($posts as $post)
          $this->variants[$post->ID]=$this->render_option_text($post);
    }
