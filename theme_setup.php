@@ -10,6 +10,8 @@
 
 namespace Maniacalipsis\Utilities;
 
+use \JSONAns;
+
 class ThemeSetup
 {
    public bool  $noindex=false;
@@ -70,7 +72,9 @@ class ThemeSetup
                                ];
       $this->actions_to_add   =[
                                   ["tag"=>"wp_enqueue_scripts","callback"=>[$this,"enqueue_public_assets_callback"]],
+                                  ["tag"=>"wp_head","callback"=>[$this,"wp_head_callback"]],
                                   ["tag"=>"admin_menu","callback"=>[$this,"init_admin_menu_callback"]],
+                                  ["tag"=>"admin_head","callback"=>[$this,"admin_head_callback"]],
                                   ["tag"=>"after_setup_theme","callback"=>[$this,"init_settings_callback"]],
                                ];
       $this->actions_deferred =[
@@ -79,16 +83,16 @@ class ThemeSetup
                                ];
       
       $this->public_script_module_imports=[
-                                             "@maniacalipsis/utils/utils"=>["src"=>$this->plugin_uri."/js_utils.js"],
-                                             "@maniacalipsis/utils/feedback"=>["src"=>$this->plugin_uri."/feedback.js","deps"=>[["id"=>"@maniacalipsis/utils/utils","import"=>"dynamic"]]],
+                                             "@maniacalipsis/utils/utils"=>$this->plugin_uri."/js_utils.js",
+                                             "@maniacalipsis/utils/feedback"=>$this->plugin_uri."/feedback.js",
                                           ];
       
       $this->admin_styles=[
                              "@maniacalipsis/utils/admin_style"=>$this->plugin_uri."/admin.css",
                           ];
       $this->admin_script_module_imports=[
-                                            "@maniacalipsis/utils/utils"=>["src"=>$this->plugin_uri."/js_utils.js"],
-                                            "@maniacalipsis/utils/admin"=>["src"=>$this->plugin_uri."/admin.js","deps"=>[["id"=>"@maniacalipsis/utils/utils","import"=>"dynamic"]]],
+                                            "@maniacalipsis/utils/utils"=>$this->plugin_uri."/js_utils.js",
+                                            "@maniacalipsis/utils/admin"=>$this->plugin_uri."/admin.js",
                                          ];
    }
    
@@ -197,13 +201,24 @@ class ThemeSetup
          wp_enqueue_style($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
       
       $wp_script_modules=wp_script_modules();
-      foreach ($this->public_script_module_imports as $asset_key=>$asset_def)
-         $wp_script_modules->register($asset_key,...$this->unify_asset_definition($asset_def));
       foreach ($this->public_script_modules as $asset_key=>$asset_def)
          $wp_script_modules->enqueue($asset_key,...$this->unify_asset_definition($asset_def));
       
       foreach ($this->public_scripts as $asset_key=>$asset_url)
          wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
+   }
+   
+   public function wp_head_callback():void
+   {
+      //Add importmap for js modules:
+      //NOTE: WP's native JS modules API has dumb behaviour (actual for 6.8.2): 
+      //       1) It sets aside all modules that are not mentioned (directly or indirectly) in the "deps" of enqueued ones. This ruins all idea of an importmap which is to let the browser to manage the loading of JS files. 
+      //          Such behaviour is bug-prone and leads to occasional bugs when use inline script modules. If inline script module "A" imports something from module "B" in b.js (which is only registered but not enqueued) and no enqueued modules depends on "B" (directly or indirectly), then it will not appear in the importmap , so the "A" will fail to import from "B".
+      //       2) It use wp_is_block_theme() to choose where to output the importmap: in the header or in the footer. Why a non-block themes was not honored to have an importmap in the header is completely beyond comprehension.
+      $js_map=new JSONAns(["imports"=>[]]);
+      foreach ($this->public_script_module_imports as $key=>$entry)
+         $js_map["imports"][$key]=(is_array($entry) ? $entry["src"] : $entry);
+      echo "\n<SCRIPT TYPE=\"importmap\">$js_map</SCRIPT>\n";
    }
    
    public function init_settings_callback():void
@@ -244,8 +259,8 @@ class ThemeSetup
          wp_enqueue_style($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
       
       $wp_script_modules=wp_script_modules();
-      foreach ($this->admin_script_modules as $asset_key=>$asset_url)
-         $wp_script_modules->enqueue($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
+      foreach ($this->admin_script_modules as $asset_key=>$asset_def)
+         $wp_script_modules->enqueue($asset_key,...$this->unify_asset_definition($asset_def));
       
       foreach ($this->admin_scripts as $asset_key=>$asset_url)
          wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
@@ -255,6 +270,19 @@ class ThemeSetup
       //Add settings pages:
       foreach ($this->settings_pages as $setting_page)
          $setting_page->setup();
+   }
+   
+   public function admin_head_callback():void
+   {
+      //Add importmap for js modules:
+      //NOTE: WP's native JS modules API has dumb behaviour (actual for 6.8.2): 
+      //       1) It sets aside all modules that are not mentioned (directly or indirectly) in the "deps" of enqueued ones. This ruins all idea of an importmap which is to let the browser to manage the loading of JS files. 
+      //          Such behaviour is bug-prone and leads to occasional bugs when use inline script modules. If inline script module "A" imports something from module "B" in b.js (which is only registered but not enqueued) and no enqueued modules depends on "B" (directly or indirectly), then it will not appear in the importmap , so the "A" will fail to import from "B".
+      //       2) It use wp_is_block_theme() to choose where to output the importmap: in the header or in the footer. Why a non-block themes was not honored to have an importmap in the header is completely beyond comprehension.
+      $js_map=new JSONAns(["imports"=>[]]);
+      foreach ($this->admin_script_module_imports as $key=>$entry)
+         $js_map["imports"][$key]=(is_array($entry) ? $entry["src"] : $entry);
+      echo "\n<SCRIPT TYPE=\"importmap\">$js_map</SCRIPT>\n";
    }
    
    public function plugin_actions_callback(array $actions_,string $plugin_file_,array $plugin_data_,$context_):array
