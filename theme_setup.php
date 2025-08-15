@@ -154,6 +154,8 @@ class ThemeSetup
       if ($this->remove_category_base)
          add_filter("category_link",[$this,"filter_category_link"],99);
       
+      add_filter("run_wptexturize","__return_false"); //Disable content formatting. Reason: It ruins inline scripts by substutution of double quotes. (Also it does a lot of replacements with unexplored consequences.) Probably it's a WP's bug. See wp-includes/formatting.php
+
       //Remove actions:
       foreach ($this->actions_to_remove as $action)
          remove_action($action["tag"],$action["callback"],$action["priority"]??10); //WP's default action priority is 10,

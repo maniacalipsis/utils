@@ -294,7 +294,6 @@ class InputJson extends InputHidden
    {
       try
       {
-         //dump("!!!",$this->value,json_decode($this->value,flags:JSON_DECODE_OPTIONS),json_encode(json_decode($this->value,flags:JSON_DECODE_OPTIONS)??null,JSON_ENCODE_OPTIONS));
          $res=json_encode(json_decode(stripcslashes($this->value),flags:JSON_DECODE_OPTIONS)??null,JSON_ENCODE_OPTIONS);   //Make a double conversion to be sure the value is JSON-encoded, not whatever else may come from outside.
       }
       catch (\JsonException $ex)
@@ -302,6 +301,7 @@ class InputJson extends InputHidden
          error_log($ex->getMessage()." Value=".$this->value);
          $res=null;
       }
+      return $res;
    }
    
    public function print()
@@ -320,53 +320,29 @@ class InputJson extends InputHidden
 
 class InputStruct extends InputJson
 {
-   public $limit=0;
-   public $struct=[];
+   public  int    $min_size=0;
+   public ?int    $max_size=null;
+   public ?array  $item_class=null; //Format: ["name"=>"ClassName","from"=>"module/name"].
+   public  array  $struct=[];
+   
+   protected string $container_class_name="struct_data";
    
    public function render()
    {
       $container_id="extra_media_".$this->key;
       $struct_params_json=json_encode($this->struct,JSON_ENCODE_OPTIONS);
       ?>
-      <DIV ID="<?=$container_id?>" CLASS="struct">
+      <DIV ID="<?=$container_id?>" CLASS="<?=$this->container_class_name?>">
          <?=parent::render()?>
-         <DIV CLASS="struct_list"></DIV>
-         <INPUT TYPE="button" CLASS="add" VALUE="+">
-         <SCRIPT>
-            document.addEventListener('DOMContentLoaded',function(e_){let params={dataInputSelector:'input[type=hidden][name=<?=$this->key?>]',listNodeSelector:'.struct_list',btnAddSelector:'input[type=button].add',limit:<?=(int)$this->limit?>,itemClass:StructForm,itemClassParams:<?=$struct_params_json?>,node:document.getElementById('<?=$container_id?>')}; new StructList(params);});
+         <DIV CLASS="items"></DIV>
+         <BUTTON TYPE="button" CLASS="add" TITLE="<?=__("Add")?>">+</BUTTON>
+         <SCRIPT TYPE="module">
+            import {StructuredDataList} from '@maniacalipsis/utils/admin';
+            <?php if ($this->item_class["from"]??null):?>
+            import {<?=$this->item_class["name"]?>} from '<?=$this->item_class["from"]?>';
+            <?php endif;?>
+            document.addEventListener('DOMContentLoaded',(e_)=>{new StructuredDataList({boxMain:document.getElementById('<?=$container_id?>'),minSize:<?=$this->min_size?>,maxSize:<?=$this->max_size??"undefined"?>,itemClass:<?=$this->item_class["name"]??"undefined"?>,itemClassParams:{inputs:<?=$struct_params_json?>}});});
          </SCRIPT>
-      </DIV>
-      <?php
-   }
-}
-
-class InputGeoLocation extends InputJson
-{
-   //TODO: DEPRECATED.
-   public function render()
-   {
-      //TODO: This code was written in a hurry and shall be refactored.
-      
-      try
-      {
-         $container_id="extra_media_".$this->key;
-         
-         $value_data=["address"=>"","lat_long"=>""];
-         if ($this->value!="")
-            $value_data=array_merge($value_data,array_intersect_key(json_decode(stripcslashes($this->value),flags:JSON_DECODE_OPTIONS)??[],$value_data));
-      }
-      catch (\JsonException $ex)
-      {
-         error_log($ex->getMessage()." Value=".$this->value);
-      }
-      ?>
-      <DIV ID="<?=$container_id?>" CLASS="geolocation" STYLE="display:flex; flex-flow:column; gap:1em; padding:0.5em; border:1px solid #CCCCCC;">
-         <?=parent::render()?>
-         <DIV STYLE="display:flex; flex-flow:row nowrap; align-items:flex-end; gap:0.5em;">
-            <LABEL CLASS="address"><SPAN><?=__("Address")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["address"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val; try {val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.address=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
-            <BUTTON TYPE="button" CLASS="dashicons dashicons-location-alt" ONCLICK="let addr=arguments[0].target.parentNode.querySelector('.address>input')?.value; if (addr) window.open('https://2gis.ru/search/'+encodeURIComponent(addr.replaceAll('\n','')),'_blank').focus(); else alert('Enter the address');"></BUTTON>
-         </DIV>
-         <LABEL CLASS="location"><SPAN><?=__("Coordinates")?></SPAN> <INPUT VALUE="<?=htmlspecialchars($value_data["lat_long"])?>" ONCHANGE="let inp=arguments[0].target.closest('.geolocation').querySelector(':scope>input[type=hidden]'); let val; try {val=JSON.parse(inp.value)??{};} catch (err){console.error(err); val={};} val.lat_long=arguments[0].target.value; inp.value=JSON.stringify(val);"></LABEL>
       </DIV>
       <?php
    }
@@ -378,20 +354,20 @@ class InputPlaceMarks extends InputStruct
    {
       parent::__construct($params_);
       
-      $this->struct=[
-                       "address"=>["label"=>__("Address")],
-                       "lat_long"=>["label"=>__("Coordinates")],
-                       "text"=>["label"=>__("Icon text")],
-                       "hint"=>["label"=>__("Hint")],
-                       "baloon"=>["label"=>__("Baloon content"),"tagName"=>"textarea"],
-                    ];
+      $this->container_class_name.=" placemarks";
+      $this->item_class=["name"=>"PlaceMarkDataNode","from"=>"@maniacalipsis/utils/admin"];
    }
 }
 
-class InputMedia extends InputJson
+class InputMedia extends InputStruct
 {
-   public $limit=0;
-   public $selector_params=["options"=>[]];
+   public function __construct(array $params_=[])
+   {
+      parent::__construct($params_);
+      
+      $this->container_class_name.=" placemarks";
+      $this->item_class=["name"=>"PlaceMarkDataNode","from"=>"@maniacalipsis/utils/admin"];
+   }
    
    public function render()
    {
@@ -409,7 +385,7 @@ class InputMedia extends InputJson
          <DIV CLASS="struct_list media"></DIV>
          <INPUT TYPE="button" CLASS="add" VALUE="+">
          <SCRIPT>
-            document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});
+            //document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});
          </SCRIPT>
       </DIV>
       <?php

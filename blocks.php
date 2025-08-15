@@ -292,13 +292,13 @@ abstract class AMapRenderer extends ABlockRenderer
            //Create places:
            let yClusterer=new ymaps.Clusterer();
            for (let place of places)
-              yClusterer.add(new ymaps.Placemark(place.lat_long,{iconContent:place.text??'',hintContent:place.hint??'',balloonContent:place.balloon},{...placeOptions,preset:place.preset??'islands#redStretchyIcon'}));
+              yClusterer.add(new ymaps.Placemark([place.lat,place.long],{iconContent:place.text??'',hintContent:place.hint??'',balloonContent:place.balloon},{...placeOptions,preset:place.preset??'islands#redStretchyIcon'}));
            
            //Adjust view area:
            if (places.length>1)
               mapState.bounds=yClusterer.getBounds();
            else
-              mapState={...mapState,center:places[0]?.lat_long??[55.755819,37.617644],zoom:zoom};
+              mapState={...mapState,center:(places[0] ? [places[0].lat,places[0].long] : [55.755819,37.617644]),zoom:zoom};
            
            //Create map and add the places on it:
            let yMap=new ymaps.Map(mapId,mapState,mapOptions);

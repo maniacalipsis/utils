@@ -83,6 +83,74 @@
    display:none;
 }
 
+/* Structured data list */
+#wpbody-content .struct_data>.items
+{
+   display:flex;
+   flex-flow:column;
+   gap:1em;
+}
+
+#wpbody-content .struct_data>.items>.item
+{
+   display:flex;
+   flex-flow:row wrap;
+   align-items:flex-start;
+   padding:1em;
+   gap:1em;
+   border:1px solid #CCCCCC;
+}
+
+#wpbody-content .struct_data>.items>.item label>:is(input,textarea,select)
+{
+   min-width:3em;
+}
+
+#wpbody-content .struct_data>.items>.item>button.del
+{
+   align-self:center;
+   font-weight:bold;
+   color:#C70A0A;
+   border-color:#C70A0A;
+   border-radius:0.25em;
+   background:#CC181820;
+}
+
+/* Placemarks */
+#wpbody-content .struct_data.placemarks>.items>.item label
+{
+   display:grid;
+   grid-template:'c' auto 'i' 1fr;
+   gap:0.25em;
+}
+#wpbody-content .struct_data.placemarks>.items>.item label.address
+{
+   grid-template:'c c' auto 'i b' 1fr/1fr auto;
+}
+
+#wpbody-content .struct_data.placemarks>.items>.item .coords
+{
+   display:flex;
+   flex-flow:row;
+   align-items:flex-end;
+   gap:0.25em;
+}
+
+#wpbody-content .struct_data.placemarks>.items>.item label>.caption
+{
+   grid-area:c;
+}
+#wpbody-content .struct_data.placemarks>.items>.item label>:is(input,textarea)
+{
+   grid-area:i;
+}
+#wpbody-content .struct_data.placemarks>.items>.item :is(label,.coords)>button
+{
+   grid-area:b;
+   width:auto;
+   height:auto;
+}
+
 /* MediaList */
 #wpbody-content .media_selector,
 #wpbody-content .media_selector>label,

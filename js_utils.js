@@ -1896,8 +1896,10 @@ export class TreeNode extends Map
       this._validateChild(newChild_);  //This method throws an error if given child is not supported.
       
       let existingChild=super.get(newChild_.key);
-      if (existingChild!==newChild_)
+      if ((existingChild!==newChild_)&&
+          this.dispatchEvent(new CustomEvent('beforechildrenchange',{detail:{target:this,attach:[newChild_]},cancelable:true})))
       {
+         
          //Remove existing:
          if (existingChild)
             this.delete(existingChild);
@@ -1917,7 +1919,8 @@ export class TreeNode extends Map
       let res=false;
       
       let child=this._getOwnChild(which_);
-      if (child)
+      if (child&&
+          this.dispatchEvent(new CustomEvent('beforechildrenchange',{detail:{target:this,detach:[newChild_]},cancelable:true})))
       {
          child.dispatchEvent(new CustomEvent('beforedetach',{detail:{target:child}})); //Let a new child prepare to attaching.
          this._removeChild(child);
@@ -1933,14 +1936,18 @@ export class TreeNode extends Map
    clear()
    {
       let removedChildren=[];
-      for (let child of this.values())
-      {
-         child.dispatchEvent(new CustomEvent('beforedetach',{detail:{target:child}})); //Let a new child prepare to attaching.
-         removedChildren.push(this._removeChild(child));
-         child.dispatchEvent(new CustomEvent('detached',{detail:{target:child}}));
-      }
       
-      this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,detached:removedChildren}}));
+      if (this.dispatchEvent(new CustomEvent('beforechildrenchange',{detail:{target:this,detach:Array.from(this.values())},cancelable:true})))
+      {
+         for (let child of this.values())
+         {
+            child.dispatchEvent(new CustomEvent('beforedetach',{detail:{target:child}})); //Let a new child prepare to attaching.
+            removedChildren.push(this._removeChild(child));
+            child.dispatchEvent(new CustomEvent('detached',{detail:{target:child}}));
+         }
+         
+         this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,detached:removedChildren}}));
+      }
    }
    
    keyOf(which_)
@@ -2325,7 +2332,8 @@ export class DataList extends TreeDataNode
       this._validateChild(newChild_);  //This method throws an error if given child is not supported.
       
       let existingChild=super.get(newChild_.key);
-      if (existingChild!==newChild_)
+      if ((existingChild!==newChild_)&&
+          this.dispatchEvent(new CustomEvent('beforechildrenchange',{detail:{target:this,attach:[newChild_]},cancelable:true})))
       {
          newChild_.dispatchEvent(new CustomEvent('beforeattach',{detail:{target:newChild_,to:this}}));   //Let a new child to prepare for attaching.
          
@@ -2345,8 +2353,6 @@ export class DataList extends TreeDataNode
          
          this.dispatchEvent(new CustomEvent('childrenchange',{detail:{target:this,attached:[newChild_]}}));
       }
-      
-      super.set(newChild_);
    }
    
    delete(which_)
@@ -2765,7 +2771,7 @@ export class DynamicHTMLList extends DataList
    //public props
    get boxMain(){return this._elements.boxMain;}
    
-   get boxItems(){return this._elements.boxItems;}
+   get boxItems(){return this._elements.boxItems;} //TODO: Candidate to be DEPRECATED. It's the child node that has to provide its boxMain to the parent. And it's the parent's internal task to alocate the child's box.
    
    //protected props
    _boxItemProto=null;  //Statically defined boxMain prototype for creating a new children.
@@ -2777,6 +2783,12 @@ export class DynamicHTMLList extends DataList
          paramsOverride_={boxMain:this._boxItemProto.cloneNode(true),...(paramsOverride_??{})};
       
       return super._createNewChild(paramsOverride_);
+   }
+   
+   _validateChild(newChild_)
+   {
+      if (!newChild_.boxMain)
+         throw new Error('A child of DynamicHTMLList must have the boxMain property defined.');
    }
    
    _initListFromStaticItems()
@@ -2970,7 +2982,7 @@ export class InputFieldsMap extends TreeDataNode
    constructor(params_)
    {
       //Arguments:
-      // params_.container - HTMLElement. Container with tha input fields.
+      // params_.container - HTMLElement. Container with the input fields.
       // params_ - Array. Configuration parameters:
       //   Parameters:
       //    radioGroupClass - class. Custom class for radio button groups. Optional, default is RadioGroup.
@@ -4231,19 +4243,22 @@ export function setCookie(name_,val_,expires_,path_)
 }
 
 //------- Array and Object -------//
-export function setElementRecursively(object_,keySequence_,value_)
+export function setElementeRcursively(object_,keySequence_,value_,forceObject_)
 {
    //[Re]places $value_ into multidimensional $array_, using a sequence of keys from the argument $key_sequence_. Makes missing dimensions.
    //Analog of the /core/utils.php\set_array_element().
    //NOTE: Unlike its php's analog, it returns the resulting array/object. Also the input argument object_ can be initially undefined.
+   //TODO: Refactor and optimize this:
+   //          1) Try to use for-cycle instead of recursion.
+   //          2) Throw TypeError if NaN key is being set into array or if autoincremental '' key is being set into object instead of converting an existing entity.
    
    let currKey=keySequence_[0];
    
    if (currKey!==undefined)
    {
       //Prepare an object/array that will accept an element with the currKey.
-      let isArrayKey=(currKey=='')||(!isNaN(currKey));
-      if ((object_===undefined)||(object_===null))       //If object/array doesn't exists yet at all
+      let isArrayKey=(!forceObject_)&&((!isNaN(currKey))||(currKey==''));  //If key is a number or '' (which means autoincrement), then Array is assumed, unless the forceObject_ is true.
+      if ((object_===undefined)||(object_===null))       //If object/array doesn't exists yet at all.
          object_=(isArrayKey ? [] : {});                 // then init it depending on the type of current key.
       else if ((object_ instanceof Array)&&!isArrayKey)  //But if that what we already have is an array, whereas the current key is alphanumeric, 
       {                                                  // then we'll have to convert it to the object to avoid unattended loss of data, 

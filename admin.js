@@ -1,5 +1,14 @@
+import {
+          TreeDataNode,
+          DynamicHTMLList,
+          cancelEvent,
+          buildNodes,
+          decorateInputFieldVal,
+          bindEvtInputToDeferredChange,
+       } from '@maniacalipsis/utils/utils';
+
 //Media setter ------------------------------------------------------------------------------------------------------
-export class StructList extends DynamicForm
+export class StructuredDataList extends DynamicHTMLList
 {
    //A list of the data structures.
    
@@ -7,185 +16,271 @@ export class StructList extends DynamicForm
    {
       try
       {
-         super(null,params_);
+         super(params_);
          
-         this._inpData=params_.dataInput??this.node.querySelector(params_.dataInputSelector);
-         this._inpData.form?.addEventListener('submit',()=>{this.updateSourceInput();});
-         this._btnAdd=params_.btnAdd??this.node.querySelector(params_.btnAddSelector);
-         this._btnAdd?.addEventListener('click',(e_)=>{this.add({});});
+         this._maxSize=params_?.maxSize??this._maxSize;
+         this._minSize=params_?.minSize??this._minSize;
          
-         //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
-         if (this._inpData.value)
-            this.data=JSON.parse(this._inpData.value);
+         this._elements.inpData=this._elements.boxMain.querySelector('input[type=hidden]');
+         this._elements.inpData.form?.addEventListener('submit',()=>{this.updateSourceInput();});
+         this._elements.btnAdd=this._elements.boxMain.querySelector('button.add');
+         this._elements.btnAdd?.addEventListener('click',(e_)=>{this.pad(this.size+1);});
+         
+         this._itemClass??=StructuredDataNode;
+         
+         //Handle own events:
+         this.addEventListener('beforechildrenchange',
+                               (e_)=>{
+                                        //Prevent oversize and undersize:
+                                        if ((e_.attach&&(this.size+e_.attach.length>(this._maxSize??Infinity)))||
+                                            (e_.detach&&(this.size-e_.detach.length<this._minSize)))
+                                           return cancelEvent(e_);
+                                     });
+         this.addEventListener('childrenchange',
+                               (e_)=>{
+                                        //Refresh items:
+                                        // NOTE: This is an experimental implementation.
+                                        this._elements.boxItems.innerHTML='';
+                                        if (this.size>0)
+                                        {
+                                           const childBoxes=new DocumentFragment();
+                                           for (let child of this.values())
+                                              childBoxes.append(child.boxMain);
+                                           this._elements.boxItems.appendChild(childBoxes);
+                                        }
+                                        
+                                        //Update button state:
+                                        this._elements.btnAdd.disabled=(this.size>=(this._maxSize??Infinity));
+                                     });
+         this.addEventListener('datachange',(e_)=>{this._elements.inpData.value=JSON.stringify(this.data); e_.stopPropagation();});
+         
+         //Get initial data and verify its type:
+         if (this._elements.inpData.value)
+            this.data=JSON.parse(this._elements.inpData.value);
+         if (!(this.data instanceof Array))
+            throw new TypeError('Initial data is not of type Array');
       }
-      catch (ex)
+      catch (err)
       {
-         console.error('StructList.constructor suffers error:',ex,' This:',this,' Params:',params_);
-      }
-      finally
-      {
-         if ((!this._btnAdd)&&(this._items.length==0))
-            this.add(); //+ one empty row.
+         console.error('StructuredDataList.constructor suffers error:',err,' This:',this,' Params:',params_);
+         if ((err instanceof TypeError)||(err instanceof SyntaxError))
+            this.data=[];
       }
    }
    
-   _inpData=null;      //The input which hold the media files list
-   _btnAdd=null;
+   _minSize=0;
+   _maxSize=null;
+   
    //public methods
    updateSourceInput()
    {
-      this._inpData.value=JSON.stringify(this.data);
-      this._inpData.dispatchEvent(new Event('change',{cancelable:true}));
+      this._elements.inpData.value=JSON.stringify(this.data);
+      this._elements.inpData.dispatchEvent(new Event('change',{cancelable:true}));
    }
 }
 
-export class StructForm extends DynamicListItem
+export class StructuredDataNode extends TreeDataNode
 {
-   //Form for the structured data input.
+   //Form fragment for a structured data list.
    
-   constructor(parent_,params_)
+   constructor(params_)
    {
+      super(params_);
       
-      let nodeStruct={tagName:'div',className:'item',childNodes:[]};
-      for (let key in params_)
-         nodeStruct.childNodes.push({
-                                       tagName:'label',
-                                       className:key,
-                                       childNodes:[
-                                                     params_[key].label??'',   //Input label (string or node struct), optional.
-                                                     (params_[key].input ? {...params_[key].input,_collectAs:key} : {tagName:'input',type:'text',value:params_[key].default??'',_collectAs:key})   //Input field (nodes truct), optional. Allow to define input field of custom type, the text input is default.
-                                                  ]
-                                     });
-      nodeStruct.childNodes.push({tagName:'input',className:'close',type:'button',value:String.fromCharCode(9747),onclick:(e_)=>{this._parent?.remove?.(this);}});
+      //Struct of item element:
+      let nodeStruct={
+                        tagName:'div',
+                        className:'item',
+                        childNodes:[
+                                      ...this._makeInputStructs(params_.inputs,['inputs']),
+                                      {tagName:'button',type:'button',className:'del',textContent:String.fromCharCode(9747),_collectAs:'btnDel'},
+                                   ],
+                        _collectAs:'boxMain',
+                     };
+      buildNodes(nodeStruct,this._elements);
       
-      super(parent_,{nodeStruct:nodeStruct});
+      //Init inputs:
+      for (let inpField of Object.values(this._elements.inputs))
+      {
+         decorateInputFieldVal(inpField);
+         switch (inpField.type)
+         {
+            case 'checkbox':
+            case 'radio':
+            case 'select-one':
+            case 'select-multiple':
+            {break;}
+            default:
+            {
+               bindEvtInputToDeferredChange(inpField);
+            }
+         }
+         inpField.addEventListener('change',(e_)=>{this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));});
+      }
       
-      this._inputs=this._insidesCollection;
+      this._elements.btnDel.addEventListener('click',(e_)=>{this.parent?.delete(this); return cancelEvent(e_);});
    }
    
-   _inputs=null;
-   
+   //public props
    get data()
    {
       let res={};
-      for (let key in this._inputs)
-         switch(this._inputs[key].type)
-         {
-            case 'checkbox':
-            {
-               res[key]=this._inputs[key].checked;
-               break;
-            }
-            case 'radio':
-            {
-               console.warn('Radios are not supported by StructForm');
-               break;
-            }
-            default:
-            {
-               res[key]=this._inputs[key].value;
-            }
-         }
+      for (let key in this._elements.inputs)
+         res[key]=this._elements.inputs[key].valueAsMixed;
       
       return res;
    }
    set data(data_)
    {
-      for (let key in this._inputs)
-         switch(this._inputs[key].type)
+      for (let key in this._elements.inputs)
+         this._elements.inputs[key].valueAsMixed=data_[key]??'';
+   }
+   
+   get boxMain(){return this._elements.boxMain;}
+   
+   //private props
+   _inputs=null;
+   
+   _makeInputStructs(inpParams_,baseKeySeq_)
+   {
+      //Arguments:
+      // inpParams_ - Array|Object. Parameters of input fields. Format: [{type:'<type>'[,name:'<inpName>'],...},...] or {'<inpName>':{type:'<type>',...},...}.
+      // baseKeySeq_ - Array. Base key for _collectAs parameter (see js_utils.js\buildNodes() for details).
+      
+      baseKeySeq_??=[];
+      
+      let res=[];
+      
+      for (let key in inpParams_)
+      {
+         let inpStruct;
+         switch(inpParams_[key].type)
          {
-            case 'checkbox':
+            case 'select':
             {
-               this._inputs[key].checked=data_[key]??false;
+               inpStruct={tagName:'select',...inpParams_[key]}
                break;
             }
-            case 'radio':
+            case 'textarea':
             {
-               console.warn('Radios are not supported by StructForm');
+               inpStruct={tagName:'textarea',...inpParams_[key]}
                break;
             }
             default:
             {
-               this._inputs[key].value=data_[key]??'';
+               inpStruct={tagName:'input',type:'text',...inpParams_[key]};
             }
          }
+         delete inpStruct.label;
+         inpStruct._collectAs=[...baseKeySeq_,inpParams_[key].name??key];
+         res.push({
+                    tagName:'label',
+                    className:key,
+                    childNodes:[
+                                  {tagName:'span',className:'caption',textContent:inpParams_[key].label??''},    //Input's caption, optional.
+                                  inpStruct,
+                               ]
+                  });
+      }
+      
+      return res;
    }
 }
 
-export class MediaList
+export class PlaceMarkDataNode extends StructuredDataNode
 {
    constructor(params_)
    {
-      //Precheck wp.media:
-      if (!wp.media)
-         console.error('MediaList: wp.media is not defined. Make shure you call the wp_enqueue_media(); in the plugin initialization at server side.');
+      super(params_);
       
-      //Init:
-      this._input=params_.input??document.querySelector(params_.inputSelector);
-      this._container=params_.container??document.querySelector(params_.containerSelector);
-
-      this._MediaSelectorClass=params_.MediaSelector??this._MediaSelectorClass;
-      this._mediaSelectorParams=params_.MediaSelectorParams??this._mediaSelectorParams;
+      this._elements.btnOpenMap.addEventListener('click',(e_)=>{if (this._elements.inputs.address.valueAsMixed!='') window.open('https://2gis.ru/search/'+encodeURIComponent(this._elements.inputs.address.valueAsMixed.replaceAll('\n','')),'_blank').focus(); return cancelEvent(e_);})
       
-      this._limit=params_.limit??this._limit;
-      this.onChange=params_.onChange??params_.onchange??null;  //Allow to pass onchange handler via params.
-      
-      if (wp.media&&this._input&&this._container)
-      {
-         //Get the media:
-         let mediaData=null;
-         try
-         {
-            //TODO: This try-catch section seems not catching a parse errors. This need to be fixed.
-            if (this._input.value)
-               mediaData=JSON.parse(this._input.value);
-            
-            mediaData??(mediaData=[]);
-            for (let media of mediaData)
-               this.add(new this._MediaSelectorClass(media,this,this._mediaSelectorParams));
-         }
-         catch (ex)
-         {
-            console.error('MediaList.constructor suffers JSON error:',ex,' Input value is ',this._input.value);
-         }
-         finally
-         {
-            this.add(); //+ one empty selector.
-            
-            this._input.form?.addEventListener('submit',()=>{this.updateSourceInput();});
-         }
-      }
+      this._elements.inputs.lat .addEventListener('paste',(e_)=>{if (this._distributeCoordsStr(e_.clipboardData.getData('text'),'lat','long')) return cancelEvent(e_);});
+      this._elements.inputs.long.addEventListener('paste',(e_)=>{if (this._distributeCoordsStr(e_.clipboardData.getData('text'),'long','lat')) return cancelEvent(e_);});
+      this._elements.btnSwap.addEventListener('click',(e_)=>{this._swapCoords();});   //Swap latitude and longitude.
    }
    
-   //public props
-   get list()
+   _makeInputStructs(inpParams_,baseKeySeq_)
    {
-      let list=[];
-      for (let selector of this._selectors)
-         if (selector.hasMedia)
-            list.push(selector.media);
-      return list;
+      //Arguments:
+      // inpParams_ - Array|Object. Parameters of input fields. Format: [{type:'<type>'[,name:'<inpName>'],...},...] or {'<inpName>':{type:'<type>',...},...}.
+      // baseKeySeq_ - Array. Base key for _collectAs parameter (see js_utils.js\buildNodes() for details).
+      
+      baseKeySeq_??=[];
+      
+      return [
+                {
+                  tagName:'label',
+                  className:'address',
+                  childNodes:[
+                                {tagName:'span',className:'caption',textContent:'Address'},
+                                {tagName:'textarea',_collectAs:[...baseKeySeq_,'address']},
+                                {tagName:'button',type:'button',className:'open_map dashicons',title:'Find on the map',textContent:String.fromCharCode(0xf231/*dashicons-location-alt*/),_collectAs:'btnOpenMap'},
+                             ]
+                },
+                {
+                   tagName:'div',
+                   className:'coords',
+                   childNodes:[
+                                 {
+                                   tagName:'label',
+                                   className:'lat',
+                                   childNodes:[
+                                                 {tagName:'span',className:'caption',textContent:'Lat.'},
+                                                 {tagName:'input',type:'text',_collectAs:[...baseKeySeq_,'lat']},
+                                              ]
+                                 },
+                                 {
+                                   tagName:'label',
+                                   className:'lat_long',
+                                   childNodes:[
+                                                 {tagName:'span',className:'caption',textContent:'Long.'},
+                                                 {tagName:'input',type:'text',_collectAs:[...baseKeySeq_,'long']},
+                                              ]
+                                 },
+                                 {tagName:'button',type:'button',className:'swap dashicons',title:'Swap coords',textContent:String.fromCharCode(0xf463/*dashicons-update*/),_collectAs:'btnSwap'},
+                              ],
+                },
+                {
+                  tagName:'label',
+                  className:'text',
+                  childNodes:[
+                                {tagName:'span',className:'caption',textContent:'Label text'},
+                                {tagName:'input',type:'text',_collectAs:[...baseKeySeq_,'text']},
+                             ]
+                },
+                {
+                  tagName:'label',
+                  className:'hint',
+                  childNodes:[
+                                {tagName:'span',className:'caption',textContent:'Label hint'},
+                                {tagName:'input',type:'text',_collectAs:[...baseKeySeq_,'hint']},
+                             ]
+                },
+                {
+                  tagName:'label',
+                  className:'baloon',
+                  childNodes:[
+                                {tagName:'span',className:'caption',textContent:'Baloon content'},
+                                {tagName:'textarea',_collectAs:[...baseKeySeq_,'baloon']},
+                             ]
+                },
+             ];
    }
    
-   //private props
-   _input=null;      //The input which hold the media files list
-   _container=null;  //DOM node that is a container for the media selectors.
-   _selectors=[];    //Array of the media selectors.
-   _MediaSelectorClass=MediaSelector;  //MediaSelector class.
-   _mediaSelectorParams=null;          //Params for MediaSelector's constructor.
-   _limit=0;         //Maximal amount of media files selected.
-   
-   //public methods
-   add(mediaSelector_)
+   _distributeCoordsStr(str_,inpNameA_,inpNameB_)
    {
+      //Distribute coords pair by inputs. Helper for the paste event handlers.
+      
       let res=false;
       
-      if (!this._limit||(this._selectors.length<this._limit))
+      if (/^ *-?[0-9]{1,3}(.[0-9]+)? *, *-?[0-9]{1,3}(.[0-9]+)? *$/.test(str_))
       {
-         mediaSelector_??(mediaSelector_=new this._MediaSelectorClass(null,this,this._mediaSelectorParams));
+         let coords=str_.replace(/[^0-9,.-]/g,'').split(',');
+         this._elements.inputs[inpNameA_].valueAsMixed=coords[0];
+         this._elements.inputs[inpNameB_].valueAsMixed=coords[1];
          
-         this._selectors.push(mediaSelector_);
-         this._container.appendChild(mediaSelector_.node);
+         this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
          
          res=true;
       }
@@ -193,64 +288,18 @@ export class MediaList
       return res;
    }
    
-   insert(mediaSelector_,after_)
+   _swapCoords()
    {
-      for (let i in this._selectors)
-         if (after_==this._selectors[i])
-         {
-            if (after_.node.nextSibling)
-               this._container.insertBefore(mediaSelector_.node,after_.node.nextSibling);
-            else
-               this._container.appendChild(mediaSelector_.node);
-            this._selectors.splice(i,0,mediaSelector_);
-            break;
-         }
-   }
-   
-   remove(mediaSelector_)
-   {
-      //Remove selector
-      if (mediaSelector_.hasMedia)
-      {
-         for (let i in this._selectors)
-            if (mediaSelector_==this._selectors[i])
-            {
-               this._container.removeChild(mediaSelector_.node);
-               this._selectors.splice(i,1);
-               break;
-            }
-         
-         if (this._selectors.length==0)
-            this.add(new this._MediaSelectorClass(null,this,this._mediaSelectorParams));
-         
-         this.onChange?.(this);
-      }
-   }
-   
-   onMediaSelected(mediaSelector_)
-   {
-      //Add one more selector if all is filled
-      let allHasMedia=true;
-      for (let selector of this._selectors)
-         if (!selector.hasMedia)
-         {
-            allHasMedia=false;
-            break;
-         }
-      if (allHasMedia)
-         this.add(new this._MediaSelectorClass(null,this,this._mediaSelectorParams));
+      let buf=this._elements.inputs.lat.valueAsMixed;
+      this._elements.inputs.lat.valueAsMixed=this._elements.inputs.long.valueAsMixed;
+      this._elements.inputs.long.valueAsMixed=buf;
       
-      this.onChange?.(this);
-   }
-   
-   updateSourceInput()
-   {
-      this._input.value=JSON.stringify(this.list);
-      this._input.dispatchEvent(new Event('change',{cancelable:true}));
+      this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
    }
 }
 
-export class MediaSelector
+//DEPRECATED:
+class _MediaSelector
 {
    //Selector of the WP media file[s]. It makes a node with the inputs that allows to select a file from the WP media library and annotate it.
    //NOTE: All the inputs the MediaSelector makes are not related to any form and normally will NOT be sent on submit. Instead the parent has to get the data from its MediaSelector[s] and deal with it on its own.
@@ -447,7 +496,8 @@ export class MediaSelector
    }
 }
 
-export class wpJSONForm
+//DEPRECATED:
+class wpJSONForm
 {
    //This class handles a [part] of a static form that represents JSON data from the hidden inupt.
    constructor(params_)
