@@ -247,13 +247,15 @@ class AsyncPostsList extends PostsRenderer
    }
 }
 
-abstract class AMapRenderer extends ABlockRenderer
+trait TMapRenderer
 {
-   //Abstract map renderer.
+   //Helper for map rendering.
    //Usage example:
-   // use \Maniacalipsis\Utilities\AMapRenderer;
-   // class MyMapRenderer extends AMapRenderer
+   // use \Maniacalipsis\Utilities\TMapRenderer;
+   // class MyMapRenderer extends ABlockRenderer
    // {
+   //    use TMapRenderer;
+   //    
    //    protected function load_data():void
    //    {
    //       $this->json_data=get_option($this->attributes["optName"],$this->json_data);
@@ -269,12 +271,10 @@ abstract class AMapRenderer extends ABlockRenderer
    protected array  $default_map_state     {get=>["controls"=>["typeSelector","fullscreenControl","geolocationControl","trafficControl","zoomControl","routeEditor","rulerControl"]];}
    protected array  $default_map_options   {get=>["yandexMapDisablePoiInteractivity"=>true];}
    protected array  $default_place_options {get=>["preset"=>"islands#blueStretchyIcon"];}
+   protected array  $map_outer_attrs       {get {$res=array_diff_key($this->attributes,["anchor"=>null]); $res["className"]="map ".$res["className"]; return $res;}}
    
    public function __toString():string
    {
-      $outer_attrs=array_diff_key($this->attributes,["anchor"=>null]);
-      $outer_attrs["className"]="map ".$outer_attrs["className"];
-      
       ob_start();
       ?>
       <SCRIPT TYPE="module">
@@ -307,11 +307,14 @@ abstract class AMapRenderer extends ABlockRenderer
            if (mapState.bounds)
               window.setTimeout(()=>{yMap.setBounds(mapState.bounds);},1000);
            
-           window.yMap=yMap;  //Debug.
+           //Let other scripts to access this map:
+           const boxMap=document.getElementById(mapId);  //Assign the map instance to the DOM element to support multiple maps on a single page.
+           if (boxMap)
+              boxMap.yMap=yMap;
         }
         ymaps.ready(mapInitCallback);
       </SCRIPT>
-      <DIV <?=render_block_attributes($outer_attrs)?>><DIV ID="<?=$this->map_id?>" CLASS="inner"></DIV></DIV>
+      <DIV <?=render_block_attributes($this->map_outer_attrs)?>><DIV ID="<?=$this->map_id?>" CLASS="inner"></DIV></DIV>
       <?php
       return ob_get_clean();
    }

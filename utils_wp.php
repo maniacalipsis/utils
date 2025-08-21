@@ -276,7 +276,7 @@ function text_clip_output($val_,$params_=NULL)
    return $val_;
 }
 
-function get_post_image_src(WP_Post $post_,string $size_='full')
+function get_post_image_src(WP_Post $post_,string $size_="full")
 {
    //Shorthand for retrieving post's thumbnail image src.
    //Arguments:
@@ -285,7 +285,7 @@ function get_post_image_src(WP_Post $post_,string $size_='full')
    //Return value:
    // Post's thumbnail URL encoded with htmlspecialchars().
    
-   return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_??$this->image_size));
+   return htmlspecialchars(wp_get_attachment_image_url(get_post_thumbnail_id($post_->ID),$size_));
 }
 
 function get_breadcrumbs(bool $include_current=false):array
