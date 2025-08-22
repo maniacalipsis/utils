@@ -258,12 +258,12 @@ trait TMapRenderer
    //    
    //    protected function load_data():void
    //    {
-   //       $this->json_data=get_option($this->attributes["optName"],$this->json_data);
+   //       $this->json_map_data=get_option($this->attributes["optName"],$this->json_map_data);
    //    }
    // }
    
    //Map data:
-   protected string $json_data="[]";   //This property is used instead of parent::$data (for decode-encode optimization) and must be filled with actual data by method load_data().
+   protected string $json_map_data="[]";   //This property is used instead of parent::$data (for decode-encode optimization) and must be filled with actual data by method load_data().
    
    //Map parameters' defaults:
    protected string $map_id {get=>htmlspecialchars(($this->attributes["anchor"]??"")!="" ? $this->attributes["anchor"] : "ymap");}
@@ -281,7 +281,7 @@ trait TMapRenderer
         function mapInitCallback()
         {
            //Source data:
-           let places=<?=$this->json_data?>;
+           let places=<?=$this->json_map_data?>;
            
            let mapId='<?=$this->map_id?>';
            let zoom=<?=$this->map_zoom?>;
