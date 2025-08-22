@@ -2,7 +2,7 @@
 /*
 Plugin Name: Utilities
 Description: Set of theme setup and utility functions.
-Version: 3.0
+Version: 3.1
 Author: FSG a.k.a ManiaC
 Author URI: http://maniacalipsis.ru/
 Plugin URI:
