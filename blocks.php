@@ -247,20 +247,19 @@ class AsyncPostsList extends PostsRenderer
    }
 }
 
-trait TMapRenderer
+abstract class AMapRenderer extends ABlockRenderer
 {
    //Helper for map rendering.
    //Usage example:
-   // use \Maniacalipsis\Utilities\TMapRenderer;
-   // class MyMapRenderer extends ABlockRenderer
+   // use \Maniacalipsis\Utilities\AMapRenderer;
+   // class MyMapRenderer extends AMapRenderer
    // {
-   //    use TMapRenderer;
-   //    
    //    protected function load_data():void
    //    {
    //       $this->json_map_data=get_option($this->attributes["optName"],$this->json_map_data);
    //    }
    // }
+   // NOTE: In a complex cases, use it as dependency. 
    
    //Map data:
    protected string $json_map_data="[]";   //This property is used instead of parent::$data (for decode-encode optimization) and must be filled with actual data by method load_data().

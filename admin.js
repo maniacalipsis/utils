@@ -52,7 +52,7 @@ export class StructuredDataList extends DynamicHTMLList
                                         //Update button state:
                                         this._elements.btnAdd.disabled=(this.size>=(this._maxSize??Infinity));
                                      });
-         this.addEventListener('datachange',(e_)=>{this._elements.inpData.value=JSON.stringify(this.data); e_.stopPropagation();});
+         this.addEventListener('datachange',(e_)=>{this.updateSourceInput(); e_.stopPropagation();});
          
          //Get initial data and verify its type:
          if (this._elements.inpData.value)
