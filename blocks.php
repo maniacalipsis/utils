@@ -138,7 +138,7 @@ class TermsRenderer extends ABlockRenderer
          {
             case "a":
             {
-               $res.="<A HREF=\"$term_url\" $item_attrs_str>${term->name}</A>";
+               $res.="<A HREF=\"$term_url\" $item_attrs_str>{$term->name}</A>";
                break;
             }
             case "span":
@@ -150,7 +150,7 @@ class TermsRenderer extends ABlockRenderer
             case "h5":
             case "h6":
             {
-               $res.="<$tag $item_attrs_str>${term->name}</$tag>";
+               $res.="<$tag $item_attrs_str>{$term->name}</$tag>";
                break;
             }
             default:
