@@ -108,6 +108,98 @@ abstract class ABlockRenderer implements \Stringable
    abstract protected function load_data():void;
 }
 
+class TermsRenderer extends ABlockRenderer
+{
+   //Designed for use in dynamic block templates to select and render terms.
+   //Usage example:
+   //<file://./src/block/render.php>
+   // use \Maniacalipsis\Utilities\TermsRenderer;
+   // echo new TermsRenderer($attributes,$content,$block);
+   
+   use TTermsQueryHelper;
+   
+   public function __toString():string
+   {
+      //Renders block's HTML.
+
+      $item_attrs=$this->attributes;
+      $item_attrs["className"]=$this->filter["post_type"]." ".$item_attrs["className"];
+      $item_attrs_str=render_block_attributes($item_attrs);
+      
+      $tag=$this->attributes["tag"]??"";
+
+      $res="";
+      $sep=null;
+      foreach ($this->data as $term)
+      {
+         $term_url=htmlspecialchars(get_term_link($term->term_id,$term->taxonomy));
+         
+         switch ($tag)
+         {
+            case "a":
+            {
+               $res.="<A HREF=\"$term_url\" $item_attrs_str>${term->name}</A>";
+               break;
+            }
+            case "span":
+            case "div":
+            case "h1":
+            case "h2":
+            case "h3":
+            case "h4":
+            case "h5":
+            case "h6":
+            {
+               $res.="<$tag $item_attrs_str>${term->name}</$tag>";
+               break;
+            }
+            default:
+            {
+               $res.=$sep.$term->name;
+               $sep??=", ";
+            }
+         }
+      }
+      return $res;
+   }
+   
+   protected function get_filter_from_attrs(string $key_="filter"):array
+   {
+      $res=$this->attributes[$key_]??[];
+      
+      switch ($res["selection_mode"]??"all")
+      {
+         case "include":
+         {
+            $res["include"]=$res["ids"];
+            break;
+         }
+         case "exclude":
+         {
+            $res["exclude"]=$res["ids"];
+            break;
+         }
+         default:
+         {
+            
+         }
+      }
+      
+      unset($res["selection_mode"]);
+      unset($res["ids"]);
+      
+      return $res;
+   }
+   
+   protected function load_data():void
+   {
+      //Loads terms using filter parameters from the block attributes.
+      // This method allows to extend posts loading in a simplier way than extending the constructor.
+      
+      $this->data=get_terms($this->prepare_filter($this->get_filter_from_attrs()));
+   }
+}
+
 class PostsRenderer extends ABlockRenderer
 {
    //Designed for use in dynamic block templates to select and render posts.
@@ -174,9 +266,9 @@ class PostsRenderer extends ABlockRenderer
       return ob_get_clean();
    }
    
-   protected function get_filter_from_attrs():array
+   protected function get_filter_from_attrs(string $key_="filter"):array
    {
-      $res=$this->attributes["filter"]??[];
+      $res=$this->attributes[$key_]??[];
       
       switch ($res["selection_mode"]??"all")
       {

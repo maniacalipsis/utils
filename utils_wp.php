@@ -98,12 +98,64 @@ function data_from_query($val_)
 }
 
 // -------------- WP-specific Database classes/functions -------------- //
+trait TEscapeHelper
+{
+   //NOTE: Currently, this trait intended for internal use only by TMetaQueryHepler and TTermsQueryHelper. Do not use it in another places.
+   
+   protected const SORT_DIRECTIONS=["ASC"=>"ASC","DESC"=>"DESC","asc"=>"ASC","desc"=>"DESC"];
+   
+   protected function esc_int($val_):int
+   {
+      return (int)$val_;
+   }
+   
+   protected function esc_bool($val_):bool
+   {
+      return to_bool($val_);
+   }
+   
+   protected function esc_str($val_):string
+   {
+      return strip_tags($val_);
+   }
+   
+   protected function esc_int_arr($val_):array
+   {
+      $res=[];
+      if (is_array($val_))
+         foreach ($val_ as $k=>$v)
+            $res[$k]=(int)$v;
+      return $res;
+   }
+   
+   protected function esc_str_arr($val_):array
+   {
+      $res=[];
+      if (is_array($val_))
+         foreach ($val_ as $k=>$v)
+            $res[$k]=$this->esc_str($v);
+      return $res;
+   }
+   
+   protected function esc_post_status($val_):string
+   {
+      return "publish"; //Force selecting published posts when escaping request params.
+   }
+   
+   protected function esc_order($val_):string
+   {
+      return self::SORT_DIRECTIONS[$val_]??"ASC";
+   }
+}
+
 trait TMetaQueryHepler
 {
-   public const META_QUERY_GLUE=";";
-   public const INCLUDE_GLUE=",";
-   public const NAMEVAL_GLUE="=";
-   public const QUERY_RELATIONS=["AND"=>"AND","and"=>"AND","OR"=>"OR","or"=>"OR"];
+   use TEscapeHelper;
+   
+   protected const META_QUERY_GLUE=";";
+   protected const INCLUDE_GLUE=",";
+   protected const NAMEVAL_GLUE="=";
+   protected const QUERY_RELATIONS=["AND"=>"AND","and"=>"AND","OR"=>"OR","or"=>"OR"];
    
    protected  array $filter_allowed =["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","offset"=>"esc_int","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_meta_query","tax_query"=>"esc_tax_query"];
    protected  array $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null,"tax_query"=>null];
@@ -162,44 +214,6 @@ trait TMetaQueryHepler
       return $res;
    }
    
-   protected function esc_int($val_):int
-   {
-      return (int)$val_;
-   }
-   
-   protected function esc_str($val_):string
-   {
-      return strip_tags($val_);
-   }
-   
-   protected function esc_int_arr($val_):array
-   {
-      $res=[];
-      if (is_array($val_))
-         foreach ($val_ as $k=>$v)
-            $res[$k]=(int)$v;
-      return $res;
-   }
-   
-   protected function esc_str_arr($val_):array
-   {
-      $res=[];
-      if (is_array($val_))
-         foreach ($val_ as $k=>$v)
-            $res[$k]=$this->esc_str($v);
-      return $res;
-   }
-   
-   protected function esc_post_status($val_):string
-   {
-      return "publish"; //Force selecting published posts when escaping request params.
-   }
-   
-   protected function esc_order($val_):string
-   {
-      return ["ASC"=>"ASC","DESC"=>"DESC","asc"=>"ASC","desc"=>"DESC"][$val_]??"ASC";
-   }
-   
    protected function esc_tax_query($val_):array
    {
       $res=[];
@@ -227,6 +241,36 @@ trait TMetaQueryHepler
    protected function esc_meta_query($val_):array
    {
       return $val_??[];
+   }
+}
+
+trait TTermsQueryHelper
+{
+   use TEscapeHelper;
+   
+   protected  array $filter_allowed =["taxonomy"=>"esc_str_arr","orderby"=>"esc_str","order"=>"esc_order","hide_empty"=>"esc_bool","object_ids"=>"esc_int_arr","include"=>"esc_int_arr","exclude"=>"esc_int_arr","exclude_tree"=>"esc_int_arr","number"=>"esc_int","fields"=>"esc_str","count"=>"esc_bool","slug"=>"esc_str","parent"=>"esc_str","hierarchical"=>"esc_bool","child_of"=>"esc_int","get"=>"esc_str","name__like"=>"esc_str","pad_counts"=>"esc_bool","offset"=>"esc_str","search"=>"esc_str","cache_domain"=>"core","name"=>"esc_str","childless"=>"esc_bool","update_term_meta_cache"=>"esc_bool","meta_query"=>"esc_meta_query"];
+   protected  array $filter_defaults=["taxonomy"=>["category"],"orderby"=>"name","order"=>"ASC","hide_empty"=>true,"number"=>0,"fields"=>"all"];
+   protected ?array $filter=null;   //Current filter state. Use after self::prepare_filter().
+   
+   
+   protected function prepare_filter(array $params_,bool $escape_=false):array
+   {
+      //Cook the filter from the params_ and defaults.
+      //This separate method allows a derived classes to interfere into the det_data() after the filter is ready.
+      //As a side effect, sets internal property $this->filter.
+      
+      //Get the posts filtering params:
+      $numberposts=$params_["numberposts"]??$params_["count"]??null; //Translate "count" to "numberposts" as the last one isn't intuitive.
+      if ($numberposts!=null)                                        //
+         $params_["numberposts"]=$numberposts;                       //
+      
+      $this->filter=array_intersect_key($params_,$this->filter_allowed);      //Filter params of the filter.
+      if ($escape_)
+         foreach ($this->filter as $key=>$val)
+            $this->filter[$key]=$this->{$this->filter_allowed[$key]}($val);
+      $this->filter=array_merge($this->filter_defaults,$this->filter);
+      
+      return $this->filter;
    }
 }
 
