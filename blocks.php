@@ -116,46 +116,7 @@ class PostsRenderer extends ABlockRenderer
    // use \Maniacalipsis\Utilities\PostsRenderer;
    // echo new PostsRenderer($attributes,$content,$block);
    
-   use TMetaQueryHepler
-   {
-      TMetaQueryHepler::prepare_filter as _helper_prepare_filter;
-   }
-
-   protected function prepare_filter(array $params_,bool $escape_=false):array
-   {
-      switch ($params_["selection_mode"]??"all")
-      {
-         case "include":
-         {
-            $params_["include"]=$params_["ids"];
-            break;
-         }
-         case "exclude":
-         {
-            $params_["exclude"]=$params_["ids"];
-            break;
-         }
-         case "exclude_current":
-         {
-            $params_["exclude"]=[get_post()?->ID];
-            break;
-         }
-         default:
-         {
-            
-         }
-      }
-      
-      return $this->_helper_prepare_filter($params_,$escape_);
-   }
-   
-   protected function load_data():void
-   {
-      //Loads posts using filter parameters from the block attributes.
-      // This method allows to extend posts loading in a simplier way than extending the constructor.
-      
-      $this->data=get_posts($this->prepare_filter($this->attributes["filter"]??[],true));
-   }
+   use TMetaQueryHepler;
    
    public function __toString():string
    {
@@ -212,25 +173,54 @@ class PostsRenderer extends ABlockRenderer
       }
       return ob_get_clean();
    }
+   
+   protected function get_filter_from_attrs():array
+   {
+      $res=$this->attributes["filter"]??[];
+      
+      switch ($res["selection_mode"]??"all")
+      {
+         case "include":
+         {
+            $res["include"]=$res["ids"];
+            break;
+         }
+         case "exclude":
+         {
+            $res["exclude"]=$res["ids"];
+            break;
+         }
+         case "exclude_current":
+         {
+            $res["exclude"]=[get_post()?->ID];
+            break;
+         }
+         default:
+         {
+            
+         }
+      }
+      
+      unset($res["selection_mode"]);
+      unset($res["ids"]);
+      
+      return $res;
+   }
+   
+   protected function load_data():void
+   {
+      //Loads posts using filter parameters from the block attributes.
+      // This method allows to extend posts loading in a simplier way than extending the constructor.
+      
+      $this->data=get_posts($this->prepare_filter($this->get_filter_from_attrs()));
+   }
 }
 
 class AsyncPostsList extends PostsRenderer
 {
    public function get_ans():JSONAns
    {
-      return new JSONAns(["status"=>"ok","data"=>$this->data]);
-   }
-   
-   protected function make_list_attrs():array
-   {
-      //Returns array of attributes for rendering a static part of the block.
-      // Designed for convenient extending.
-      
-      return [
-                "id"=>$this->attributes["anchor"],
-                "class"=>$this->filter["post_type"]." ".($this->attributes["className"]??""),
-                "data-request"=>new JSONAns(["action"=>get_block_action($this->block),"filter"=>$this->attributes["filter"]??[]]),   //Allow descendant classes to append request params.
-             ];
+      return new JSONAns(["status"=>"ok","data"=>$this->data,"dbg"=>["req"=>$_REQUEST["filter"],"filter"=>$this->filter]]);
    }
    
    public function __toString():string
@@ -244,6 +234,27 @@ class AsyncPostsList extends PostsRenderer
          <DIV <?=$item_attrs_str?>></DIV>
          <?php
       return ob_get_clean();
+   }
+   
+   protected function load_data():void
+   {
+      //Loads posts using filter parameters from the block attributes.
+      // This method allows to extend posts loading in a simplier way than extending the constructor.
+      
+      if (wp_doing_ajax())
+         $this->data=get_posts($this->prepare_filter($_REQUEST["filter"],true));
+   }
+   
+   protected function make_list_attrs():array
+   {
+      //Returns array of attributes for rendering a static part of the block.
+      // Designed for convenient extending.
+      
+      return [
+                "id"=>$this->attributes["anchor"],
+                "class"=>$this->filter["post_type"]." ".($this->attributes["className"]??""),
+                "data-request"=>new JSONAns(["action"=>get_block_action($this->block),"filter"=>$this->get_filter_from_attrs()]),   //Allow descendant classes to append request params.
+             ];
    }
 }
 

@@ -103,8 +103,9 @@ trait TMetaQueryHepler
    public const META_QUERY_GLUE=";";
    public const INCLUDE_GLUE=",";
    public const NAMEVAL_GLUE="=";
+   public const QUERY_RELATIONS=["AND"=>"AND","and"=>"AND","OR"=>"OR","or"=>"OR"];
    
-   protected  array $filter_allowed =["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","offset"=>"esc_int","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_str_arr","tax_query"=>"esc_str_arr"];
+   protected  array $filter_allowed =["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","offset"=>"esc_int","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_meta_query","tax_query"=>"esc_tax_query"];
    protected  array $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null,"tax_query"=>null];
    protected ?array $filter=null;   //Current filter state. Use after self::prepare_filter().
    
@@ -139,7 +140,9 @@ trait TMetaQueryHepler
       
       $res=null;
       
-      if (($sub_query_!==null)&&(!is_array($sub_query_)))   //If "meta_query" is naturally passed as array (e.g. using $shortcode->do([...])) then let it be.
+      if (is_array($sub_query_))
+         $res=$sub_query_;
+      elseif ($sub_query_!==null)
       {
          $res=[];
          
@@ -195,6 +198,35 @@ trait TMetaQueryHepler
    protected function esc_order($val_):string
    {
       return ["ASC"=>"ASC","DESC"=>"DESC","asc"=>"ASC","desc"=>"DESC"][$val_]??"ASC";
+   }
+   
+   protected function esc_tax_query($val_):array
+   {
+      $res=[];
+      
+      if (is_array($val_))
+      {
+         foreach ($val_ as $key=>$entry)
+            switch ($key)
+            {
+               case "relation":
+               {
+                  $res["relation"]=self::QUERY_RELATIONS[$entry]??"OR";
+                  break;
+               }
+               default:
+               {
+                  $res[$key]=$entry;   //TODO: Incomplete!
+               }
+            }
+      }
+      
+      return $val_??[];
+   }
+   
+   protected function esc_meta_query($val_):array
+   {
+      return $val_??[];
    }
 }
 
