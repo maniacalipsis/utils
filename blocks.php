@@ -123,7 +123,7 @@ class TermsRenderer extends ABlockRenderer
       //Renders block's HTML.
 
       $item_attrs=$this->attributes;
-      $item_attrs["className"]=$this->filter["post_type"]." ".$item_attrs["className"];
+      $item_attrs["className"]=$this->filter["taxonomy"]." ".$item_attrs["className"];
       $item_attrs_str=render_block_attributes($item_attrs);
       
       $tag=$this->attributes["tag"]??"";
