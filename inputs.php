@@ -99,7 +99,7 @@ class InputPwd extends InputField
    {
       $attrs=["type"=>"password","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
@@ -121,7 +121,7 @@ class InputString extends InputField
    {
       $attrs=["type"=>"text","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
@@ -132,7 +132,7 @@ class InputText extends InputString
    {
       $attrs=["name"=>$this->key]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <TEXTAREA <?=render_element_attrs($attrs)?>><?=htmlspecialchars($this->value??$this->default)?></TEXTAREA></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN> <TEXTAREA <?=render_element_attrs($attrs)?>><?=htmlspecialchars($this->value??$this->default)?></TEXTAREA></LABEL>
       <?php
    }
 }
@@ -218,7 +218,7 @@ class InputRichText extends InputText
    {
       $wp_editor_params=["textarea_name"=>$this->key]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN><?=wp_editor($this->value??$this->default,$this->key,$wp_editor_params)?></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN><?=wp_editor($this->value??$this->default,$this->key,$wp_editor_params)?></LABEL>
       <?php
    }
 }
@@ -242,7 +242,7 @@ class InputFloat extends InputField
    {
       $attrs=["type"=>"number","name"=>$this->key,"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
@@ -283,7 +283,7 @@ class InputBool extends InputField
       $attrs_hdden=["type"=>"hidden","name"=>$this->key,"value"=>$this->value??$this->default];
       $attrs_ccheck=["type"=>"checkbox","checked"=>to_bool($this->value??$this->default),"onclick"=>"let inp=this.parentNode.querySelector('input[type=hidden]'); console.log(inp); if (inp) inp.value=(this.checked ? '1' : '0');"]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs_hdden)?>> <INPUT<?=render_element_attrs($attrs_ccheck)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs_hdden)?>> <INPUT<?=render_element_attrs($attrs_ccheck)?>></LABEL>
       <?php
    }
 }
@@ -333,6 +333,7 @@ class InputStruct extends InputJson
       $struct_params_json=json_encode($this->struct,JSON_ENCODE_OPTIONS);
       ?>
       <DIV ID="<?=$container_id?>" CLASS="<?=$this->container_class_name?>">
+         <SPAN CLASS="caption"><?=$this->title?></SPAN>
          <?=parent::render()?>
          <DIV CLASS="items"></DIV>
          <BUTTON TYPE="button" CLASS="add" TITLE="<?=__("Add")?>">+</BUTTON>
@@ -463,7 +464,7 @@ class InputSelectRaw extends InputField
    {
       $attrs=["name"=>$this->key]+$this->attrs
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <SPAN CLASS="select"><?=html_select($this->key,$this->variants,$this->value??$this->default,$attrs)?></SPAN></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN> <SPAN CLASS="select"><?=html_select($this->key,$this->variants,$this->value??$this->default,$attrs)?></SPAN></LABEL>
       <?php
    }
 }
@@ -597,7 +598,7 @@ class InputFile extends InputField
    {
       $attrs=["type"=>"file","name"=>$this->key.($this->attrs["multiple"]??false ? "[]" : ""),"value"=>$this->value??$this->default]+$this->attrs;
       ?>
-      <LABEL CLASS="<?=$this->key?>"><SPAN><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
+      <LABEL CLASS="<?=$this->key?>"><SPAN CLASS="caption"><?=$this->title?></SPAN> <INPUT<?=render_element_attrs($attrs)?>></LABEL>
       <?php
    }
 }
