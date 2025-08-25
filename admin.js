@@ -193,12 +193,14 @@ export class PlaceMarkDataNode extends StructuredDataNode
    {
       super(params_);
       
-      this._elements.btnOpenMap.addEventListener('click',(e_)=>{if (this._elements.inputs.address.valueAsMixed!='') window.open('https://2gis.ru/search/'+encodeURIComponent(this._elements.inputs.address.valueAsMixed.replaceAll('\n','')),'_blank').focus(); return cancelEvent(e_);})
+      this._elements.btnOpenMap.addEventListener('click',(e_)=>{if (this._elements.inputs.address.valueAsMixed!='') window.open(this.mapURLTmpl.replace('%s',encodeURIComponent(this._elements.inputs.address.valueAsMixed.replaceAll('\n',''))),'_blank').focus(); return cancelEvent(e_);})
       
       this._elements.inputs.lat .addEventListener('paste',(e_)=>{if (this._distributeCoordsStr(e_.clipboardData.getData('text'),'lat','long')) return cancelEvent(e_);});
       this._elements.inputs.long.addEventListener('paste',(e_)=>{if (this._distributeCoordsStr(e_.clipboardData.getData('text'),'long','lat')) return cancelEvent(e_);});
       this._elements.btnSwap.addEventListener('click',(e_)=>{this._swapCoords();});   //Swap latitude and longitude.
    }
+   
+   mapURLTmpl='https://2gis.ru/search/%s';
    
    _makeInputStructs(inpParams_,baseKeySeq_)
    {
@@ -274,11 +276,11 @@ export class PlaceMarkDataNode extends StructuredDataNode
       
       let res=false;
       
-      if (/^ *-?[0-9]{1,3}(.[0-9]+)? *, *-?[0-9]{1,3}(.[0-9]+)? *$/.test(str_))
+      let matches=/^ *(-?[0-9]{1,3}(.[0-9]+)?)( *, *|%2C)(-?[0-9]{1,3}(.[0-9]+)?) *$/.exec(str_);
+      if (matches)
       {
-         let coords=str_.replace(/[^0-9,.-]/g,'').split(',');
-         this._elements.inputs[inpNameA_].valueAsMixed=coords[0];
-         this._elements.inputs[inpNameB_].valueAsMixed=coords[1];
+         this._elements.inputs[inpNameA_].valueAsMixed=matches[1];
+         this._elements.inputs[inpNameB_].valueAsMixed=matches[4];
          
          this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
          
