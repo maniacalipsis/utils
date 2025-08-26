@@ -261,10 +261,10 @@ export class PlaceMarkDataNode extends StructuredDataNode
                 },
                 {
                   tagName:'label',
-                  className:'baloon',
+                  className:'balloon',
                   childNodes:[
-                                {tagName:'span',className:'caption',textContent:'Baloon content'},
-                                {tagName:'textarea',_collectAs:[...baseKeySeq_,'baloon']},
+                                {tagName:'span',className:'caption',textContent:'balloon content'},
+                                {tagName:'textarea',_collectAs:[...baseKeySeq_,'balloon']},
                              ]
                 },
              ];
