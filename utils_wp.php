@@ -157,10 +157,9 @@ trait TMetaQueryHepler
    protected const NAMEVAL_GLUE="=";
    protected const QUERY_RELATIONS=["AND"=>"AND","and"=>"AND","OR"=>"OR","or"=>"OR"];
    
-   protected  array $filter_allowed =["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","offset"=>"esc_int","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_meta_query","tax_query"=>"esc_tax_query"];
+   protected  array $filter_allowed =["post_type"=>"esc_str","category"=>"esc_int","category_name"=>"esc_str","tag"=>"esc_str","post_status"=>"esc_post_status","post_parent"=>"esc_int","orderby"=>"esc_str","order"=>"esc_order","offset"=>"esc_int","numberposts"=>"esc_int","exclude"=>"esc_int_arr","include"=>"esc_int_arr","meta_key"=>"esc_str","meta_value"=>"esc_str","meta_query"=>"esc_meta_query","tax_query"=>"esc_tax_query","s"=>"esc_str"];
    protected  array $filter_defaults=["post_type"=>"post","post_status"=>"publish","orderby"=>"date","order"=>"DESC","numberposts"=>-1,"exclude"=>[],"include"=>[],"meta_query"=>null,"tax_query"=>null];
    protected ?array $filter=null;   //Current filter state. Use after self::prepare_filter().
-   
    
    protected function prepare_filter(array $params_,bool $escape_=false):array
    {
