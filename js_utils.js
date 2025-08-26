@@ -4305,6 +4305,7 @@ export function structuredCloneAwared(object_)
 {
    //Recursively clones a plain object|Array|Map, passing through a simple types, instances of custom classes and [potentially] not cloneable objects, including functions and DOM nodes.
    //NOTE: This method tested on plain objects, functions, DOM nodes, DocumentFragment and custom classes. However it may fail in some unpredicted cases.
+   //DEPRECATED: Use structuredClone() instead.
    
    let res=object_;
    
@@ -4343,6 +4344,7 @@ export function cloneOverriden(default_,actual_,options_)
    //    mergeArraysUnique - boolean, similar to mergeArrays, but excludes duplicate values, using a simple comparison (only duplicates of a simple types and referrences can be efficiently excluded), (values will be deep-cloned, indexes aren't preserved).
    //    mergeMaps - boolean, whether to merge default_ and actual_ maps or replace one with another. Merging acts like PHP's array_merge() with associative arrays.
    //NOTE: This method tested on plain objects, functions, DOM nodes, DocumentFragment and custom classes. However it may fail in some unpredicted cases.
+   //TODO: Replace this implementation with _experimental_cloneOverriden().
    
    var res=null;
    
@@ -4442,6 +4444,132 @@ export function cloneOverriden(default_,actual_,options_)
    return res;
 }
 
+export function _experimental_cloneOverriden(default_,actual_,options_)
+{
+   //Recursively clones two objects, overriding the first one with the second.
+   // NOTE: This is an updated replacement for cloneOverriden().
+   //Arguments:
+   // default_ - Object|Map|simple type|null|undefined, a first object to be overriden.
+   // actual_  - Object|Map|simple type|null|undefined, a second object which overrides/complements the first one.
+   // options_ - object, options.
+   
+   //TODO: Implement new behaviour:
+   // 1) Instances of Object, Map and FormData are always merged. Result has type of the default.
+   // 1.1) Values of incompartible types are not replaced by default. In type-strict mode Map and Object are merged interchangeably, result has type of default value; if any value is not Map or Object, then default is replaced with actual (unless default is not treated as undefined).
+   // 2) Arrays are replaced by default and optionally merged or concatenated.
+   // 3) Nulls are treated as normal values by default and optionally as undefined. I.e. by default _experimental_cloneOverriden(<any>,null)==null; _experimental_cloneOverriden(<any>,undefined)==<any>.
+   // 4) Entries with undefined values are not merged: _experimental_cloneOverriden({a:'A'},{b:undefined})=={a:'A'}; _experimental_cloneOverriden([1,2,3],[4,undefined,5])==[1,2,3,4,5].
+   
+   if (!options_?.strictNull)
+   {
+      default_??=undefined;
+      actual_??=undefined;
+   }
+   
+   let res=undefined;
+   
+   if ((options_?.strictNull&&(default_===undefined))||(default_==undefined))       //Undefined default is replaced with cloned actual.
+      res=structuredClone(actual_);
+   else if ((options_?.strictNull&&(actual_===undefined))||(actual_==undefined))    //If actual is undefined, then cloned default is returned.
+      res=structuredClone(default_);
+   else  //If neither default nor actual are undefined, then override according to their types.
+   {
+      if ((default_ instanceof Array)&&(actual_ instanceof Array))
+      {
+         switch (options_?.arrays)
+         {
+            case 'concat':
+            {
+               //Append clones of all actual elements to clones of the default elements:
+               res=structuredClone(default_);
+               for (let val of actual_)
+                  res.push(structuredClone(val));
+               
+               break;
+            }
+            case 'merge':
+            {
+               //Append clones of only those actual elements which are not present in the default array:
+               res=structuredClone(default_);
+               for (let val of actual_)
+                  if (!default_.includes(val))
+                     res.push(structuredClone(val));
+               
+               break;
+            }
+            default:
+            {
+               //Just replace the default with the cloned actual:
+               res=structuredClone(actual_);
+            }
+         }
+      }
+      else if (  //Both the default and  the actual are of map-like type.
+                 (
+                    //In type-strict mode both the default and the actual are of the same type exactly.
+                    options_?.strictType&&(
+                                             (default_.constructor.name=='Map')&&(actual_constructor.name=='Map')||
+                                             (default_.constructor.name=='FormData')&&(actual_constructor.name=='FormData')||
+                                             (default_.constructor.name=='Object')&&(actual_constructor.name=='Object')
+                                          )
+                 )||
+                 (
+                    //In normal mode the default and the actual are of compartible types.
+                    ((default_ instanceof Map)||(default_ instanceof FormData)||(default_ instanceof Object))&&
+                    ((actual_ instanceof Map)||(actual_ instanceof FormData)||(actual_ instanceof Object))
+                 )
+              )
+      {
+         //Prepare to access elements uniformly:
+         const mapDefault=(default_.constructor.name=='Object' ? new Map(Object.entries(default_)) : default_);
+         const mapActual =(actual_ .constructor.name=='Object' ? new Map(Object.entries(actual_ )) : actual_ );
+         const keys=(new Set(mapDefault.keys())).union(new Set(mapActual.keys()));
+         
+         //Create an empty map-like instance (if possible):
+         switch (default_.constructor.name)
+         {
+            case 'Map':
+            {
+               res=new Map();
+               break;
+            }
+            case 'FormData':
+            {
+               res=new FormData();
+               break;
+            }
+            case "Object":
+            {
+               res={};
+               break;
+            }
+            default: //If the default is not of exactly-known class, then fallback to inefficient but reliable way. TODO: This behavior may be revised in the future.
+            {
+               res=structuredClone(default_);   //This way, all the structured elements inside the default will be cloned twice, but it ensures the default will be cloned correctly.
+            }
+         }
+         //Merge cloned elements:
+         for (let key of keys)
+         {
+            let resVal=_experimental_cloneOverriden(mapDefault.get(key),mapActual.get(key),options_);
+            if (resVal!==undefined)
+            {
+               if (res.constructor.name=='Object')
+                  res[key]=resVal;
+               else
+                  res.set(resVal);
+            }
+         }
+      }
+      else  //Both the default and the actual are of different simple types.
+      {
+         res=structuredClone(actual_);
+      }
+   }
+   
+   return res;
+}
+
 export function arrayRelativeSlice(base_,array_,end_)
 {
    //Extracts a portion of array_ by matching its beginning against the base_.
@@ -4484,17 +4612,18 @@ export function HTMLSpecialCharsDecode(val_)
    return val_.replace(/&(amp|lt|gt|quot);/g,function(ch_){return map[ch_];});
 }
 
-export function serializeUrlQuery(query_data_,parent_)
+export function serializeUrlQuery(queryData_,parent_)
 {
    //Serializes a structured data into URL-query.
    //NOTE: There is a standard JS class URLSearchParams(), but it catn't replace this function because it unable to work with multidimensional data.
    
    var res_arr=[];
    
-   for (var key in query_data_)
+   let itQueryData=((queryData_ instanceof Map)||(queryData_ instanceof FormData) ? queryData_ : Object.entries(queryData_));
+   for (let [key,val] of itQueryData)
    {
       let full_key=(parent_!==undefined ? parent_+'['+encodeURIComponent(key)+']' : encodeURIComponent(key));
-      res_arr.push(typeof query_data_[key]=='object' ? serializeUrlQuery(query_data_[key],full_key) : full_key+'='+encodeURIComponent(query_data_[key]));
+      res_arr.push(typeof val=='object' ? serializeUrlQuery(val,full_key) : full_key+'='+encodeURIComponent(val));
    }
    
    return res_arr.join('&');
