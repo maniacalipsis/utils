@@ -367,30 +367,8 @@ class InputMedia extends InputStruct
       parent::__construct($params_);
       
       $this->container_class_name.=" placemarks";
-      $this->item_class=["name"=>"PlaceMarkDataNode","from"=>"@maniacalipsis/utils/admin"];
-   }
-   
-   public function render()
-   {
-      $container_id="extra_media_".$this->key;
-      $list_params=[
-                      "inputSelector"=>"#$container_id input[type=hidden][name=".$this->key."]",
-                      "containerSelector"=>"#$container_id .struct_list.media",
-                      "limit"=>$this->limit,
-                      "MediaSelectorParams"=>$this->selector_params,
-                   ];
-      $list_params_json=json_encode($list_params,JSON_ENCODE_OPTIONS);
-      ?>
-      <DIV ID="<?=$container_id?>" CLASS="media">
-         <?=parent::render()?>
-         <DIV CLASS="struct_list media"></DIV>
-         <INPUT TYPE="button" CLASS="add" VALUE="+">
-         <SCRIPT>
-            //document.addEventListener('DOMContentLoaded',function(e_){let list=new MediaList(<?=$list_params_json?>); list.onChange=function(mediaList_){mediaList_.updateSourceInput();};});
-         </SCRIPT>
-      </DIV>
-      <?php
-   }
+      $this->item_class=["name"=>"MediaDataNode","from"=>"@maniacalipsis/utils/admin"];
+   }   
 }
 
 class InputSelectRaw extends InputField

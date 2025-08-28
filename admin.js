@@ -5,6 +5,7 @@ import {
           buildNodes,
           decorateInputFieldVal,
           bindEvtInputToDeferredChange,
+          reqServer,
        } from '@maniacalipsis/utils/utils';
 
 //Media setter ------------------------------------------------------------------------------------------------------
@@ -134,6 +135,8 @@ export class StructuredDataNode extends TreeDataNode
    {
       for (let key in this._elements.inputs)
          this._elements.inputs[key].valueAsMixed=data_[key]??'';
+      
+      this.dispatchEvent(new CustomEvent('dataassigned',{bubbles:true}));
    }
    
    get boxMain(){return this._elements.boxMain;}
@@ -300,146 +303,71 @@ export class PlaceMarkDataNode extends StructuredDataNode
    }
 }
 
-//DEPRECATED:
-class _MediaSelector
+export class MediaDataNode extends StructuredDataNode
 {
-   //Selector of the WP media file[s]. It makes a node with the inputs that allows to select a file from the WP media library and annotate it.
-   //NOTE: All the inputs the MediaSelector makes are not related to any form and normally will NOT be sent on submit. Instead the parent has to get the data from its MediaSelector[s] and deal with it on its own.
-   //Arguments:
-   // mixedMedia_ - th default/initial value of the selected media. 
-   //                In the 1st case it's an object like {id:123,displayName:'some name'} where id - is ID of the file within WP media library and displayName - is some text that may be used as a pretty text in the download link, annotation, whatever.
-   //                In the 2nd case it's a attachment attributes retrieved from the WP media library dialog. This variation used internally by method _onMediaSelected().
-   // parent_ - some master class that e.g. controls a dynamic list of media files.
-   //             The primary duty of the parent is to send the data from its MediaSelector[s] to the server in the way is needed. To get the data refer to the properties MediaSelector.media and MediaSelector.hasMedia.
-   //             Optional feature is to maintain a multiple selection. For this parent should implement two methods: insert(newMediaSelector,afterMediaSelector) and remove(mediaSelector).
-   //             Additionally parent may has onMediaSelected(fromMediaSelector) listener. The argument is that selector which has opened the WP media library dialog.
-   //             NOTE: in case of multiple selection the onMediaSelected() will be called after all insert()s.
-   
-   constructor(mixedMedia_,parent_,params_)
+   constructor(params_)
    {
-      this._parent=parent_;
-      this.isMultiple=true; //NOTE: Multiple selection will be not allowed if the parent doesn't support method insert().
-      this._params=params_??{label:null};
-      this._params.options??(this._params.options={displayName:{label:null,default:null}});
+      super(params_);
       
-      this._build();
-      if (mixedMedia_?.id)
-      {
-         if (mixedMedia_.sizes&&mixedMedia_.icon&&mixedMedia_.editLink) //Detect if the mixedMedia_ is WP media file attributes obtained from WP media dialog.
-            this._setAttachmentAttrs(mixedMedia_);                      //If so, store these attributes to this._wpAttachmentAttrs, by the way filling empty optional data properties.
-         else                                                           //But if mixedMedia_ is a data then:
-            this.media=mixedMedia_;                                     // then assign it as data.
-      }
+      this._elements.btnMediaSet  .addEventListener('click',(e_)=>{this._openMediaDialog(); return cancelEvent(e_);});
+      this._elements.btnMediaUnset.addEventListener('click',(e_)=>{this._unsetMedia(); return cancelEvent(e_);});
+      
+      this.addEventListener('dataassigned',(e_)=>{this._fetchPreview();});
    }
    
-   //public props
-   get node(){return this._node;}
-   
-   get hasMedia(){return (this._wpAttachmentAttrs ? true : false);}
-   
-   get media()
-   {
-      let res=null;
-      
-      if (this._wpAttachmentAttrs)
-      {
-         res={id:this._wpAttachmentAttrs.id};
-         for (let key in this._params.options)
-            res[key]=this._subNodes[key].value;
-      }
-      
-      return res;
-   }
-   set media(mediaData_)
-   {
-      //First, set the optional properties of the media data:
-      for (let key in this._params.options)
-         if (this._subNodes[key])
-            this._subNodes[key].value=mediaData_?.[key]??this._params.options[key].default; 
-   
-      //Next, get WP media file attributes:
-      if (mediaData_?.id!=null)
-         wp.media.attachment(mediaData_.id).fetch().then((attrs_)=>{/*console.log(attrs_);*/if (attrs_){this._setAttachmentAttrs(attrs_); this._render();} else console.error('MediaSelector: Failed to retrieve media file attributes.');});
-      else
-      {
-         this._wpAttachmentAttrs=null;
-         this._render();
-      }
-   }
-   
-   get isMultiple(){return this._isMultiple;}
-   set isMultiple(val_){this._isMultiple=val_&&(typeof this._parent?.insert == 'function');}  //The parent has to support the method insert() to set this property true.
-   
-   //private props
-   _parent=null;              //Reference to the parent. 
-   _node=null;                //The DOM node with selector's UI.
-   _subNodes={};              //Pointers to the editable/changeable elements of UI.
+   //protected props
    _isMultiple=false;         //Allow or deny the multiple selection.
-   _wpAttachmentAttrs=null;   //Attributes of the selected media retrieved from WP.
    _wpMediaDialog=null;       //WordPress media popup dialog. 
    _params=null;              //Sonstructor params.
    
-   //public methods
-   
-   //private methods
-   _build()
+   get preview() {return this._elements.btnMediaSet.children[0]?.src;}
+   set preview(url_)
    {
-      //Create selector's DOM node:
-      let struct={
-                    tagName:'div',
-                    className:'media_selector',
-                    childNodes:[
-                                  {
-                                     tagName:'label',
-                                     className:'media',
-                                     childNodes:[
-                                                   this._params.label,
-                                                   {tagName:'span',className:'glyph flex center x-center',childNodes:[{tagName:'img',src:'',alt:'',_collectAs:'_glyphImg'}]},
-                                                   {tagName:'span',className:'url',textContent:'',title:'',_collectAs:'_urlBox'},
-                                                   {tagName:'input',className:'open',type:'button',value:'Выбрать файл',onclick:(e_)=>{this._openMediaDialog();},_collectAs:'_selBtn'},
-                                                   {tagName:'span',className:'spacer'},
-                                                ]
-                                  }
-                               ]
-                 };
-      for (let key in this._params.options)
+      if (url_)
       {
-         let inputStruct=this._params.options[key].inputStruct??{tagName:'input',type:'text',value:''};
-         inputStruct._collectAs=key;
-         struct.childNodes.push({tagName:'label',className:key,childNodes:[this._params.options[key].label,inputStruct]});
-      }
-      struct.childNodes.push({tagName:'input',className:'close',type:'button',value:String.fromCharCode(9747),onclick:(e_)=>{this._parent?.remove?.(this);}});
-      
-      this._node=buildNodes(struct,this._subNodes);
-   }
-   
-   _render()
-   {
-      //Displays changes at media file select.
-      
-      if (this._wpAttachmentAttrs)
-      {
-         //console.log(this._wpAttachmentAttrs.sizes);
-         this._subNodes._glyphImg.src=(this._wpAttachmentAttrs.type=='image' ? this._wpAttachmentAttrs.sizes?.thumbnail?.url??this._wpAttachmentAttrs.sizes?.full?.url : this._wpAttachmentAttrs.icon);
-         this._subNodes._glyphImg.alt=this._wpAttachmentAttrs.title;
-         this._subNodes._glyphImg.title=this._subNodes._glyphImg.src;
+         this._elements.btnMediaSet.innerHTML='';
+         let img=document.createElement('img');
+         img.src=url_;
+         this._elements.btnMediaSet.appendChild(img);
          
-         this._subNodes._urlBox.textContent=this._wpAttachmentAttrs.url;
-         this._subNodes._urlBox.title=this._wpAttachmentAttrs.url;
-         
-         this._subNodes._selBtn.value='Сменить файл';
+         this._elements.btnMediaUnset.classList.remove('hidden');
       }
       else
       {
-         this._subNodes._glyphImg.src='';
-         this._subNodes._glyphImg.alt='';
-         this._subNodes._glyphImg.title='';
-         
-         this._subNodes._urlBox.textContent='';
-         this._subNodes._urlBox.title='';
-         
-         this._subNodes._selBtn.value='Выбрать файл';
+         this._elements.btnMediaSet.innerHTML='Select image';
+         this._elements.btnMediaUnset.classList.add('hidden');
       }
+   }
+   
+   //protected methods
+   _makeInputStructs(inpParams_,baseKeySeq_)
+   {
+      //Arguments:
+      // inpParams_ - Array|Object. Parameters of input fields. Format: [{type:'<type>'[,name:'<inpName>'],...},...] or {'<inpName>':{type:'<type>',...},...}.
+      // baseKeySeq_ - Array. Base key for _collectAs parameter (see js_utils.js\buildNodes() for details).
+      
+      baseKeySeq_??=[];
+      
+      let res=super._makeInputStructs(inpParams_,baseKeySeq_);
+      
+      res.unshift({
+                    tagName:'label',
+                    className:'media',
+                    childNodes:[
+                                  {tagName:'span',className:'caption',textContent:'Media'},
+                                  {
+                                     tagName:'div',
+                                     className:'image',
+                                     childNodes:[
+                                                   {tagName:'button',type:'button',className:'set_image',_collectAs:'btnMediaSet'},
+                                                   {tagName:'button',type:'button',className:'unset_image',innerHTML:'&#9746;',_collectAs:'btnMediaUnset'},
+                                                ],
+                                  },
+                                  {tagName:'input',type:'number',className:'hidden',_collectAs:[...baseKeySeq_,'media']},
+                               ],
+                  });
+      
+      return res;
    }
    
    _openMediaDialog()
@@ -448,162 +376,49 @@ class _MediaSelector
       if (!this._wpMediaDialog)
       {
          this._wpMediaDialog=wp.media({title:'Выбарите файл[ы]',multiple:this.isMultiple});
-         this._wpMediaDialog.on('select',()=>{this._onMediaSelected();}); //This event will be fired when user confirms the selection by pressing the 'Select' button in the WP media dialog.
+         this._wpMediaDialog.on('select',()=>{this._onMediaSelected(this._wpMediaDialog.state().get('selection'));}); //This event will be fired when user confirms the selection by pressing the 'Select' button in the WP media dialog.
       }
       
       //Open
       this._wpMediaDialog.open();
    }
    
-   _onMediaSelected()
+   _onMediaSelected(selection_)
    {
       //Callback for the wp.media instance 'select' event.
-      let selection=this._wpMediaDialog.state().get('selection');
-      let attachment;
-      let isMediaSelected=false;
-      
-      //Get out the 1st selected media:
-      if (selection.length>0)
+      for (let media of selection_) //NOTE: selection_ is iterable but accessing elements by the bracket syntax doesn't work.
       {
-         attachment=selection.shift();
-         this._setAttachmentAttrs(attachment.attributes);
-         isMediaSelected=true;
-      }
-      
-      //Ask parent to add more selectors for the rest attachments:
-      if (this._isMultiple&&(selection.length>0))  //Force blocking of the multiple selection. However normally it should be allowed/disallowed by passing this._isMultiple to wp.media() parameters.
-      {
-         let afterWhich=this;
-         for (attachment of selection)
-         {
-            let selector=new MediaSelector(attachment.attributes,this._parent,this._params);
-            this._parent?.insert?.(selector,afterWhich);
-            afterWhich=selector;
-         }
-      }
-      
-      //Notify the parent about media was selected.
-      if (isMediaSelected)
-         this._parent?.onMediaSelected?.(this);
-   }
-   
-   _setAttachmentAttrs(attrs_)
-   {
-      this._wpAttachmentAttrs=attrs_;
-      for (let key in ['displayName','title'])
-         if (this._subNodes[key]&&!this._subNodes[key].value)
-            this._subNodes[key].value=attrs_.title;
-      
-      this._render();
-   }
-}
-
-//DEPRECATED:
-class wpJSONForm
-{
-   //This class handles a [part] of a static form that represents JSON data from the hidden inupt.
-   constructor(params_)
-   {
-      //Init:
-      let container=params_.container??document.querySelector(params_.containerSelector);
-      console.log(container);
-      this._sourceInput=params_.sourceInput??container?.querySelector(params_.sourceInputSelector??'input[type=hidden]');  //By default, a first hidden input will be the data source.
-      this._defaultsInput=params_.sourceInput??container?.querySelector(params_.sourceInputSelector??'input.defaults[type=hidden]');
-      this._inputs=this._filterInputs(params_.inputs??container?.querySelectorAll(params_.inputsSelector??'input,select,textarea'));   //Select all inputs and then filter-off unwanted ones (e.g.buttons).
-      
-      try
-      {
-         this._loadData();
-      }
-      catch (exc)
-      {
-         console.error('wpJSONForm failed to get JSON data from the source or defaults input.',exc,this);
-      }
-      finally
-      {
-         this._initInputs();
-         console.log(this);
+         //Store media ID to the hidden input:
+         //console.log(media);
+         this._elements.inputs.media.valueAsMixed=media?.attributes.id??null;
+         this.preview=media?.attributes.url;
+         
+         //Try to propagate media attributes to relevant input fields:
+         for (let key of ['alt','title','description'])
+            if (this._elements.inputs[key]&&(this._elements.inputs[key].valueAsMixed==''))   //Don't overwrite already filled inputs.
+               this._elements.inputs[key].valueAsMixed=media?.attributes[key];               //Set value w/o dispatching a 'change' event to each one, but dispatch 'datachange' after all changes.
+         
+         //Notify listeners that data was changed:
+         //console.log(this._data,this.data);
+         this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
+         
+         break;   //Use only one (first) media.
       }
    }
    
-   assignValue(keysSeq_,value_)
+   _unsetMedia()
    {
-      console.log(keysSeq_,value_);
-      this._data=setElementRecursively(this._data,keysSeq_,value_);
-      this._sourceInput.value=JSON.stringify(this._data);   //TODO: hook to post save event.
+      this._elements.inputs.media.valueAsMixed=null;
+      this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
+      this.preview=null;
    }
    
-   //private props
-   _sourceInput=null;
-   _defaultsInput=null;
-   _inputs=[];
-   _data=null;
-   
-   //private methods
-   _loadData()
+   _fetchPreview()
    {
-      //Get data and apply defaults (if given):
+      //Fetches URL of selected media by its ID.
+      // This method is used when only stored ID is available.
       
-      this._data=JSON.parse(this._sourceInput.value);
-      if (this._defaultsInput)
-         this._data=cloneOverriden(JSON.parse(this._defaultsInput.value),this._data);
+      if (this.data?.media&&!this.preview)
+         reqServer('/wp-json/wp/v2/media/'+this.data.media,null,'GET').then((ans_)=>{this.preview=ans_.source_url;});   //NOTE: Answer format is not the same as media retrieved from wp.media().get('selection').
    }
-   
-   _initInputs()
-   {
-      this._keysCache=[];
-      for (var input of this._inputs)
-      {
-         switch (input.type)
-         {
-            case 'hidden':
-            {
-               input.value=getElementRecursively(this._data,this._getKeysSequence(input));
-               input.addEventListener('change',(e_)=>{console.log('Hidden changed:',e_.target); this.assignValue(this._getKeysSequence(e_.target),e_.target.value);});
-            }
-            case 'image':
-            case 'radio':
-            {
-               console.warn('wpJSONForm didn\'t learned how to treat inputs of types image and radio yet.');
-               break;
-            }
-            case 'checkbox':
-            {
-               input.checked=toBool(getElementRecursively(this._data,this._getKeysSequence(input)));
-               input.addEventListener('click',(e_)=>{this.assignValue(this._getKeysSequence(e_.target),toBool(e_.target.checked));});
-               break;
-            }
-            default:
-            {
-               input.value=getElementRecursively(this._data,this._getKeysSequence(input));
-               input.addEventListener('input',(e_)=>{this.assignValue(this._getKeysSequence(e_.target),e_.target.value);});
-            }
-         }
-      }
-   }
-   
-   _getKeysSequence(input_)
-   {
-      if (!input_.keysSequenceCache)
-         input_.keysSequenceCache=input_.dataset.keys_seq?.split(',');
-      
-      return input_.keysSequenceCache;
-   }
-   
-   _filterInputs(inputs_)
-   {
-      //This method filters inputs. It nade to simplify the inputs selector, and also to check that selector can't.
-      //NOTE: overrde this method to make more custom checks or to cancel them all.
-      
-      let res=[];
-      
-      for (let input of inputs_)
-         if (input!=this._sourceInput&&
-             input!=this._defaultsInput&&
-             this._getKeysSequence(input))
-            res.push(input);
-      
-      return res;
-   }
-   //
 }

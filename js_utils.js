@@ -4610,16 +4610,19 @@ export function serializeUrlQuery(queryData_,parent_)
    //Serializes a structured data into URL-query.
    //NOTE: There is a standard JS class URLSearchParams(), but it catn't replace this function because it unable to work with multidimensional data.
    
-   var res_arr=[];
+   var res=[];
    
-   let itQueryData=((queryData_ instanceof Map)||(queryData_ instanceof FormData) ? queryData_ : Object.entries(queryData_));
-   for (let [key,val] of itQueryData)
+   if (queryData_)
    {
-      let full_key=(parent_!==undefined ? parent_+'['+encodeURIComponent(key)+']' : encodeURIComponent(key));
-      res_arr.push(typeof val=='object' ? serializeUrlQuery(val,full_key) : full_key+'='+encodeURIComponent(val));
+      let itQueryData=((queryData_ instanceof Map)||(queryData_ instanceof FormData) ? queryData_ : Object.entries(queryData_));
+      for (let [key,val] of itQueryData)
+      {
+         let full_key=(parent_!==undefined ? parent_+'['+encodeURIComponent(key)+']' : encodeURIComponent(key));
+         res.push(typeof val=='object' ? serializeUrlQuery(val,full_key) : full_key+'='+encodeURIComponent(val));
+      }
    }
    
-   return res_arr.join('&');
+   return res.join('&');
 }
 
 export function splitInpFieldName(name_,isMultiple_=false)
