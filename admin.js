@@ -313,6 +313,8 @@ export class MediaDataNode extends StructuredDataNode
       this._elements.btnMediaUnset.addEventListener('click',(e_)=>{this._unsetMedia(); return cancelEvent(e_);});
       
       this.addEventListener('dataassigned',(e_)=>{this._fetchPreview();});
+      
+      this.preview=null;   //Initialize preview state.
    }
    
    //protected props
