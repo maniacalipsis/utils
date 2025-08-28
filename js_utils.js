@@ -3922,15 +3922,8 @@ export class Scroller
    {
       //Scroll to the specific node.
       
-      let offset=0;
-      for (let child of this._content.childNodes)
-         if (child==target_)
-         {
-            offset=child.offsetLeft;
-            break;
-         }
-      
-      this.scrollBy(offset,true);
+      if (target_.parentNode==this._content)
+         this.scrollBy(target_.offsetLeft,false);
    }
    
    resume()
@@ -3939,7 +3932,7 @@ export class Scroller
       //NOTE: This method named "resume" because it doesn't affect the currIndex, which might be implied for "reset" or "restart".
       //NOTE: This method doesnt preserves a time passed from the last tick to the stop and this is the feature.
       
-      if (this._interval>0)
+      if (this._interval!=0)
       {
          this.stop();
          this._intervalID=setInterval((e_)=>{this.scroll(Math.sign(this._interval));},Math.abs(this._interval));
@@ -4748,6 +4741,42 @@ export function parseCompleteFloat(val_)
       res=parseFloat(val_);
    
    return res;
+}
+
+export class CSSSize
+{
+   constructor(size_,context_)
+   {
+      //
+      const matches=/^\s*(-?\d*\.?\d*)(em|%|px|vw|vh)?\s*$/i.exec(size_);
+      if (!matches)
+         throw new TypeError('Value "[[1]]" is not a valid CSS size'.replace('[[1]]',size_));
+      
+      this._content=context_;
+      this._value=matches[1];
+      this._unit=matches[2]
+   }
+   
+   //public props
+   get value(){return this._value??=this.pixelsToVal();}
+   set value(newVal_){}
+   
+   get pixels(){return this._pixels??=this.valToPixels();}
+   get pixels(){return this._unit;}
+   
+   get unit(){return this._unit;}
+   set unit(newVal_){}
+   
+   //protected props
+   _value=null;
+   _pixels=null;
+   _unit='px';
+   _context=null;
+   
+   toString()
+   {
+      return this._value+this._unit;
+   }
 }
 
 export function mUnit(size_)
