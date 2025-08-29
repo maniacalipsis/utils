@@ -4748,37 +4748,137 @@ export function parseCompleteFloat(val_)
 
 export class CSSSize
 {
-   constructor(size_,context_)
+   constructor(size_,...args_)
    {
-      //
-      const matches=/^\s*(-?\d*\.?\d*)(em|%|px|vw|vh)?\s*$/i.exec(size_);
-      if (!matches)
-         throw new TypeError('Value "[[1]]" is not a valid CSS size'.replace('[[1]]',size_));
+      //Arguments format:
+      // new CSSSize('10em'[,'x'][,boxMain]);
+      // new CSSSize(10,'em'[,'x'][,boxMain]);
       
-      this._content=context_;
-      this._value=matches[1];
-      this._unit=matches[2]
+      //Get Size value and measurement unit:
+      if (typeof size_ =='number')
+      {
+         this._value=size_;                     //If value is a number,
+         this._unit=args_.shift()??this._unit;  // then unit must be the next argument.
+      }
+      else if (typeof size_ =='string')
+      {
+         const matches=/^\s*(-?\d*\.?\d*)(px|em|en|ex|rem|%|vw|vh)?\s*$/i.exec(size_);  //Try to parse value and unit from string.
+         if (!matches)
+            throw new TypeError('Failed to parse CSS size "[[1]]"'.replace('[[1]]',size_));
+         this._value=parseFloat(matches[1]);
+         this._unit=(matches[2] ? matches[2] : args_.shift()??this._unit); //If the string does not contain a unit, then the unit must be the next argument.
+      }
+      
+      //Get axis:
+      if (typeof args_[0] =='string')
+         this._axis=args_.shift();
+      
+      //Get context element:
+      if (args_[0] instanceof HTMLElement)
+         this._context=args_[0];
    }
    
    //public props
-   get value(){return this._value??=this.pixelsToVal();}
-   set value(newVal_){}
+   get value(){return this._value;}
+   set value(newVal_){this._value=parseFloat(newVal_);}
    
-   get pixels(){return this._pixels??=this.valToPixels();}
-   get pixels(){return this._unit;}
+   get pixels(){return this._value*this._getRatio();}          //Returns value converted from the current unit to pixels.
+   set pixels(newVal_){this._value=newVal_/this._getRatio();}  //Sets the value, converted from pixels to the current unit.
    
    get unit(){return this._unit;}
-   set unit(newVal_){}
+   set unit(newVal_){let oldPixels=this.pixels; this._unit=newVal_; this.pixels=oldPixels;}  //Assign a new unit and teh value will be converted to it.
    
    //protected props
-   _value=null;
-   _pixels=null;
-   _unit='px';
-   _context=null;
+   _value=null;            //The value in the given unit.
+   _unit='px';             //The measurement unit.
+   _axis='x';              //An axis is required to convert percents.
+   _context=document.body; //A reference HTMLElement. It used to get font size and dimensions for uniot conversion.
+   
+   toUnitConverted(unit_)
+   {
+      //Returns a new instance with value converted to the given unit.
+      
+      let res=new CSSSize(0,unit_,this._axis,this._context);
+      res.pixels=this.pixels;
+      return res;
+   }
    
    toString()
    {
+      //Implements implicit conversion to string.
+      
       return this._value+this._unit;
+   }
+   
+   toJSON()
+   {
+      //Implements conversion by JSON.stringify().
+      
+      return this._value+this._unit;
+   }
+   
+   
+   //TODO: Implement [Symbol.iterator] to use spread syntax for CSSSize instances: let cs1=new CSSSize('10em'); cs2=new CSSSize(...cs1);.
+   
+   _getRatio()
+   {
+      //Returns unit/pixels ratio.
+      
+      let res=undefined;
+      
+      switch (this._unit)
+      {
+         case 'px':
+         {
+            res=this._value;
+            break;
+         }
+         case 'em':
+         {
+            res=parseFloat(window.getComputedStyle(this._context).fontSize);
+            break;
+         }
+         case 'en':
+         case 'ex':
+         {
+            throw new Error('CSSSize currently does not support en and ex units');
+            break;
+         }
+         case 'rem':
+         {
+            res=parseFloat(window.getComputedStyle(document.documentElement).fontSize);
+            break;
+         }
+         case '%':
+         {
+            switch (this._axis)
+            {
+               case 'x':
+               {
+                  res=this._context.offsetWidth/100;
+                  break;
+               }
+               case 'y':
+               {
+                  res=this._context.offsetHeight/100;
+                  break;
+               }
+            }
+            break;
+         }
+         case 'vw':
+         {
+            res=window.innerWidth;
+            break;
+         }
+         case 'vh':
+         {
+            res=window.innerHeight;
+            break;
+         }
+      }
+      
+      return res;
    }
 }
 
