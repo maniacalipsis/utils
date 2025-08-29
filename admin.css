@@ -78,7 +78,7 @@
 }
 
 /* Single inputs */
-#wpbody-content  td>label:only-child>span /*Experimental. Hides duplication of the title for fields with a single input.*/
+#wpbody-content  td>label:only-child>.caption /*Experimental. Hides duplication of the title for fields with a single input.*/
 {
    display:none;
 }
