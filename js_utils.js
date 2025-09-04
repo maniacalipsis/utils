@@ -3495,22 +3495,22 @@ export class TabBox extends TabsController
 
       //Split and map params for the inherited constructor and the child TabsController:
       let tabsParams={
-                        tabs:params_.tabs,                                                   //1st, look for already selected tabs.
+                        tabs:params_.tabs,                                                      //1st, look for already selected tabs.
                         container:container,
-                        tabsSelector:params_.tabsSelector??container?.dataset?.tabs??'.tab',  //2nd, take the selector from params, or container's dataset or set the default.
-                        switchCmpCallback:params_.switchCmpCallback,
+                        tabsSelector:params_.tabsSelector??container?.dataset?.tabs??'.tab',    //2nd, take the selector from params, or container's dataset or set the default.
                         selClassName:params_.selClassName,
+                        switchCmpCallback:params_.switchCmpCallback??((class_,tab_)=>{return tab_.classList.contains(class_)}),
                      };
       let btnsParams={
-                        tabs:params_.buttons,                                                         //1st, look for already selected buttons.
+                        tabs:params_.buttons,                                                            //1st, look for already selected buttons.
                         container:container,
-                        tabsSelector:params_.buttonsSelector??container?.dataset?.buttons??'.tab_btn', //2nd, take the selector from params, or container's dataset or set the default.
+                        tabsSelector:params_.buttonsSelector??container?.dataset?.buttons??'.tab_btn',   //2nd, take the selector from params, or container's dataset or set the default.
                         selClassName:params_.selClassName,
                      };
 
       //Construct inherited:
       super(tabsParams);   //This class will directly control the tabs of the tabbox.
-
+      
       //Set the properties from params:
       this._matchByCallback=params_.matchByCallback??this._matchByCallback;
 
@@ -3539,8 +3539,6 @@ export class TabBox extends TabsController
 
    //public props
    get currBtn(){return this._switch.currTab;}  //The currently selected button.
-
-   switchCmpCallback=(class_,tab_)=>{return tab_.classList.contains(class_)};
 
    //protected props
    _switch=null;           //The TabsSwitch instance which will control the tab butons.

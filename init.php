@@ -25,7 +25,7 @@ require_once(__DIR__."/blocks.php");               //Collection of helper functi
 require_once(__DIR__."/captcha.php");              //Text captcha for feedback forms.
 
 if (version_compare(phpversion(),"8.4.0","<"))     //This is a tempopary solution for extending compartibility 
-   require_once("./utils.prior-to-phpv8.4.php");   // with older versions of PHP (until they are not tool old yet).
+   require_once("utils.prior-to-phpv8.4.php");     // with older versions of PHP (until they are not tool old yet).
 
 spl_autoload_register(__NAMESPACE__."\\ClassesAutoloader::callback");
 
