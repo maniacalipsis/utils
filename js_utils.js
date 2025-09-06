@@ -4512,8 +4512,8 @@ export function _experimental_cloneOverriden(default_,actual_,options_)
               )
       {
          //Prepare to access elements uniformly:
-         const mapDefault=(default_.constructor.name=='Object' ? new Map(Object.entries(default_)) : default_);
-         const mapActual =(actual_ .constructor.name=='Object' ? new Map(Object.entries(actual_ )) : actual_ );
+         const mapDefault=(default_ instanceof Map ? default_ : new Map(Object.entries(default_)));
+         const mapActual =(actual_  instanceof Map ? actual_  : new Map(Object.entries(actual_ )));
          const keys=(new Set(mapDefault.keys())).union(new Set(mapActual.keys()));
          
          //Create an empty map-like instance (if possible):
