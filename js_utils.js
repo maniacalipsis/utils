@@ -4234,7 +4234,7 @@ export function setCookie(name_,val_,expires_,path_)
 }
 
 //------- Array and Object -------//
-export function setElementeRcursively(object_,keySequence_,value_,forceObject_)
+export function setElementRecursively(object_,keySequence_,value_,forceObject_)
 {
    //[Re]places $value_ into multidimensional $array_, using a sequence of keys from the argument $key_sequence_. Makes missing dimensions.
    //Analog of the /core/utils.php\set_array_element().
