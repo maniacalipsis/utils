@@ -83,6 +83,7 @@ export class StructuredDataList extends DynamicHTMLList
 export class StructuredDataNode extends TreeDataNode
 {
    //Form fragment for a structured data list.
+   // This class manages an editing of structured data utilizing unnamed input fields that are never submitted to the server directly, but their values are collected and submitted to a parent StructuredDataList.
    
    constructor(params_)
    {
@@ -101,23 +102,7 @@ export class StructuredDataNode extends TreeDataNode
       buildNodes(nodeStruct,this._elements);
       
       //Init inputs:
-      for (let inpField of Object.values(this._elements.inputs))
-      {
-         decorateInputFieldVal(inpField);
-         switch (inpField.type)
-         {
-            case 'checkbox':
-            case 'radio':
-            case 'select-one':
-            case 'select-multiple':
-            {break;}
-            default:
-            {
-               bindEvtInputToDeferredChange(inpField);
-            }
-         }
-         inpField.addEventListener('change',(e_)=>{this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));});
-      }
+      this._initInputs(this._elements.inputs);
       
       this._elements.btnDel.addEventListener('click',(e_)=>{this.parent?.delete(this); return cancelEvent(e_);});
    }
@@ -188,6 +173,34 @@ export class StructuredDataNode extends TreeDataNode
       
       return res;
    }
+   
+   _initInputs(inputs_)
+   {
+      //Recursively initialize input fields.
+      //Arguments:
+      // inputs_ - Object. A dictionary with inputs.
+      
+      for (let inpField of Object.values(inputs_))
+      {
+         decorateInputFieldVal(inpField); //All inputs are decorated with unified accessor to value, named valueAsMixed.
+         switch (inpField.type)
+         {
+            case 'checkbox':
+            case 'radio':
+            case 'select-one':
+            case 'select-multiple':
+            {
+               //For these fields the 'change' dispatched immediately.
+               break;
+            } 
+            default:
+            {
+               bindEvtInputToDeferredChange(inpField);   //For other inputs the 'change' is usually dispatched after the focus loss.
+            }
+         }
+         inpField.addEventListener('change',(e_)=>{this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));}); //All inputs are notifies this class of their value changes.
+      }
+   }
 }
 
 export class PlaceMarkDataNode extends StructuredDataNode
@@ -201,9 +214,36 @@ export class PlaceMarkDataNode extends StructuredDataNode
       this._elements.inputs.lat .addEventListener('paste',(e_)=>{if (this._distributeCoordsStr(e_.clipboardData.getData('text'),'lat','long')) return cancelEvent(e_);});
       this._elements.inputs.long.addEventListener('paste',(e_)=>{if (this._distributeCoordsStr(e_.clipboardData.getData('text'),'long','lat')) return cancelEvent(e_);});
       this._elements.btnSwap.addEventListener('click',(e_)=>{this._swapCoords();});   //Swap latitude and longitude.
+      
+      this._elements.btnMediaSet  .addEventListener('click',(e_)=>{this._openMediaDialog(); return cancelEvent(e_);});
+      this._elements.btnMediaUnset.addEventListener('click',(e_)=>{this._unsetMedia(); return cancelEvent(e_);});
+      
+      this.addEventListener('dataassigned',(e_)=>{this._fetchPreview();});
+      
+      this.preview=null;   //Initialize preview state.
+   }
+   
+   get preview() {return this._elements.btnMediaSet.children[0]?.src;}
+   set preview(url_)
+   {
+      if (url_)
+      {
+         this._elements.btnMediaSet.innerHTML='';
+         let img=document.createElement('img');
+         img.src=url_;
+         this._elements.btnMediaSet.appendChild(img);
+         
+         this._elements.btnMediaUnset.classList.remove('hidden');
+      }
+      else
+      {
+         this._elements.btnMediaSet.innerHTML='Select image';
+         this._elements.btnMediaUnset.classList.add('hidden');
+      }
    }
    
    mapURLTmpl='https://2gis.ru/search/%s';
+   _wpMediaDialog=null;       //WordPress media popup dialog.
    
    _makeInputStructs(inpParams_,baseKeySeq_)
    {
@@ -270,6 +310,81 @@ export class PlaceMarkDataNode extends StructuredDataNode
                                 {tagName:'textarea',_collectAs:[...baseKeySeq_,'balloon']},
                              ]
                 },
+                {
+                   tagName:'details',
+                   className:'glyph_params',
+                   childNodes:[
+                                 {
+                                    tagName:'summary',
+                                    className:'caption',
+                                    childNodes:[
+                                                  {
+                                                     tagName:'div',
+                                                     className:'media glyph',
+                                                     childNodes:[
+                                                                   {tagName:'span',className:'caption',textContent:'Glyph'},
+                                                                   {
+                                                                      tagName:'div',
+                                                                      className:'image',
+                                                                      childNodes:[
+                                                                                    {tagName:'button',type:'button',className:'set_image',_collectAs:'btnMediaSet'},
+                                                                                    {tagName:'button',type:'button',className:'unset_image',innerHTML:'&#9746;',_collectAs:'btnMediaUnset'},
+                                                                                 ],
+                                                                   },
+                                                                   {tagName:'input',type:'number',className:'hidden',_collectAs:[...baseKeySeq_,'glyph_id']},
+                                                                ],
+                                                  },
+                                               ],
+                                 },
+                                 {
+                                    tagName:'div',
+                                    className:'group size',
+                                    childNodes:[
+                                                  {tagName:'span',className:'caption',textContent:'Size'},
+                                                  {
+                                                    tagName:'label',
+                                                    className:'width',
+                                                    childNodes:[
+                                                                  {tagName:'span',className:'caption',textContent:'W'},
+                                                                  {tagName:'input',type:'number',_collectAs:[...baseKeySeq_,'glyph_size_w']},
+                                                               ]
+                                                  },
+                                                  {
+                                                    tagName:'label',
+                                                    className:'height',
+                                                    childNodes:[
+                                                                  {tagName:'span',className:'caption',textContent:'H'},
+                                                                  {tagName:'input',type:'number',_collectAs:[...baseKeySeq_,'glyph_size_h']},
+                                                               ]
+                                                  },
+                                               ],
+                                 },
+                                 {
+                                    tagName:'div',
+                                    className:'group offset',
+                                    childNodes:[
+                                                  {tagName:'span',className:'caption',textContent:'Offset'},
+                                                  {
+                                                    tagName:'label',
+                                                    className:'x',
+                                                    childNodes:[
+                                                                  {tagName:'span',className:'caption',textContent:'X'},
+                                                                  {tagName:'input',type:'number',_collectAs:[...baseKeySeq_,'glyph_offset_x']},
+                                                               ]
+                                                  },
+                                                  {
+                                                    tagName:'label',
+                                                    className:'y',
+                                                    childNodes:[
+                                                                  {tagName:'span',className:'caption',textContent:'Y'},
+                                                                  {tagName:'input',type:'number',_collectAs:[...baseKeySeq_,'glyph_offset_y']},
+                                                               ]
+                                                  },
+                                               ],
+                                 },
+                              ],
+                   _collectAs:'boxGlyphParams',
+                },
              ];
    }
    
@@ -301,6 +416,51 @@ export class PlaceMarkDataNode extends StructuredDataNode
       
       this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
    }
+   
+   _openMediaDialog()
+   {
+      //Lazy instantiate the WP media dialog:
+      if (!this._wpMediaDialog)
+      {
+         this._wpMediaDialog=wp.media({title:'Выбарите файл[ы]',multiple:this.isMultiple});
+         this._wpMediaDialog.on('select',()=>{this._onMediaSelected(this._wpMediaDialog.state().get('selection'));}); //This event will be fired when user confirms the selection by pressing the 'Select' button in the WP media dialog.
+      }
+      
+      //Open
+      this._wpMediaDialog.open();
+   }
+   
+   _onMediaSelected(selection_)
+   {
+      //Callback for the wp.media instance 'select' event.
+      for (let media of selection_) //NOTE: selection_ is iterable but accessing elements by the bracket syntax doesn't work.
+      {
+         //Store media ID to the hidden input:
+         this._elements.inputs.glyph_id.valueAsMixed=media?.attributes.id??null;
+         this.preview=media?.attributes.url;
+         
+         //Notify listeners that data was changed:
+         this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
+         
+         break;   //Use only one (first) media.
+      }
+   }
+   
+   _unsetMedia()
+   {
+      this._elements.inputs.glyph_id.valueAsMixed=null;
+      this.dispatchEvent(new CustomEvent('datachange',{bubbles:true}));
+      this.preview=null;
+   }
+   
+   _fetchPreview()
+   {
+      //Fetches URL of selected media by its ID.
+      // This method is used when only stored ID is available.
+      
+      if (this.data?.glyph_id&&!this.preview)
+         reqServer('/wp-json/wp/v2/media/'+this.data.glyph_id,null,'GET').then((ans_)=>{this.preview=ans_.source_url;});   //NOTE: Answer format is not the same as media retrieved from wp.media().get('selection').
+   }
 }
 
 export class MediaDataNode extends StructuredDataNode
@@ -320,7 +480,7 @@ export class MediaDataNode extends StructuredDataNode
    //protected props
    _isMultiple=false;         //Allow or deny the multiple selection.
    _wpMediaDialog=null;       //WordPress media popup dialog. 
-   _params=null;              //Sonstructor params.
+   //_params=null;              //Constructor params.
    
    get preview() {return this._elements.btnMediaSet.children[0]?.src;}
    set preview(url_)

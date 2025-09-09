@@ -151,26 +151,69 @@
    height:auto;
 }
 
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params
+{
+   display:flex;
+   flex-flow:row wrap;
+   gap:0 1em;
+}
+
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params>summary>.media
+{
+   display:inline-flex;
+   flex-flow: column;
+}
+
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params>.group
+{
+   display:grid;
+   grid:'cc cc' auto 'l1 l2' 1fr/1fr 1fr;
+}
+
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params>.caption
+{
+   grid-area:cc;
+}
+
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params>.group>label
+{
+   grid:'c i' 1fr/auto 1fr;
+   align-items:center;
+}
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params>.group>label:nth-of-type(1)
+{
+   grid-area:l1;
+}
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params>.group>label:nth-of-type(2)
+{
+   grid-area:l2;
+}
+
+#wpbody-content .struct_data.placemarks>.items>.item .glyph_params input
+{
+   width:4em;
+}
+
 /* MediaList */
-#wpbody-content .struct_data>.items>.item>label.media>.image
+#wpbody-content .struct_data>.items>.item .media>.image
 {
    position:relative;
 }
 
-#wpbody-content .struct_data>.items>.item>label.media>.image>button.set_image
+#wpbody-content .struct_data>.items>.item .media>.image>button.set_image
 {
    position:relative;
    padding:0.5em 0.5em;
    border:1px solid #666666;
    background:none #0000000F;
 }
-#wpbody-content .struct_data>.items>.item>label.media>.image>button.set_image:has(img)
+#wpbody-content .struct_data>.items>.item .media>.image>button.set_image:has(img)
 {
    width:5em;
    height:4em;
 }
 
-#wpbody-content .struct_data>.items>.item>label.media>.image>button.set_image>img
+#wpbody-content .struct_data>.items>.item .media>.image>button.set_image>img
 {
    position:absolute;
    top:0;
@@ -181,7 +224,7 @@
    object-position:center;
 }
 
-#wpbody-content .struct_data>.items>.item>label.media>.image>button.unset_image
+#wpbody-content .struct_data>.items>.item .media>.image>button.unset_image
 {
    position:absolute;
    top:0;
@@ -197,7 +240,7 @@
    background:none #d41b1f20;
    opacity:0.6;
 }
-#wpbody-content .struct_data>.items>.item>label.media>.image>button.unset_image:hover
+#wpbody-content .struct_data>.items>.item .media>.image>button.unset_image:hover
 {
    background:none #d4abaf;
    opacity:1;

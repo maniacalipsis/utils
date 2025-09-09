@@ -359,13 +359,20 @@ abstract class AMapRenderer extends ABlockRenderer
    // {
    //    protected function load_data():void
    //    {
-   //       $this->json_map_data=get_option($this->attributes["optName"],$this->json_map_data);
+   //       try
+   //       {
+   //          $this->map_data=get_option($this->attributes["optName"],$this->json_map_data);
+   //       }
+   //       catch (JsonException $ex)
+   //       {
+   //          $this->map_data=[];
+   //       }
    //    }
    // }
    // NOTE: In a complex cases, use it as dependency. 
    
    //Map data:
-   protected string $json_map_data="[]";   //This property is used instead of parent::$data (for decode-encode optimization) and must be filled with actual data by method load_data().
+   protected array  $map_data=[];      //This property is used instead of parent::$data (for decode-encode optimization) and must be filled with actual data by method load_data().
    
    //Map parameters' defaults:
    protected string $map_id {get=>htmlspecialchars(($this->attributes["anchor"]??"")!="" ? $this->attributes["anchor"] : "ymap");}
@@ -380,45 +387,63 @@ abstract class AMapRenderer extends ABlockRenderer
       ob_start();
       ?>
       <SCRIPT TYPE="module">
-        function mapInitCallback()
-        {
-           //Source data:
-           let places=<?=$this->json_map_data?>;
-           
-           let mapId='<?=$this->map_id?>';
-           let zoom=<?=$this->map_zoom?>;
-           let mapState=<?=json_encode($this->default_map_state,JSON_ENCODE_OPTIONS)?>;
-           let mapOptions=<?=json_encode($this->default_map_options,JSON_ENCODE_OPTIONS)?>;
-           let placeOptions=<?=json_encode($this->default_place_options,JSON_ENCODE_OPTIONS)?>;
-           
-           //Create places:
-           let yClusterer=new ymaps.Clusterer();
-           for (let place of places)
-              yClusterer.add(new ymaps.Placemark([place.lat,place.long],{iconContent:place.text??'',hintContent:place.hint??'',balloonContent:place.balloon},{...placeOptions,preset:place.preset??'islands#redStretchyIcon'}));
-           
-           //Adjust view area:
-           if (places.length>1)
-              mapState.bounds=yClusterer.getBounds();
-           else
-              mapState={...mapState,center:(places[0] ? [places[0].lat,places[0].long] : [55.755819,37.617644]),zoom:zoom};
-           
-           //Create map and add the places on it:
-           let yMap=new ymaps.Map(mapId,mapState,mapOptions);
-           yMap.geoObjects.add(yClusterer);
-           //Bounds hotfix:
-           if (mapState.bounds)
-              window.setTimeout(()=>{yMap.setBounds(mapState.bounds);},1000);
-           
-           //Let other scripts to access this map:
-           const boxMap=document.getElementById(mapId);  //Assign the map instance to the DOM element to support multiple maps on a single page.
-           if (boxMap)
-              boxMap.yMap=yMap;
-        }
-        ymaps.ready(mapInitCallback);
+         import {cloneOverriden} from '<?=plugin_dir_url(__FILE__)?>js_utils.js';
+         
+         function mapInitCallback()
+         {
+            //Source data:
+            let places=<?=json_encode($this->prepare_map_data($this->map_data),JSON_ENCODE_OPTIONS)?>;
+            
+            let mapId='<?=$this->map_id?>';
+            let zoom=<?=$this->map_zoom?>;
+            let mapState=<?=json_encode($this->default_map_state,JSON_ENCODE_OPTIONS)?>;
+            let mapOptions=<?=json_encode($this->default_map_options,JSON_ENCODE_OPTIONS)?>;
+            let defaultPlaceOptions=<?=json_encode($this->default_place_options,JSON_ENCODE_OPTIONS)?>;
+            
+            //Create places:
+            let yClusterer=new ymaps.Clusterer();
+            for (let place of places)
+               yClusterer.add(new ymaps.Placemark([place.lat,place.long],{iconContent:place.text??'',hintContent:place.hint??'',balloonContent:place.balloon},place.options??defaultPlaceOptions));
+            
+            //Adjust view area:
+            if (places.length>1)
+               mapState.bounds=yClusterer.getBounds();
+            else
+               mapState={...mapState,center:(places[0] ? [places[0].lat,places[0].long] : [55.755819,37.617644]),zoom:zoom};
+            
+            //Create map and add the places on it:
+            let yMap=new ymaps.Map(mapId,mapState,mapOptions);
+            yMap.geoObjects.add(yClusterer);
+            //Bounds hotfix:
+            if (mapState.bounds)
+               window.setTimeout(()=>{yMap.setBounds(mapState.bounds);},1000);
+            
+            //Let other scripts to access this map:
+            const boxMap=document.getElementById(mapId);  //Assign the map instance to the DOM element to support multiple maps on a single page.
+            if (boxMap)
+               boxMap.yMap=yMap;
+         }
+         ymaps.ready(mapInitCallback);
       </SCRIPT>
       <DIV <?=render_block_attributes($this->map_outer_attrs)?>><DIV ID="<?=$this->map_id?>" CLASS="inner"></DIV></DIV>
       <?php
       return ob_get_clean();
+   }
+   
+   protected function prepare_map_data(array $map_data):array
+   {
+      $res=[];
+      
+      foreach ($map_data as $place)
+      {
+         if ($place["glyph_id"])
+            $place["options"]=["iconLayout"=>"default#image","iconImageHref"=>wp_get_attachment_image_url($place["glyph_id"],"full"),"iconImageSize"=>[$place["glyph_size_w"]??20,$place["glyph_size_h"]??30],"iconImageOffset"=>[$place["glyph_offset_x"]??-10,$place["glyph_offset_y"]??0]];
+         unset($place["glyph"],$place["glyph_size_w"],$place["glyph_size_h"],$place["glyph_offset_x"],$place["glyph_offset_y"]);
+         
+         $res[]=$place;
+      }
+      
+      return $res;
    }
 }
 ?>
