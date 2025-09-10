@@ -29,21 +29,20 @@ if (version_compare(phpversion(),"8.4.0","<"))     //This is a tempopary solutio
 
 spl_autoload_register(__NAMESPACE__."\\ClassesAutoloader::callback");
 
-function plugin_init()
-{
-   //Common utility scripts for both of front and back ends:
-   // wp_enqueue_script_module("@maniacalipsis/utils/utils",plugins_url("/js_utils.js",__FILE__));
-   
-   //Backend-specific utils:
-   if (is_admin())
-   {
-      // wp_enqueue_script_module("@maniacalipsis/utils/admin_utils",plugins_url("/admin.js",__FILE__));
-      // wp_enqueue_style("@maniacalipsis/utils/admin_style",plugins_url("/admin.css",__FILE__));
-   }
-   else
-   {
-      // wp_enqueue_script_module("@maniacalipsis/utils/feedback",plugins_url("/feedback.js",__FILE__));
-   }
-}
-add_action("init",__NAMESPACE__."\\plugin_init");
+//TODO: Following code has no more use and was left as template.
+//function plugin_init()
+//{
+//   //Common utility scripts for both of front and back ends:
+//   
+//   //Backend-specific utils:
+//   if (is_admin())
+//   {
+//      //Nothing to do.
+//   }
+//   else
+//   {
+//      //Nothing to do.
+//   }
+//}
+//add_action("init",__NAMESPACE__."\\plugin_init");
 ?>

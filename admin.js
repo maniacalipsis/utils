@@ -6,7 +6,7 @@ import {
           decorateInputFieldVal,
           bindEvtInputToDeferredChange,
           reqServer,
-       } from '@maniacalipsis/utils/utils';
+       } from 'maniacalipsis/utils/utils';
 
 //Media setter ------------------------------------------------------------------------------------------------------
 export class StructuredDataList extends DynamicHTMLList

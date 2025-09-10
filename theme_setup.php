@@ -11,6 +11,8 @@
 namespace Maniacalipsis\Utilities;
 
 use \JSONAns;
+use \URLParams;
+use \ImpFInfo;
 
 class ThemeSetup
 {
@@ -33,13 +35,13 @@ class ThemeSetup
    //Format for (public|admin)_script_(modules|module_imports): ["<id>"=>"uri","<id2>"=>["src"=>"<uri2>","deps"=>[...],"version"=>"1.0"],...], where array form contains arguments for WP_Script_Modules::register() and WP_Script_Modules::enqueue().
    //NOTE: Modules from (public|admin)_script_module_imports will appear in the importmap if (and only if) there is any enqueued module that refers them in their "deps" directly or indirectly.
    public array $public_styles=[];                    //Styles will be enqueued on public pages.
-   public array $public_scripts=[];                   //Simple JS scripts will be enqueued on public pages.
-   public array $public_script_module_imports=[];     //JS modules will be just registered for public pages.
-   public array $public_script_modules=[];            //JS modules will be enqueued on public pages.
+   public array $public_scripts=[];                   //Ordinary JS scripts that will be enqueued on public pages. Format: ["handle"=>"/assets/script.js",...].
+   public array $public_importmap=[];                 //JS modules that will be listed in the importmap. Format: ["module_specifier"=>"/assets/importing_script_module.js",...].
+   public array $public_script_modules=[];            //JS modules that will be added to the pages like a simple scripts, but with attribute type="module". Format: ["handle"=>"/assets/script_module.js",...].
    public array $admin_styles=[];                     //Styles will be enqueued on admin pages.
-   public array $admin_scripts=[];                    //Simple JS scripts will be enqueued on admin pages.
-   public array $admin_script_module_imports=[];      //JS modules will be just registered for admin pages.
-   public array $admin_script_modules=[];             //JS modules will be enqueued on admin pages.
+   public array $admin_scripts=[];                    //Ordinary JS scripts will be enqueued on admin pages. Format: ["handle"=>"/assets/script.js",...].
+   public array $admin_importmap=[];                  //JS modules that will be listed in the importmap on admin pages. Format: ["module_specifier"=>"/assets/importing_script_module.js",...].
+   public array $admin_script_modules=[];             //JS modules that will be added to the admin pages like a simple scripts, but with attribute type="module". Format: ["handle"=>"/assets/script_module.js",...].
    
    public bool  $remove_category_base=true;
    
@@ -82,18 +84,18 @@ class ThemeSetup
                                   ["tag"=>"the_content","callback"=>"do_shortcode","priority"=>11],                //Enable shortcodes in content.
                                ];
       
-      $this->public_script_module_imports=[
-                                             "@maniacalipsis/utils/utils"=>$this->plugin_uri."/js_utils.js",
-                                             "@maniacalipsis/utils/feedback"=>$this->plugin_uri."/feedback.js",
-                                          ];
+      $this->public_importmap=[
+                                 "maniacalipsis/utils/utils"=>$this->plugin_uri."/js_utils.js",
+                                 "maniacalipsis/utils/feedback"=>$this->plugin_uri."/feedback.js",
+                              ];
       
       $this->admin_styles=[
-                             "@maniacalipsis/utils/admin_style"=>$this->plugin_uri."/admin.css",
+                             "maniacalipsis/utils/admin_style"=>$this->plugin_uri."/admin.css",
                           ];
-      $this->admin_script_module_imports=[
-                                            "@maniacalipsis/utils/utils"=>$this->plugin_uri."/js_utils.js",
-                                            "@maniacalipsis/utils/admin"=>$this->plugin_uri."/admin.js",
-                                         ];
+      $this->admin_importmap=[
+                                "maniacalipsis/utils/utils"=>$this->plugin_uri."/js_utils.js",
+                                "maniacalipsis/utils/admin"=>$this->plugin_uri."/admin.js",
+                             ];
    }
    
    public function remove_action(string $tag_,array|string|callable $callback_,?int $priority_=null,?int $argc_=null):void
@@ -197,30 +199,31 @@ class ThemeSetup
          wp_dequeue_script($asset_key);
       
       //Add public styles and scripts:
-      $theme_url=get_stylesheet_directory_uri();
-      
       foreach ($this->public_styles as $asset_key=>$asset_url)
-         wp_enqueue_style($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
-      
-      $wp_script_modules=wp_script_modules();
-      foreach ($this->public_script_modules as $asset_key=>$asset_def)
-         $wp_script_modules->enqueue($asset_key,...$this->unify_asset_definition($asset_def));
+         wp_enqueue_style($asset_key,$this->render_asset_url($asset_url));
       
       foreach ($this->public_scripts as $asset_key=>$asset_url)
-         wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
+         wp_enqueue_script($asset_key,$this->render_asset_url($asset_url));
    }
    
    public function wp_head_callback():void
    {
-      //Add importmap for js modules:
-      //NOTE: WP's native JS modules API has dumb behaviour (actual for 6.8.2): 
+      //Add JS importmap and modules:
+      //NOTE: WP's native JS modules API has dumb behaviour (actual for 6.8.2):
       //       1) It sets aside all modules that are not mentioned (directly or indirectly) in the "deps" of enqueued ones. This ruins all idea of an importmap which is to let the browser to manage the loading of JS files. 
       //          Such behaviour is bug-prone and leads to occasional bugs when use inline script modules. If inline script module "A" imports something from module "B" in b.js (which is only registered but not enqueued) and no enqueued modules depends on "B" (directly or indirectly), then it will not appear in the importmap , so the "A" will fail to import from "B".
       //       2) It use wp_is_block_theme() to choose where to output the importmap: in the header or in the footer. Why a non-block themes was not honored to have an importmap in the header is completely beyond comprehension.
+      
+      //Render importmap:
       $js_map=new JSONAns(["imports"=>[]]);
-      foreach ($this->public_script_module_imports as $key=>$entry)
-         $js_map["imports"][$key]=(is_array($entry) ? $entry["src"] : $entry);
+      foreach ($this->public_importmap as $module_specifier=>$module_url)
+         $js_map["imports"][$module_specifier]=$this->render_asset_url($module_url);
+      
       echo "\n<SCRIPT TYPE=\"importmap\">$js_map</SCRIPT>\n";
+      
+      //Render linked JS modules:
+      foreach ($this->public_script_modules as $asset_key=>$asset_url)
+         echo "\n<SCRIPT TYPE=\"module\" SRC=\"".htmlspecialchars($this->render_asset_url($asset_url))."\"></SCRIPT>\n";   //These modules will be executed at the point where they appear on the page (like inline and ordinary scripts), so they should be rendered after the importmap to be able to import from the mapped modiles.
    }
    
    public function init_settings_callback():void
@@ -260,10 +263,6 @@ class ThemeSetup
       foreach ($this->admin_styles as $asset_key=>$asset_url)
          wp_enqueue_style($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
       
-      $wp_script_modules=wp_script_modules();
-      foreach ($this->admin_script_modules as $asset_key=>$asset_def)
-         $wp_script_modules->enqueue($asset_key,...$this->unify_asset_definition($asset_def));
-      
       foreach ($this->admin_scripts as $asset_key=>$asset_url)
          wp_enqueue_script($asset_key,(preg_match("/^http(s)?:/i",$asset_url) ? $asset_url : $theme_url.$asset_url));
       
@@ -276,15 +275,22 @@ class ThemeSetup
    
    public function admin_head_callback():void
    {
-      //Add importmap for js modules:
+      //Add JS importmap and modules:
       //NOTE: WP's native JS modules API has dumb behaviour (actual for 6.8.2): 
       //       1) It sets aside all modules that are not mentioned (directly or indirectly) in the "deps" of enqueued ones. This ruins all idea of an importmap which is to let the browser to manage the loading of JS files. 
       //          Such behaviour is bug-prone and leads to occasional bugs when use inline script modules. If inline script module "A" imports something from module "B" in b.js (which is only registered but not enqueued) and no enqueued modules depends on "B" (directly or indirectly), then it will not appear in the importmap , so the "A" will fail to import from "B".
       //       2) It use wp_is_block_theme() to choose where to output the importmap: in the header or in the footer. Why a non-block themes was not honored to have an importmap in the header is completely beyond comprehension.
+      
+      //Render importmap:
       $js_map=new JSONAns(["imports"=>[]]);
-      foreach ($this->admin_script_module_imports as $key=>$entry)
-         $js_map["imports"][$key]=(is_array($entry) ? $entry["src"] : $entry);
+      foreach ($this->admin_importmap as $module_specifier=>$module_url)
+         $js_map["imports"][$module_specifier]=$this->render_asset_url($module_url);
+      
       echo "\n<SCRIPT TYPE=\"importmap\">$js_map</SCRIPT>\n";
+      
+      //Render linked JS modules:
+      foreach ($this->admin_script_modules as $asset_key=>$asset_url)
+         echo "\n<SCRIPT TYPE=\"module\" SRC=\"".htmlspecialchars($this->render_asset_url($asset_url))."\"></SCRIPT>\n";   //These modules will be executed at the point where they appear on the page (like inline and ordinary scripts), so they should be rendered after the importmap to be able to import from the mapped modiles.
    }
    
    public function plugin_actions_callback(array $actions_,string $plugin_file_,array $plugin_data_,$context_):array
@@ -298,16 +304,14 @@ class ThemeSetup
       return $actions_;
    }
    
-   protected function unify_asset_definition(string|array $asset_def_):array
+   protected function render_asset_url(string|array|URLParams|ImpFInfo $asset_url_):string
    {
-      //Make asset definitions uniform and also makes their URI absolute.
-      
-      $res=(is_array($asset_def_) ? $asset_def_ : ["src"=>$asset_def_]);
-      
-      if (!preg_match("/^http(s)?:/i",$res["src"]))
-         $res["src"]=$this->theme_url.$res["src"];
-      
-      return $res;
+      return match (true)
+             {
+                is_array($asset_url_)           =>(preg_match("/^http(s)?:/i",$asset_url_["src"]) ? $asset_url_["src"] : $this->theme_url.$asset_url_["src"]),
+                $asset_url_ instanceof URLParams=>(string)$asset_url_,  //TODO: Draft. Experimental.
+                default                         =>(preg_match("/^http(s)?:/i",$asset_url_) ? $asset_url_ : $this->theme_url.$asset_url_),
+             };
    }
 }
 
