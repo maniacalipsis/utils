@@ -214,6 +214,14 @@ class ThemeSetup
       //          Such behaviour is bug-prone and leads to occasional bugs when use inline script modules. If inline script module "A" imports something from module "B" in b.js (which is only registered but not enqueued) and no enqueued modules depends on "B" (directly or indirectly), then it will not appear in the importmap , so the "A" will fail to import from "B".
       //       2) It use wp_is_block_theme() to choose where to output the importmap: in the header or in the footer. Why a non-block themes was not honored to have an importmap in the header is completely beyond comprehension.
       
+      //Render global constants:
+      ?>
+      <SCRIPT>
+         const ajaxurl='<?=admin_url("admin-ajax.php")?>'; //Define AJAX URL for public-side JS that makes an XHR requests. If user is authorized in wp-admin, WP defines this variable within wp_head(). The URL itself is the same for both public and admin requests.
+         const themeURL='<?=get_stylesheet_directory_uri();?>';
+      </SCRIPT>
+      <?php
+      
       //Render importmap:
       $js_map=new JSONAns(["imports"=>[]]);
       foreach ($this->public_importmap as $module_specifier=>$module_url)
