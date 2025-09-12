@@ -338,7 +338,7 @@ class InputStruct extends InputJson
          <DIV CLASS="items"></DIV>
          <BUTTON TYPE="button" CLASS="add" TITLE="<?=__("Add")?>">+</BUTTON>
          <SCRIPT TYPE="module">
-            import {StructuredDataList} from '@maniacalipsis/utils/admin';
+            import {StructuredDataList} from 'maniacalipsis/utils/admin';
             <?php if ($this->item_class["from"]??null):?>
             import {<?=$this->item_class["name"]?>} from '<?=$this->item_class["from"]?>';
             <?php endif;?>
@@ -356,7 +356,7 @@ class InputPlaceMarks extends InputStruct
       parent::__construct($params_);
       
       $this->container_class_name.=" placemarks";
-      $this->item_class=["name"=>"PlaceMarkDataNode","from"=>"@maniacalipsis/utils/admin"];
+      $this->item_class=["name"=>"PlaceMarkDataNode","from"=>"maniacalipsis/utils/admin"];
    }
 }
 
@@ -367,7 +367,7 @@ class InputMedia extends InputStruct
       parent::__construct($params_);
       
       $this->container_class_name.=" placemarks";
-      $this->item_class=["name"=>"MediaDataNode","from"=>"@maniacalipsis/utils/admin"];
+      $this->item_class=["name"=>"MediaDataNode","from"=>"maniacalipsis/utils/admin"];
    }   
 }
 
