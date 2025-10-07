@@ -3746,7 +3746,7 @@ export class Scroller
    //Animates a scroller.
    //Usage:
    // Typical HTML layout is:
-   //    <DIV CLASS="scroller" DATA-SHORTCUTS="{left:[{type:'wheel',val:-1}],right:[{type:'wheel',val:1}],drag:[{type:'touchmove'},{type:'mousemove',val:5}]}" DATA-SPEED="100%" DATA-CYCLED="true">
+   //    <DIV CLASS="scroller" DATA-SHORTCUTS="{left:[{type:'wheel',val:-1}],right:[{type:'wheel',val:1}],drag:[{type:'touchmove'},{type:'mousemove',val:5}]}" DATA-step="100%" DATA-CYCLED="true">
    //      <DIV CLASS="area">
    //        <DIV CLASS="content">
    //          <!-- here are the payload of the scroller -->
@@ -3760,11 +3760,11 @@ export class Scroller
    //    div.area - an area where the content moves. This block must be positioned relatively or absolutely and typically has a hidden overflow.
    //    div.content - container for something that needs to be scrolled. If the area is positioned relatively the content must be positioned absolutely, if the area is positioned absolutely the content may be positioned both of absolutely or relatively.
    //                  NOTE: use of justify-content:center; for this block will result in it being incorrectly positioned.
-   //    div.button - a click listeners that will scroll the content on amount of SPEED.
+   //    div.button - a click listeners that will scroll the content on amount of step.
    // Params:
    //    node_ - the main scroller container. All scroller presets may be set via its DATA-... attributes.
    //       data-shortcuts - shortcuts parameters. See class ShortcutsList for details.
-   //       data-speed - mixed. Speed is distance which content block covers per iteration. It may be defined in px, em, vw, vh or %. The % are counted from the current area width. For other units conversion details see the function toPixels().
+   //       data-step - mixed. step is distance which content block covers per iteration. It may be defined in px, em, vw, vh or %. The % are counted from the current area width. For other units conversion details see the function toPixels().
    //       data-cycled - boolean. If true the scrolling will be infinite, if false it will stop when the content end reaches the same end of the area.
    //       data-interval - interval of autoscrolling iterations in msec.
    // The buttons are optional.
@@ -3777,7 +3777,7 @@ export class Scroller
       {
          
          //Init params
-         this.speed        =params_?.speed??this._root.dataset.speed??this.speed;
+         this.step        =params_?.step??this._root.dataset.step??this.step;
          this.cycled       =toBool(params_?.cycled??this._root.dataset.cycled??this.cycled);
          this._handle=params_?.handle??this._root.dataset.handle?.split(',')??this._handle;
          this.stopTreshold =parseInt(params_?.stopTreshold??this._root.dataset.stopTreshold??this.stopTreshold);
@@ -3816,7 +3816,7 @@ export class Scroller
             img.addEventListener('load',(e_)=>{this.recalcContentSize();});   //For the case of lazy/late image loading. (Some images may be loaded lately, so content size calculation right at DOMContentLoaded may give incorrect results.)
          
          if (this._buttons.left)
-            this._buttons.left.addEventListener('click',function(e_){this.scroller.scroll(-1); return cancelEvent(e_);});
+            this._buttons.left.addEventListener('click',function(e_){this.scroller.scroll(-this.step); return cancelEvent(e_);});
          if (this._buttons.right)
             this._buttons.right.addEventListener('click',function(e_){this.scroller.scroll(+1); return cancelEvent(e_);});
          
@@ -3856,7 +3856,7 @@ export class Scroller
    }
    
    //public props
-   speed='33%';      //Scrolling speed (affects scrolling by cklicking on buttons and by mouse wheel scrolling).
+   step='33%';      //Scrolling step (affects scrolling by cklicking on buttons and by mouse wheel scrolling).
    cycled=false;     //If true, when reaching the end/start, scrolling will continue from the opposite. If false scrolling will stop.
    stopTreshold=10;  //The end/start detection treshold.
    get interval(){return this._interval;}
@@ -3884,10 +3884,10 @@ export class Scroller
    //public methods
    scroll(ort_)
    {
-      //Scroll in left or right direction, using the speed parameter to get scrolling amount
+      //Scroll in left or right direction, using the step parameter to get scrolling amount
       
       if (ort_!=0)   //ort_ should be -1 or +1.
-         this.scrollBy((ort_*parseFloat(this.speed))+mUnit(this.speed));
+         this.scrollBy((ort_*parseFloat(this.step))+mUnit(this.step));
    }
    
    scrollBy(deltaX_,from_start_)
@@ -4512,8 +4512,8 @@ export function _experimental_cloneOverriden(default_,actual_,options_)
               )
       {
          //Prepare to access elements uniformly:
-         const mapDefault=(default_ instanceof Map ? default_ : new Map(Object.entries(default_)));
-         const mapActual =(actual_  instanceof Map ? actual_  : new Map(Object.entries(actual_ )));
+         const mapDefault=((default_ instanceof Map)||(default_ instanceof FormData) ? default_ : new Map(Object.entries(default_)));
+         const mapActual =((actual_  instanceof Map)||(actual_  instanceof FormData) ? actual_  : new Map(Object.entries(actual_ )));
          const keys=(new Set(mapDefault.keys())).union(new Set(mapActual.keys()));
          
          //Create an empty map-like instance (if possible):
@@ -4548,7 +4548,7 @@ export function _experimental_cloneOverriden(default_,actual_,options_)
                if (res.constructor.name=='Object')
                   res[key]=resVal;
                else
-                  res.set(resVal);
+                  res.set(key,resVal);
             }
          }
       }
@@ -4749,8 +4749,8 @@ export class CSSSize
    constructor(size_,...args_)
    {
       //Arguments format:
-      // new CSSSize('10em'[,'x'][,boxMain]);
-      // new CSSSize(10,'em'[,'x'][,boxMain]);
+      // new CSSSize('10em'[,boxMain][,'x']);
+      // new CSSSize(10,'em'[,boxMain][,'x']);
       
       //Get Size value and measurement unit:
       if (typeof size_ =='number')
@@ -4768,12 +4768,12 @@ export class CSSSize
       }
       
       //Get axis:
-      if (typeof args_[0] =='string')
-         this._axis=args_.shift();
+      if (args_[0] instanceof HTMLElement)
+         this._context.element=args_.shift();
       
       //Get context element:
-      if (args_[0] instanceof HTMLElement)
-         this._context=args_[0];
+      if (typeof args_[0] =='string')
+         this._context.axis=args_[0];
    }
    
    //public props
@@ -4787,10 +4787,9 @@ export class CSSSize
    set unit(newVal_){let oldPixels=this.pixels; this._unit=newVal_; this.pixels=oldPixels;}  //Assign a new unit and teh value will be converted to it.
    
    //protected props
-   _value=null;            //The value in the given unit.
-   _unit='px';             //The measurement unit.
-   _axis='x';              //An axis is required to convert percents.
-   _context=document.body; //A reference HTMLElement. It used to get font size and dimensions for uniot conversion.
+   _value=null;                                 //The value in the given unit.
+   _unit='px';                                  //The measurement unit.
+   _context={element:document.body,axis:'x'};   //Unit conversion context: element - reference HTMLElement, used to obtain font size and dimensions; axis - 'x'|'y' axis, required to resolve size given as percentage.
    
    toUnitConverted(unit_)
    {
